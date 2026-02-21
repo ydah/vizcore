@@ -13,10 +13,11 @@ module E2EServerHelper
 
     attr_reader :host, :port
 
-    def initialize(scene_name:, host: "127.0.0.1")
+    def initialize(scene_name:, host: "127.0.0.1", broadcaster_options: {})
       @host = host
       @port = reserve_port
       @scene_name = scene_name
+      @broadcaster_options = broadcaster_options
       @server = nil
       @broadcaster = nil
     end
@@ -27,7 +28,7 @@ module E2EServerHelper
       @server.add_tcp_listener(host, port)
       @server.run
 
-      @broadcaster = Vizcore::Server::FrameBroadcaster.new(scene_name: @scene_name)
+      @broadcaster = Vizcore::Server::FrameBroadcaster.new(scene_name: @scene_name, **@broadcaster_options)
       @broadcaster.start
 
       wait_until_ready!
