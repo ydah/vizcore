@@ -1,13 +1,16 @@
 # frozen_string_literal: true
 
+require_relative "../audio"
+
 module Vizcore
   module Server
     class FrameBroadcaster
       FRAME_RATE = 60.0
       FRAME_INTERVAL = 1.0 / FRAME_RATE
 
-      def initialize(scene_name: "basic")
+      def initialize(scene_name: "basic", input_manager: nil)
         @scene_name = scene_name
+        @input_manager = input_manager || Vizcore::Audio::InputManager.new(source: :mic)
         @running = false
         @thread = nil
         @beat_count = 0
@@ -16,6 +19,7 @@ module Vizcore
       def start
         return if running?
 
+        @input_manager.start
         @running = true
         started_at = monotonic_time
         @thread = Thread.new { run_loop(started_at) }
@@ -28,32 +32,30 @@ module Vizcore
         thread = @thread
         @thread = nil
         thread&.join(1.0)
+        @input_manager.stop
       end
 
       def running?
         @running
       end
 
-      def build_frame(elapsed_seconds)
-        amplitude = ((Math.sin(elapsed_seconds * 2.0) + 1.0) / 2.0).clamp(0.0, 1.0)
-        bass = ((Math.sin(elapsed_seconds * 1.1) + 1.0) / 2.0).clamp(0.0, 1.0)
-        mid = ((Math.sin(elapsed_seconds * 1.7 + 1.2) + 1.0) / 2.0).clamp(0.0, 1.0)
-        high = ((Math.sin(elapsed_seconds * 2.3 + 2.5) + 1.0) / 2.0).clamp(0.0, 1.0)
+      def build_frame(_elapsed_seconds, samples = nil)
+        audio_samples = samples || capture_samples
+        amplitude = rms(audio_samples)
+        bands = split_bands(audio_samples)
+        bass = bands[:low]
+        mid = bands[:mid]
+        high = bands[:high]
 
-        beat = amplitude > 0.96
+        beat = amplitude > 0.72
         @beat_count += 1 if beat
 
         {
           timestamp: Time.now.to_f,
           audio: {
             amplitude: amplitude.round(4),
-            bands: {
-              sub: (bass * 0.75).round(4),
-              low: bass.round(4),
-              mid: mid.round(4),
-              high: high.round(4)
-            },
-            fft: Array.new(32) { |index| ((Math.sin(elapsed_seconds + index * 0.2) + 1.0) / 2.0).round(4) },
+            bands: bands.transform_values { |value| value.round(4) },
+            fft: fft_preview(audio_samples),
             beat: beat,
             beat_count: @beat_count,
             bpm: 128.0
@@ -81,7 +83,8 @@ module Vizcore
         while running?
           loop_started = monotonic_time
           elapsed = loop_started - started_at
-          frame = build_frame(elapsed)
+          samples = capture_samples
+          frame = build_frame(elapsed, samples)
           WebSocketHandler.broadcast(type: "audio_frame", payload: frame)
 
           duration = monotonic_time - loop_started
@@ -92,6 +95,48 @@ module Vizcore
 
       def monotonic_time
         Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      end
+
+      def capture_samples
+        samples = @input_manager.capture_frame
+        samples.empty? ? Array.new(@input_manager.frame_size, 0.0) : samples
+      rescue StandardError
+        Array.new(1024, 0.0)
+      end
+
+      def split_bands(samples)
+        abs = samples.map { |sample| sample.abs.clamp(0.0, 1.0) }
+        chunk_size = [abs.length / 4, 1].max
+        sub = average(abs[0, chunk_size]) * 0.7
+        low = average(abs[chunk_size, chunk_size])
+        mid = average(abs[chunk_size * 2, chunk_size])
+        high = average(abs[chunk_size * 3, chunk_size])
+
+        { sub: sub, low: low, mid: mid, high: high }
+      end
+
+      def fft_preview(samples)
+        values = samples.map { |sample| sample.abs.clamp(0.0, 1.0) }
+        step = [values.length / 32, 1].max
+
+        Array.new(32) do |index|
+          window = values[index * step, step]
+          average(window).round(4)
+        end
+      end
+
+      def rms(samples)
+        return 0.0 if samples.empty?
+
+        sum = samples.reduce(0.0) { |acc, sample| acc + (sample * sample) }
+        Math.sqrt(sum / samples.length.to_f).clamp(0.0, 1.0)
+      end
+
+      def average(values)
+        normalized = Array(values).compact
+        return 0.0 if normalized.empty?
+
+        normalized.sum / normalized.length.to_f
       end
     end
   end

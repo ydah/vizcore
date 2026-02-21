@@ -4,6 +4,7 @@ require "fileutils"
 require "pathname"
 require "thor"
 require_relative "../vizcore"
+require_relative "audio"
 require_relative "config"
 require_relative "server"
 
@@ -61,14 +62,20 @@ module Vizcore
 
     def print_audio_devices
       say("Audio devices:")
-      say("  - default (placeholder)")
-      say("  - usb-audio (placeholder)")
+      Vizcore::Audio::InputManager.available_audio_devices.each do |device|
+        index = device[:index]
+        name = device[:name]
+        channels = device[:max_input_channels]
+        sample_rate = device[:default_sample_rate]
+        say("  - #{index}: #{name} (inputs=#{channels}, rate=#{sample_rate})")
+      end
     end
 
     def print_midi_devices
       say("MIDI devices:")
-      say("  - launchpad (placeholder)")
-      say("  - virtual-midi (placeholder)")
+      Vizcore::Audio::InputManager.available_midi_devices.each do |device|
+        say("  - #{device[:name]}")
+      end
     end
   end
 end
