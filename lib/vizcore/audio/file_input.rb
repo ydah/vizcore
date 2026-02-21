@@ -37,7 +37,7 @@ module Vizcore
 
         samples = []
         WaveFile::Reader.new(@path).each_buffer(1024) do |buffer|
-          mono = if buffer.format.channels == 1
+          mono = if buffer.channels == 1
                    buffer.samples
                  else
                    buffer.samples.map { |frame| frame.is_a?(Array) ? frame.sum / frame.length.to_f : frame }

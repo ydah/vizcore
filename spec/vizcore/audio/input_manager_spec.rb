@@ -3,6 +3,8 @@
 require "vizcore/audio/input_manager"
 
 RSpec.describe Vizcore::Audio::InputManager do
+  let(:fixture_path) { Vizcore.root.join("spec", "fixtures", "audio", "pulse16_mono.wav").to_s }
+
   describe "#capture_frame" do
     it "captures frame-size samples and stores them in the ring buffer" do
       manager = described_class.new(source: :dummy, frame_size: 16, ring_buffer_size: 32)
@@ -24,6 +26,15 @@ RSpec.describe Vizcore::Audio::InputManager do
       expect(manager.capture_frame).to eq(Array.new(8, 0.0))
     ensure
       manager.stop
+    end
+
+    it "reads samples from a WAV file source" do
+      manager = described_class.new(source: :file, file_path: fixture_path, frame_size: 4)
+      manager.start
+
+      expect(manager.capture_frame).to eq([0.0, 12_000.0, -12_000.0, 24_000.0])
+    ensure
+      manager&.stop
     end
   end
 
