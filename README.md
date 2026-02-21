@@ -65,6 +65,10 @@ bundle exec rspec
 - Runtime components emit contextual error logs (for example scene reload and MIDI runtime failures).
 - Audio inputs keep diagnostic state in `last_error` while preserving fallback behavior (silence/dummy source).
 
+## Cross-Platform Validation
+
+- Cross-platform smoke verification and artifact format are documented in `docs/CROSS_PLATFORM_TESTING.md`.
+
 ## Gem Packaging Policy
 
 - Runtime files only are packaged in the gem: `lib/`, `exe/`, `frontend/index.html`, `frontend/src/`, `examples/`, `sig/`, `README.md`, `GETTING_STARTED.md`, `LICENSE.txt`.
