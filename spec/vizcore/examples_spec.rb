@@ -3,6 +3,7 @@
 require "vizcore/dsl/engine"
 require "vizcore/dsl/mapping_resolver"
 require "vizcore/dsl/shader_source_resolver"
+require "vizcore/dsl/transition_controller"
 require "vizcore/renderer/scene_serializer"
 
 RSpec.describe "example scenes" do
@@ -46,6 +47,20 @@ RSpec.describe "example scenes" do
 
       expect(frame.dig(:scene, :layers)).not_to be_empty
       expect(frame.dig(:scene, :layers, 0, :name)).to be_a(String)
+
+      if path == "examples/intro_drop.rb"
+        transition_controller = Vizcore::DSL::TransitionController.new(
+          scenes: resolved_definition[:scenes],
+          transitions: resolved_definition[:transitions]
+        )
+        transition = transition_controller.next_transition(
+          scene_name: :intro,
+          audio: audio.merge(beat: false, beat_count: 0),
+          frame_count: 360
+        )
+        expect(transition).not_to be_nil
+        expect(transition[:to]).to eq(:drop)
+      end
 
       next unless expectation[:expect_glsl_source]
 

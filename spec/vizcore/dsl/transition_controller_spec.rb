@@ -46,5 +46,27 @@ RSpec.describe Vizcore::DSL::TransitionController do
 
       expect(controller.next_transition(scene_name: :intro, audio: {})).to be_nil
     end
+
+    it "exposes frame_count to transition trigger context" do
+      controller = described_class.new(
+        scenes: [
+          { name: :intro, layers: [] },
+          { name: :drop, layers: [] }
+        ],
+        transitions: [
+          {
+            from: :intro,
+            to: :drop,
+            trigger: proc { frame_count >= 3 }
+          }
+        ]
+      )
+
+      expect(controller.next_transition(scene_name: :intro, audio: {}, frame_count: 2)).to be_nil
+      expect(controller.next_transition(scene_name: :intro, audio: {}, frame_count: 3)).to include(
+        from: :intro,
+        to: :drop
+      )
+    end
   end
 end

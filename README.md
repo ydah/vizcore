@@ -76,7 +76,7 @@ vizcore start examples/midi_scene_switch.rb --audio-source dummy
 vizcore start examples/custom_shader.rb --audio-source dummy
 ```
 
-For beat-sensitive transitions (like `intro_drop`), file input with a rhythmic track is recommended.
+`intro_drop` automatically falls back to a time-based transition after about 6 seconds when beats are not detected (for example with `dummy` source). Use file input for beat-synced transitions.
 
 Re-generate demo assets with:
 
