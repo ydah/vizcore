@@ -44,7 +44,7 @@ module Vizcore
         headers = {
           "content-type" => Rack::Mime.mime_type(File.extname(full_path), "text/plain"),
           "content-length" => body.bytesize.to_s,
-          "cache-control" => "no-cache"
+          "cache-control" => "no-store, max-age=0, must-revalidate"
         }
         [200, headers, [body]]
       end
