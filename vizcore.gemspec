@@ -31,6 +31,7 @@ Gem::Specification.new do |spec|
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
+  spec.add_dependency "ffi", "~> 1.17"
   spec.add_dependency "faye-websocket", "~> 0.11"
   spec.add_dependency "puma", "~> 6.0"
   spec.add_dependency "rack", "~> 2.2.0"
