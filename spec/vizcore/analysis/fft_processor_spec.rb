@@ -31,9 +31,38 @@ RSpec.describe Vizcore::Analysis::FFTProcessor do
     end
   end
 
+  it "uses the ruby backend when explicitly requested" do
+    processor = described_class.new(sample_rate: 44_100, fft_size: 1024, backend: :ruby)
+
+    expect(processor.backend_name).to eq(:ruby)
+  end
+
+  it "falls back to ruby backend for auto when fftw is unavailable" do
+    allow(described_class).to receive(:fftw_available?).and_return(false)
+    processor = described_class.new(sample_rate: 44_100, fft_size: 1024, backend: :auto)
+
+    expect(processor.backend_name).to eq(:ruby)
+    result = processor.call(sine_samples(frequency_hz: 220.0, sample_rate: 44_100, count: 1024))
+    expect(result[:peak_bin]).to be > 0
+  end
+
+  it "raises when fftw backend is explicitly selected but unavailable" do
+    allow(described_class).to receive(:fftw_available?).and_return(false)
+
+    expect do
+      described_class.new(backend: :fftw)
+    end.to raise_error(ArgumentError, /fftw backend is unavailable/)
+  end
+
   it "raises for unsupported window" do
     expect do
       described_class.new(window: :invalid)
     end.to raise_error(ArgumentError)
+  end
+
+  it "raises for unsupported backend" do
+    expect do
+      described_class.new(backend: :invalid)
+    end.to raise_error(ArgumentError, /unsupported backend/)
   end
 end
