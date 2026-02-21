@@ -1,5 +1,6 @@
 import { getBuiltinShader } from "../shaders/builtins.js";
 import { buildWireframeLines, estimateDeformFromSpectrum } from "../visuals/geometry.js";
+import { ParticleSystem } from "../visuals/particle-system.js";
 import { FULLSCREEN_VERTEX_SHADER } from "./shader-manager.js";
 
 const GEOMETRY_VERTEX_SHADER = `#version 300 es
@@ -38,6 +39,7 @@ export class LayerManager {
     );
     this.geometryPositionLocation = this.gl.getAttribLocation(this.geometryProgram, "a_position");
     this.geometryColorLocation = this.gl.getUniformLocation(this.geometryProgram, "u_color");
+    this.particleSystem = new ParticleSystem(this.gl, this.shaderManager);
 
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.fullscreenBuffer);
     this.gl.bufferData(this.gl.ARRAY_BUFFER, FULLSCREEN_VERTICES, this.gl.STATIC_DRAW);
@@ -46,7 +48,9 @@ export class LayerManager {
   renderScene({ layers, audio, time, rotation, resolution }) {
     const layerList = Array.isArray(layers) && layers.length > 0 ? layers : [defaultLayer(audio)];
     for (const layer of layerList) {
-      if (isShaderLayer(layer)) {
+      if (isParticleLayer(layer)) {
+        this.renderParticleLayer(layer, audio, time);
+      } else if (isShaderLayer(layer)) {
         this.renderShaderLayer(layer, audio, time, resolution);
       } else {
         this.renderGeometryLayer(layer, audio, rotation);
@@ -120,6 +124,17 @@ export class LayerManager {
     gl.drawArrays(gl.LINES, 0, points.length / 2);
   }
 
+  renderParticleLayer(layer, audio, time) {
+    const params = layer?.params || {};
+    this.particleSystem.render({
+      count: Number(params.count || 2400),
+      speed: Number(params.speed || audio?.amplitude || 0),
+      size: Number(params.size || 2.0),
+      audio,
+      time
+    });
+  }
+
   setUniform1f(program, uniformName, value) {
     const location = this.gl.getUniformLocation(program, uniformName);
     if (location === null) {
@@ -140,6 +155,11 @@ export class LayerManager {
 const isShaderLayer = (layer) => {
   const type = String(layer?.type || "").toLowerCase();
   return type === "shader" || !!layer?.shader || !!layer?.glsl;
+};
+
+const isParticleLayer = (layer) => {
+  const type = String(layer?.type || "").toLowerCase();
+  return type === "particle_field" || type === "particles" || type === "particle";
 };
 
 const defaultLayer = (audio) => ({
