@@ -69,6 +69,12 @@ bundle exec rspec
 
 - Cross-platform smoke verification and artifact format are documented in `docs/CROSS_PLATFORM_TESTING.md`.
 
+## Release Process
+
+- Release checklist: `docs/RELEASE.md`
+- Demo capture checklist (README embed asset prep): `docs/DEMO_CAPTURE.md`
+- Changelog: `CHANGELOG.md`
+
 ## Gem Packaging Policy
 
 - Runtime files only are packaged in the gem: `lib/`, `exe/`, `frontend/index.html`, `frontend/src/`, `examples/`, `sig/`, `README.md`, `GETTING_STARTED.md`, `LICENSE.txt`.
