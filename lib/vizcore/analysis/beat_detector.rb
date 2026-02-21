@@ -2,9 +2,14 @@
 
 module Vizcore
   module Analysis
+    # Detects beat onsets using short-term energy thresholding.
     class BeatDetector
       attr_reader :beat_count
 
+      # @param history_size [Integer] number of historical frames to keep
+      # @param sensitivity [Float] multiplier applied to moving average energy
+      # @param refractory_frames [Integer] minimum frames between beat events
+      # @param min_history [Integer] minimum history size before detecting beats
       def initialize(history_size: 43, sensitivity: 1.35, refractory_frames: 4, min_history: 8)
         @history_size = Integer(history_size)
         @sensitivity = Float(sensitivity)
@@ -16,6 +21,8 @@ module Vizcore
         @beat_count = 0
       end
 
+      # @param samples [Array<Numeric>] PCM frame samples
+      # @return [Hash] beat flag and detector internals
       def call(samples)
         instant_energy = frame_energy(samples)
         average_energy = average(@energy_history)

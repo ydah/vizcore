@@ -2,9 +2,16 @@
 
 module Vizcore
   module Analysis
+    # End-to-end analysis pipeline from PCM samples to renderer-ready features.
     class Pipeline
       attr_reader :fft_processor, :band_splitter, :beat_detector, :bpm_estimator, :smoother
 
+      # @param sample_rate [Integer]
+      # @param fft_size [Integer]
+      # @param window [Symbol]
+      # @param beat_detector [Vizcore::Analysis::BeatDetector, nil]
+      # @param bpm_estimator [Vizcore::Analysis::BPMEstimator, nil]
+      # @param smoother [Vizcore::Analysis::Smoother, nil]
       def initialize(sample_rate: 44_100, fft_size: 1024, window: :hamming, beat_detector: nil, bpm_estimator: nil, smoother: nil)
         @fft_processor = FFTProcessor.new(sample_rate: sample_rate, fft_size: fft_size, window: window)
         @band_splitter = BandSplitter.new(sample_rate: sample_rate, fft_size: fft_size)
@@ -14,6 +21,8 @@ module Vizcore
         @smoother = smoother || Smoother.new(alpha: 0.35)
       end
 
+      # @param samples [Array<Numeric>] audio frame samples
+      # @return [Hash] normalized analysis payload consumed by frame broadcaster
       def call(samples)
         fft = @fft_processor.call(samples)
         bands = @band_splitter.call(fft[:magnitudes])

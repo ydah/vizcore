@@ -2,9 +2,16 @@
 
 module Vizcore
   module Analysis
+    # Estimates tempo (BPM) from beat onsets using lag autocorrelation.
     class BPMEstimator
       attr_reader :frame_rate
 
+      # @param frame_rate [Float] analysis frames per second
+      # @param min_bpm [Float] minimum candidate BPM
+      # @param max_bpm [Float] maximum candidate BPM
+      # @param history_seconds [Float] history duration used for autocorrelation
+      # @param smoothing [Float] EMA factor for stable BPM output
+      # @param min_onsets [Integer] minimum onsets before estimation
       def initialize(frame_rate:, min_bpm: 60.0, max_bpm: 200.0, history_seconds: 10.0, smoothing: 0.25, min_onsets: 4)
         @frame_rate = Float(frame_rate)
         @min_bpm = Float(min_bpm)
@@ -16,6 +23,8 @@ module Vizcore
         @current_bpm = 0.0
       end
 
+      # @param beat [Boolean] whether the current frame contains a beat onset
+      # @return [Float] smoothed BPM estimate
       def call(beat:)
         @history << (beat ? 1.0 : 0.0)
         @history.shift while @history.length > @history_size

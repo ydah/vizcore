@@ -8,6 +8,7 @@ module Vizcore
   module DSL
     # Evaluates and stores scene definitions built with the Vizcore Ruby DSL.
     class Engine
+      # Thread-local key used when evaluating scene files.
       THREAD_KEY = :vizcore_current_dsl_engine
 
       class << self
@@ -191,12 +192,17 @@ module Vizcore
         end
       end
 
+      # Builder object for `transition` block internals.
+      # @api private
       class TransitionBuilder
         def initialize
           @effect = nil
           @trigger = nil
         end
 
+        # @param name [Symbol, String] transition effect name
+        # @param options [Hash] effect options
+        # @return [void]
         def effect(name, **options)
           @effect = {
             name: name.to_sym,
@@ -204,10 +210,13 @@ module Vizcore
           }
         end
 
+        # @yield Trigger predicate executed in transition context
+        # @return [void]
         def trigger(&block)
           @trigger = block
         end
 
+        # @return [Hash] serialized transition extras
         def to_h
           output = {}
           output[:effect] = @effect if @effect

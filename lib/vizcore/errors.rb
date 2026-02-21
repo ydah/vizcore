@@ -13,9 +13,13 @@ module Vizcore
   # Frame generation failed in the render pipeline.
   class FrameBuildError < StandardError; end
 
+  # Small helper for concise contextual error messages.
   module ErrorFormatting
     module_function
 
+    # @param error [Exception]
+    # @param context [String]
+    # @return [String]
     def summarize(error, context:)
       "#{context}: #{error.class}: #{error.message}"
     end

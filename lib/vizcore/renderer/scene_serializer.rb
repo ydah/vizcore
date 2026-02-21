@@ -2,7 +2,14 @@
 
 module Vizcore
   module Renderer
+    # Serializes analysis and scene state into transport payloads.
     class SceneSerializer
+      # @param timestamp [Numeric]
+      # @param audio [Hash]
+      # @param scene_name [String, Symbol]
+      # @param scene_layers [Array<Hash>]
+      # @param transition [Hash, nil]
+      # @return [Hash]
       def audio_frame(timestamp:, audio:, scene_name:, scene_layers:, transition: nil)
         {
           timestamp: Float(timestamp),

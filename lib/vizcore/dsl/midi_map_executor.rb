@@ -2,21 +2,32 @@
 
 module Vizcore
   module DSL
+    # Executes `midi_map` action blocks against incoming MIDI events.
     class MidiMapExecutor
+      # @param midi_maps [Array<Hash>]
+      # @param scenes [Array<Hash>]
+      # @param globals [Hash]
       def initialize(midi_maps:, scenes:, globals: {})
         update(midi_maps: midi_maps, scenes: scenes, globals: globals)
       end
 
+      # @param midi_maps [Array<Hash>]
+      # @param scenes [Array<Hash>]
+      # @param globals [Hash, nil]
+      # @return [void]
       def update(midi_maps:, scenes:, globals: nil)
         @midi_maps = normalize_midi_maps(midi_maps)
         @scenes = normalize_scenes(scenes)
         @globals = normalize_globals(globals) unless globals.nil?
       end
 
+      # @return [Hash] mutable global parameter snapshot
       def globals
         @globals.dup
       end
 
+      # @param event [Vizcore::Audio::MidiInput::Event]
+      # @return [Array<Hash>] runtime actions (`:switch_scene`, `:set_global`)
       def handle_event(event)
         @midi_maps.each_with_object([]) do |mapping, actions|
           next unless mapping_match?(mapping[:trigger], event)
@@ -113,15 +124,23 @@ module Vizcore
         end
       end
 
+      # Runtime DSL context used while executing one `midi_map` action block.
+      # @api private
       class ActionContext
+        # Collected runtime actions emitted by DSL calls.
         attr_reader :actions
 
+        # @param scenes [Hash]
+        # @param globals [Hash]
         def initialize(scenes:, globals:)
           @scenes = scenes
           @globals = globals
           @actions = []
         end
 
+        # @param name [Symbol, String]
+        # @param effect [Hash, nil]
+        # @return [void]
         def switch_scene(name, effect: nil)
           scene = @scenes[name.to_sym]
           return unless scene
@@ -136,6 +155,9 @@ module Vizcore
           }
         end
 
+        # @param key [Symbol, String]
+        # @param value [Object]
+        # @return [void]
         def set(key, value)
           symbol_key = key.to_sym
           @globals[symbol_key] = value

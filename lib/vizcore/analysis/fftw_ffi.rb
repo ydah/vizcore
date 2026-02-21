@@ -4,9 +4,11 @@ require "ffi"
 
 module Vizcore
   module Analysis
+    # Thin FFI wrapper for FFTW3 availability checks and symbol binding.
     module FFTWFFI
       extend FFI::Library
 
+      # Candidate library names across macOS/Linux/Windows.
       LIBRARY_NAMES = %w[
         fftw3
         libfftw3.so.3
@@ -18,9 +20,11 @@ module Vizcore
         libfftw3-3.dll
       ].freeze
 
+      # FFTW planning flag (`FFTW_ESTIMATE`).
       ESTIMATE = 64
 
       class << self
+        # @return [Boolean] true when FFTW bindings can be attached.
         def available?
           attach_bindings!
           true

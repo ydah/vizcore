@@ -2,16 +2,25 @@
 
 module Vizcore
   module DSL
+    # Evaluates transition rules and returns scene-change payloads.
     class TransitionController
+      # @param scenes [Array<Hash>]
+      # @param transitions [Array<Hash>]
       def initialize(scenes:, transitions:)
         update(scenes: scenes, transitions: transitions)
       end
 
+      # @param scenes [Array<Hash>]
+      # @param transitions [Array<Hash>]
+      # @return [void]
       def update(scenes:, transitions:)
         @scenes_by_name = normalize_scenes(scenes)
         @transitions = normalize_transitions(transitions)
       end
 
+      # @param scene_name [String, Symbol]
+      # @param audio [Hash]
+      # @return [Hash, nil] transition payload when condition matches
       def next_transition(scene_name:, audio:)
         current = scene_name.to_sym
         transition = @transitions.find do |entry|
@@ -90,34 +99,44 @@ module Vizcore
         end
       end
 
+      # Runtime DSL context exposed to transition trigger blocks.
+      # @api private
       class TriggerContext
+        # @param audio [Hash]
         def initialize(audio)
           @audio = symbolize_hash(audio)
           @bands = symbolize_hash(@audio[:bands])
         end
 
+        # @return [Float]
         def amplitude
           @audio[:amplitude].to_f
         end
 
+        # @param name [Symbol, String]
+        # @return [Float]
         def frequency_band(name)
           @bands[name.to_sym].to_f
         end
 
+        # @return [Array<Float>]
         def fft_spectrum
           Array(@audio[:fft])
         end
 
+        # @return [Boolean]
         def beat?
           !!@audio[:beat]
         end
 
+        # @return [Integer]
         def beat_count
           Integer(@audio[:beat_count] || 0)
         rescue StandardError
           0
         end
 
+        # @return [Float]
         def bpm
           @audio[:bpm].to_f
         end

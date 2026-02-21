@@ -2,9 +2,16 @@
 
 module Vizcore
   module Renderer
+    # Fixed-interval scheduler used by the frame broadcast loop.
     class FrameScheduler
+      # Default frame rate used by renderer loops.
       DEFAULT_FRAME_RATE = 60.0
 
+      # @param frame_rate [Float]
+      # @param monotonic_clock [#call, nil]
+      # @param sleeper [#call, nil]
+      # @param error_handler [#call, nil]
+      # @yieldparam elapsed [Float]
       def initialize(frame_rate: DEFAULT_FRAME_RATE, monotonic_clock: nil, sleeper: nil, error_handler: nil, &on_tick)
         @frame_rate = Float(frame_rate)
         raise ArgumentError, "frame_rate must be positive" unless @frame_rate.positive?
@@ -18,6 +25,7 @@ module Vizcore
         @thread = nil
       end
 
+      # @return [void]
       def start
         return if running?
 
@@ -26,6 +34,8 @@ module Vizcore
         @thread = Thread.new { run_loop(started_at) }
       end
 
+      # @param timeout [Float]
+      # @return [void]
       def stop(timeout: 1.0)
         return unless running?
 
@@ -38,6 +48,7 @@ module Vizcore
         thread.join(timeout)
       end
 
+      # @return [Boolean]
       def running?
         @running
       end

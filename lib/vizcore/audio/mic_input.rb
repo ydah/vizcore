@@ -7,9 +7,16 @@ require_relative "portaudio_ffi"
 
 module Vizcore
   module Audio
+    # Microphone input using PortAudio, with automatic fallback to dummy source.
     class MicInput < BaseInput
       attr_reader :device, :last_error
 
+      # @param device [Symbol, String]
+      # @param sample_rate [Integer]
+      # @param fallback_input [Vizcore::Audio::BaseInput, nil]
+      # @param portaudio_backend [Module]
+      # @param channels [Integer]
+      # @param frames_per_buffer [Integer]
       def initialize(device: :default, sample_rate: 44_100, fallback_input: nil, portaudio_backend: PortAudioFFI, channels: 1, frames_per_buffer: 1024)
         super(sample_rate: sample_rate)
         @device = device
@@ -22,6 +29,7 @@ module Vizcore
         @last_error = nil
       end
 
+      # @return [Vizcore::Audio::MicInput]
       def start
         super
         @using_fallback = false
@@ -32,6 +40,7 @@ module Vizcore
         self
       end
 
+      # @return [Vizcore::Audio::MicInput]
       def stop
         close_stream
         @fallback_input.stop if @using_fallback
@@ -39,6 +48,8 @@ module Vizcore
         super
       end
 
+      # @param frame_size [Integer]
+      # @return [Array<Float>] microphone frame or fallback samples
       def read(frame_size)
         count = Integer(frame_size)
         return Array.new(count, 0.0) unless running?
@@ -56,6 +67,7 @@ module Vizcore
         @fallback_input.read(count)
       end
 
+      # @return [Boolean]
       def using_fallback?
         @using_fallback
       end

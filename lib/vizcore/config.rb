@@ -5,9 +5,13 @@ require "pathname"
 module Vizcore
   # Runtime configuration for CLI/server startup.
   class Config
+    # Default host used by `vizcore start`.
     DEFAULT_HOST = "127.0.0.1"
+    # Default HTTP/WebSocket port.
     DEFAULT_PORT = 4567
+    # Default audio source.
     DEFAULT_AUDIO_SOURCE = :mic
+    # Supported CLI audio source values.
     SUPPORTED_AUDIO_SOURCES = %i[mic file dummy].freeze
 
     attr_reader :host, :port, :scene_file, :audio_source, :audio_file

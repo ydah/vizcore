@@ -7,8 +7,13 @@ require_relative "../errors"
 
 module Vizcore
   module Server
+    # Stateless WebSocket endpoint manager for frame broadcast transport.
     class WebSocketHandler
       class << self
+        # Rack endpoint for WebSocket upgrade handling.
+        #
+        # @param env [Hash]
+        # @return [Array]
         def call(env)
           websocket_klass = faye_websocket_class
           return dependency_error_response unless websocket_klass
@@ -23,6 +28,11 @@ module Vizcore
           socket.rack_response
         end
 
+        # Broadcast one typed payload to all active websocket clients.
+        #
+        # @param type [String]
+        # @param payload [Hash]
+        # @return [Boolean] false when websocket backend is unavailable
         def broadcast(type:, payload:)
           return false unless faye_websocket_class
 
@@ -35,10 +45,12 @@ module Vizcore
           true
         end
 
+        # @return [Integer]
         def connection_count
           mutex.synchronize { sockets.size }
         end
 
+        # @return [StandardError, nil]
         def last_error
           mutex.synchronize { @last_error }
         end
