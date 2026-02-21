@@ -6,6 +6,7 @@ AllCops:
   Exclude:
     - "frontend/**/*"
     - "spec/fixtures/**/*"
+    - "vendor/**/*"
 
 Lint:
   Enabled: true
