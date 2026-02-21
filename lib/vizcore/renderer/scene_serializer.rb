@@ -51,6 +51,7 @@ module Vizcore
         }
         output[:shader] = values[:shader].to_s if values[:shader]
         output[:glsl] = values[:glsl].to_s if values[:glsl]
+        output[:glsl_source] = values[:glsl_source].to_s if values[:glsl_source]
         output
       end
 

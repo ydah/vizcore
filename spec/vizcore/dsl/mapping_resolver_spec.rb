@@ -44,6 +44,25 @@ RSpec.describe Vizcore::DSL::MappingResolver do
       )
     end
 
+    it "preserves custom shader source payload for frontend compilation" do
+      resolver = described_class.new
+      scene_layers = [
+        {
+          name: :wave_shader,
+          type: :shader,
+          glsl: "shaders/custom_wave.frag",
+          glsl_source: "void main() { }",
+          params: {}
+        }
+      ]
+
+      resolved = resolver.resolve_layers(scene_layers: scene_layers, audio: { bands: {} })
+      layer = resolved.fetch(0)
+
+      expect(layer[:glsl]).to eq("shaders/custom_wave.frag")
+      expect(layer[:glsl_source]).to eq("void main() { }")
+    end
+
     it "ignores unknown mapping source kinds" do
       resolver = described_class.new
       scene_layers = [

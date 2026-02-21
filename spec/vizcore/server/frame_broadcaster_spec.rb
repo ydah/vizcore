@@ -61,6 +61,8 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
           name: :background,
           type: :shader,
           shader: :gradient_pulse,
+          glsl: "shaders/custom_wave.frag",
+          glsl_source: "void main() { }",
           params: { intensity: 0.1 },
           mappings: [
             { source: { kind: :amplitude }, target: :intensity },
@@ -80,6 +82,8 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
       expect(layer[:name]).to eq("background")
       expect(layer[:type]).to eq("shader")
       expect(layer[:shader]).to eq("gradient_pulse")
+      expect(layer[:glsl]).to eq("shaders/custom_wave.frag")
+      expect(layer[:glsl_source]).to eq("void main() { }")
       expect(layer[:params]).to include(intensity: 0.8, flash: true)
     end
 

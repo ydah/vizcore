@@ -22,6 +22,8 @@ RSpec.describe Vizcore::Renderer::SceneSerializer do
             name: :background,
             type: :shader,
             shader: :gradient_pulse,
+            glsl: "shaders/custom_wave.frag",
+            glsl_source: "void main() { }",
             params: { intensity: 0.5 }
           }
         ]
@@ -43,6 +45,8 @@ RSpec.describe Vizcore::Renderer::SceneSerializer do
             name: "background",
             type: "shader",
             shader: "gradient_pulse",
+            glsl: "shaders/custom_wave.frag",
+            glsl_source: "void main() { }",
             params: { intensity: 0.5 }
           }
         ]
