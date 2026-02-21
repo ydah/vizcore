@@ -21,6 +21,7 @@ module Vizcore
       )
         @scene_name = scene_name
         @scene_layers = Array(scene_layers)
+        @scene_mutex = Mutex.new
         @input_manager = input_manager || Vizcore::Audio::InputManager.new(source: :mic)
         fft_size = supported_fft_size(@input_manager.frame_size)
         @analysis_pipeline = analysis_pipeline || Vizcore::Analysis::Pipeline.new(
@@ -56,15 +57,23 @@ module Vizcore
         @frame_scheduler.running?
       end
 
+      def update_scene(scene_name:, scene_layers:)
+        @scene_mutex.synchronize do
+          @scene_name = scene_name.to_s
+          @scene_layers = Array(scene_layers)
+        end
+      end
+
       def build_frame(_elapsed_seconds, samples = nil)
         audio_samples = samples || capture_samples
         analyzed = @analysis_pipeline.call(audio_samples)
-        layers = build_scene_layers(analyzed)
+        scene = current_scene
+        layers = build_scene_layers(scene[:layers], analyzed)
 
         @scene_serializer.audio_frame(
           timestamp: Time.now.to_f,
           audio: analyzed,
-          scene_name: @scene_name,
+          scene_name: scene[:name],
           scene_layers: layers,
           transition: nil
         )
@@ -92,10 +101,10 @@ module Vizcore
         value.positive? && (value & (value - 1)).zero?
       end
 
-      def build_scene_layers(analyzed)
-        return default_scene_layers(analyzed) if @scene_layers.empty?
+      def build_scene_layers(scene_layers, analyzed)
+        return default_scene_layers(analyzed) if scene_layers.empty?
 
-        @mapping_resolver.resolve_layers(scene_layers: @scene_layers, audio: analyzed)
+        @mapping_resolver.resolve_layers(scene_layers: scene_layers, audio: analyzed)
       end
 
       def default_scene_layers(analyzed)
@@ -112,6 +121,15 @@ module Vizcore
             }
           }
         ]
+      end
+
+      def current_scene
+        @scene_mutex.synchronize do
+          {
+            name: @scene_name,
+            layers: Array(@scene_layers)
+          }
+        end
       end
 
     end

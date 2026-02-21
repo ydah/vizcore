@@ -5,6 +5,7 @@ require_relative "../config"
 require_relative "../dsl"
 require_relative "frame_broadcaster"
 require_relative "rack_app"
+require_relative "websocket_handler"
 
 module Vizcore
   module Server
@@ -34,6 +35,7 @@ module Vizcore
           input_manager: input_manager
         )
         broadcaster.start
+        watcher = start_scene_watcher(broadcaster)
 
         @output.puts("Vizcore server listening at http://#{@config.host}:#{@config.port}")
         @output.puts("Scene: #{scene[:name]}")
@@ -41,6 +43,7 @@ module Vizcore
 
         wait_for_interrupt
       ensure
+        watcher&.stop
         broadcaster&.stop
         server&.stop(true)
       end
@@ -61,13 +64,10 @@ module Vizcore
 
       def load_scene!
         definition = Vizcore::DSL::Engine.load_file(@config.scene_file.to_s)
-        first_scene = definition.fetch(:scenes, []).first
+        first_scene = first_scene(definition)
         return first_scene if first_scene
 
-        {
-          name: @config.scene_file.basename(".rb").to_sym,
-          layers: []
-        }
+        fallback_scene
       rescue StandardError => e
         raise ArgumentError, "Failed to load scene file: #{e.message}"
       end
@@ -87,6 +87,33 @@ module Vizcore
           nil
         end
         sleep(0.1) until stop_requested
+      end
+
+      def start_scene_watcher(broadcaster)
+        watcher = Vizcore::DSL::Engine.watch_file(@config.scene_file.to_s) do |definition, _changed_path|
+          scene = first_scene(definition) || fallback_scene
+          broadcaster.update_scene(scene_name: scene[:name], scene_layers: scene[:layers])
+          WebSocketHandler.broadcast(type: "config_update", payload: { scene: scene })
+          @output.puts("Scene reloaded: #{scene[:name]}")
+        rescue StandardError => e
+          @output.puts("Scene reload failed: #{e.message}")
+        end
+        watcher.start
+        watcher
+      rescue StandardError => e
+        @output.puts("Scene watcher disabled: #{e.message}")
+        nil
+      end
+
+      def first_scene(definition)
+        definition.fetch(:scenes, []).first
+      end
+
+      def fallback_scene
+        {
+          name: @config.scene_file.basename(".rb").to_sym,
+          layers: []
+        }
       end
     end
   end

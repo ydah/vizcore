@@ -82,5 +82,41 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
       expect(layer[:shader]).to eq("gradient_pulse")
       expect(layer[:params]).to include(intensity: 0.8, flash: true)
     end
+
+    it "uses updated scene definition after hot reload" do
+      input_manager = instance_double(
+        Vizcore::Audio::InputManager,
+        frame_size: 1024,
+        sample_rate: 44_100,
+        capture_frame: Array.new(1024, 0.0),
+        start: nil,
+        stop: nil
+      )
+      analyzed = {
+        amplitude: 0.5,
+        bands: { sub: 0.0, low: 0.2, mid: 0.3, high: 0.4 },
+        fft: Array.new(32, 0.1),
+        beat: false,
+        beat_count: 0,
+        bpm: 0.0
+      }
+      pipeline = instance_double(Vizcore::Analysis::Pipeline, call: analyzed)
+      broadcaster = described_class.new(
+        scene_name: "intro",
+        scene_layers: [{ name: :intro_layer, type: :geometry, params: {} }],
+        input_manager: input_manager,
+        analysis_pipeline: pipeline
+      )
+
+      broadcaster.update_scene(
+        scene_name: :drop,
+        scene_layers: [{ name: :drop_layer, type: :shader, shader: :gradient_pulse, params: {} }]
+      )
+      frame = broadcaster.build_frame(0.5, Array.new(1024, 0.0))
+
+      expect(frame.dig(:scene, :name)).to eq("drop")
+      expect(frame.dig(:scene, :layers, 0, :name)).to eq("drop_layer")
+      expect(frame.dig(:scene, :layers, 0, :type)).to eq("shader")
+    end
   end
 end

@@ -73,4 +73,53 @@ RSpec.describe Vizcore::DSL::Engine do
       end.to raise_error(ArgumentError, /Scene file not found/)
     end
   end
+
+  describe ".watch_file" do
+    it "loads updated definition and yields it to callback" do
+      fake_listener = nil
+
+      Dir.mktmpdir("vizcore-dsl-watch") do |dir|
+        scene_path = File.join(dir, "scene.rb")
+        File.write(scene_path, <<~RUBY)
+          Vizcore.define do
+            scene :initial do
+              layer :l do
+                type :geometry
+              end
+            end
+          end
+        RUBY
+
+        yielded = nil
+        watcher = described_class.watch_file(
+          scene_path,
+          listener_factory: lambda do |_directory, _pattern, &block|
+            fake_listener = Struct.new(:callback) do
+              def start; end
+              def stop; end
+            end.new(block)
+          end
+        ) do |definition, changed_path|
+          yielded = [definition, changed_path]
+        end
+
+        watcher.start
+        File.write(scene_path, <<~RUBY)
+          Vizcore.define do
+            scene :updated do
+              layer :l do
+                type :shader
+              end
+            end
+          end
+        RUBY
+        fake_listener.callback.call([scene_path], [], [])
+        watcher.stop
+
+        definition, changed_path = yielded
+        expect(changed_path.to_s).to eq(scene_path)
+        expect(definition[:scenes][0][:name]).to eq(:updated)
+      end
+    end
+  end
 end

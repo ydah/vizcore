@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "pathname"
+require_relative "file_watcher"
 require_relative "scene_builder"
 
 module Vizcore
@@ -21,6 +22,13 @@ module Vizcore
           engine = new
           with_current(engine) { Kernel.load(scene_path.to_s) }
           engine.result
+        end
+
+        def watch_file(path, poll_interval: FileWatcher::DEFAULT_POLL_INTERVAL, listener_factory: nil, &on_change)
+          FileWatcher.new(path: path, poll_interval: poll_interval, listener_factory: listener_factory) do |changed_path|
+            definition = load_file(changed_path.to_s)
+            on_change&.call(definition, changed_path)
+          end
         end
 
         def current
