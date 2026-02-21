@@ -19,6 +19,18 @@ void main() {
 }
 `;
 
+const COMPOSITE_FRAGMENT_SHADER = `#version 300 es
+precision mediump float;
+in vec2 v_uv;
+uniform sampler2D u_texture;
+uniform float u_opacity;
+out vec4 outColor;
+void main() {
+  vec4 color = texture(u_texture, v_uv);
+  outColor = vec4(color.rgb, color.a * u_opacity);
+}
+`;
+
 const FULLSCREEN_VERTICES = new Float32Array([
   -1.0, -1.0,
   1.0, -1.0,
@@ -30,8 +42,10 @@ export class LayerManager {
   constructor(gl, shaderManager) {
     this.gl = gl;
     this.shaderManager = shaderManager;
+
     this.fullscreenBuffer = this.gl.createBuffer();
     this.geometryBuffer = this.gl.createBuffer();
+
     this.geometryProgram = this.shaderManager.getProgram(
       "geometry-wireframe",
       GEOMETRY_VERTEX_SHADER,
@@ -39,6 +53,22 @@ export class LayerManager {
     );
     this.geometryPositionLocation = this.gl.getAttribLocation(this.geometryProgram, "a_position");
     this.geometryColorLocation = this.gl.getUniformLocation(this.geometryProgram, "u_color");
+
+    this.compositeProgram = this.shaderManager.getProgram(
+      "layer-composite",
+      FULLSCREEN_VERTEX_SHADER,
+      COMPOSITE_FRAGMENT_SHADER
+    );
+    this.compositePositionLocation = this.gl.getAttribLocation(this.compositeProgram, "a_position");
+    this.compositeTextureLocation = this.gl.getUniformLocation(this.compositeProgram, "u_texture");
+    this.compositeOpacityLocation = this.gl.getUniformLocation(this.compositeProgram, "u_opacity");
+
+    this.layerFramebuffer = null;
+    this.layerTexture = null;
+    this.layerDepthRenderbuffer = null;
+    this.layerTargetWidth = 0;
+    this.layerTargetHeight = 0;
+
     this.particleSystem = new ParticleSystem(this.gl, this.shaderManager);
 
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.fullscreenBuffer);
@@ -47,15 +77,35 @@ export class LayerManager {
 
   renderScene({ layers, audio, time, rotation, resolution }) {
     const layerList = Array.isArray(layers) && layers.length > 0 ? layers : [defaultLayer(audio)];
+    const width = Math.max(1, Math.floor(Number(resolution?.[0] || 1)));
+    const height = Math.max(1, Math.floor(Number(resolution?.[1] || 1)));
+    this.ensureLayerTarget(width, height);
+
     for (const layer of layerList) {
-      if (isParticleLayer(layer)) {
-        this.renderParticleLayer(layer, audio, time);
-      } else if (isShaderLayer(layer)) {
-        this.renderShaderLayer(layer, audio, time, resolution);
-      } else {
-        this.renderGeometryLayer(layer, audio, rotation);
-      }
+      this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.layerFramebuffer);
+      this.gl.viewport(0, 0, width, height);
+      this.gl.clearColor(0.0, 0.0, 0.0, 0.0);
+      this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+
+      this.renderLayer(layer, audio, time, rotation, [width, height]);
+
+      this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+      this.gl.viewport(0, 0, width, height);
+      this.compositeLayer(layer);
     }
+    this.setBlendMode("alpha");
+  }
+
+  renderLayer(layer, audio, time, rotation, resolution) {
+    if (isParticleLayer(layer)) {
+      this.renderParticleLayer(layer, audio, time);
+      return;
+    }
+    if (isShaderLayer(layer)) {
+      this.renderShaderLayer(layer, audio, time, resolution);
+      return;
+    }
+    this.renderGeometryLayer(layer, audio, rotation);
   }
 
   renderShaderLayer(layer, audio, time, resolution) {
@@ -133,6 +183,82 @@ export class LayerManager {
       audio,
       time
     });
+  }
+
+  compositeLayer(layer) {
+    const gl = this.gl;
+    const params = layer?.params || {};
+    const opacity = clamp(Number(params.opacity || 1), 0, 1);
+    const blend = String(params.blend || "alpha").toLowerCase();
+
+    this.setBlendMode(blend);
+
+    gl.useProgram(this.compositeProgram);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.fullscreenBuffer);
+    gl.enableVertexAttribArray(this.compositePositionLocation);
+    gl.vertexAttribPointer(this.compositePositionLocation, 2, gl.FLOAT, false, 0, 0);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.layerTexture);
+    gl.uniform1i(this.compositeTextureLocation, 0);
+    gl.uniform1f(this.compositeOpacityLocation, opacity);
+
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  ensureLayerTarget(width, height) {
+    if (this.layerFramebuffer && this.layerTargetWidth === width && this.layerTargetHeight === height) {
+      return;
+    }
+    this.layerTargetWidth = width;
+    this.layerTargetHeight = height;
+
+    this.disposeLayerTarget();
+
+    const gl = this.gl;
+    this.layerFramebuffer = gl.createFramebuffer();
+    this.layerTexture = gl.createTexture();
+    this.layerDepthRenderbuffer = gl.createRenderbuffer();
+
+    gl.bindTexture(gl.TEXTURE_2D, this.layerTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.layerFramebuffer);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.layerTexture, 0);
+
+    gl.bindRenderbuffer(gl.RENDERBUFFER, this.layerDepthRenderbuffer);
+    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.layerDepthRenderbuffer);
+
+    gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+
+  disposeLayerTarget() {
+    if (this.layerTexture) {
+      this.gl.deleteTexture(this.layerTexture);
+      this.layerTexture = null;
+    }
+    if (this.layerDepthRenderbuffer) {
+      this.gl.deleteRenderbuffer(this.layerDepthRenderbuffer);
+      this.layerDepthRenderbuffer = null;
+    }
+    if (this.layerFramebuffer) {
+      this.gl.deleteFramebuffer(this.layerFramebuffer);
+      this.layerFramebuffer = null;
+    }
+  }
+
+  setBlendMode(mode) {
+    if (mode === "add" || mode === "additive") {
+      this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE);
+      return;
+    }
+    this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
   }
 
   setUniform1f(program, uniformName, value) {
