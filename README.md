@@ -17,10 +17,27 @@ The page initializes WebGL and renders a wireframe cube driven by dummy frame da
 ## CLI Commands
 
 ```bash
-vizcore start SCENE_FILE [--host 127.0.0.1] [--port 4567]
+vizcore start SCENE_FILE [--host 127.0.0.1] [--port 4567] [--audio-source mic|file|dummy] [--audio-file path]
 vizcore new PROJECT_NAME
 vizcore devices [audio|midi]
 ```
+
+### File Audio Source
+
+```bash
+# WAV
+vizcore start examples/basic.rb --audio-source file --audio-file spec/fixtures/audio/pulse16_mono.wav
+
+# MP3/FLAC (decoded via ffmpeg)
+vizcore start examples/basic.rb --audio-source file --audio-file path/to/set.mp3
+```
+
+When using `--audio-source file`, `--audio-file` is required and must point to an existing file.
+
+## Requirements
+
+- Ruby 3.2+
+- For `--audio-source file` with `.mp3` / `.flac`: `ffmpeg` must be installed and available on `PATH`
 
 ## Project Scaffold
 
