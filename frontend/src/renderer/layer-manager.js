@@ -212,6 +212,7 @@ export class LayerManager {
       content: params.content || "VIZCORE",
       fontSize: Number(params.font_size || 120),
       color: params.color || "#e5f3ff",
+      glowStrength: Number(params.glow_strength ?? 0.15),
       audio,
       time
     });

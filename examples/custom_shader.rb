@@ -15,7 +15,8 @@ Vizcore.define do
     layer :title do
       type :text
       content "VIZCORE"
-      font_size 110
+      font_size 84
+      glow_strength 0.08
       color "#f8fbff"
     end
   end
