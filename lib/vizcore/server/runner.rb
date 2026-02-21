@@ -2,6 +2,7 @@
 
 require "puma"
 require_relative "../config"
+require_relative "../dsl"
 require_relative "frame_broadcaster"
 require_relative "rack_app"
 
@@ -16,6 +17,7 @@ module Vizcore
       def run
         validate_scene_file!
         validate_audio_settings!
+        scene = load_scene!
 
         app = RackApp.new(frontend_root: Vizcore.frontend_root)
         server = Puma::Server.new(app, nil, min_threads: 0, max_threads: 4)
@@ -26,11 +28,15 @@ module Vizcore
           source: @config.audio_source,
           file_path: @config.audio_file&.to_s
         )
-        broadcaster = FrameBroadcaster.new(scene_name: scene_name, input_manager: input_manager)
+        broadcaster = FrameBroadcaster.new(
+          scene_name: scene[:name].to_s,
+          scene_layers: scene[:layers],
+          input_manager: input_manager
+        )
         broadcaster.start
 
         @output.puts("Vizcore server listening at http://#{@config.host}:#{@config.port}")
-        @output.puts("Scene: #{scene_name}")
+        @output.puts("Scene: #{scene[:name]}")
         @output.puts("Press Ctrl+C to stop.")
 
         wait_for_interrupt
@@ -53,8 +59,17 @@ module Vizcore
         raise ArgumentError, message
       end
 
-      def scene_name
-        @config.scene_file.basename(".rb").to_s
+      def load_scene!
+        definition = Vizcore::DSL::Engine.load_file(@config.scene_file.to_s)
+        first_scene = definition.fetch(:scenes, []).first
+        return first_scene if first_scene
+
+        {
+          name: @config.scene_file.basename(".rb").to_sym,
+          layers: []
+        }
+      rescue StandardError => e
+        raise ArgumentError, "Failed to load scene file: #{e.message}"
       end
 
       def validate_audio_settings!

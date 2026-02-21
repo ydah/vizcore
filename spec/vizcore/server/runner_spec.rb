@@ -27,7 +27,11 @@ RSpec.describe Vizcore::Server::Runner do
 
       expect(Puma::Server).to have_received(:new).with(rack_app, nil, min_threads: 0, max_threads: 4)
       expect(Vizcore::Audio::InputManager).to have_received(:new).with(source: :mic, file_path: nil)
-      expect(Vizcore::Server::FrameBroadcaster).to have_received(:new).with(scene_name: "basic", input_manager: input_manager)
+      expect(Vizcore::Server::FrameBroadcaster).to have_received(:new).with(
+        scene_name: "basic",
+        scene_layers: [hash_including(name: :wireframe_cube, type: :wireframe_cube)],
+        input_manager: input_manager
+      )
       expect(puma_server).to have_received(:add_tcp_listener).with("127.0.0.1", 4567)
       expect(puma_server).to have_received(:run)
       expect(puma_server).to have_received(:stop).with(true)
