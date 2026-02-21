@@ -110,12 +110,25 @@ export class LayerManager {
 
   renderShaderLayer(layer, audio, time, resolution) {
     const shaderName = String(layer?.shader || "gradient_pulse");
-    const fragmentShader = getBuiltinShader(shaderName);
-    const program = this.shaderManager.getProgram(
-      `builtin:${shaderName}`,
-      FULLSCREEN_VERTEX_SHADER,
-      fragmentShader
-    );
+    const customSource = typeof layer?.glsl_source === "string" ? layer.glsl_source : null;
+    const fragmentShader = customSource || getBuiltinShader(shaderName);
+    const cacheKey = customSource
+      ? `custom:${String(layer?.glsl || shaderName)}:${hashString(customSource)}`
+      : `builtin:${shaderName}`;
+    let program = null;
+    try {
+      program = this.shaderManager.getProgram(cacheKey, FULLSCREEN_VERTEX_SHADER, fragmentShader);
+    } catch (error) {
+      if (!customSource) {
+        throw error;
+      }
+      console.warn("Failed to compile custom GLSL, falling back to builtin shader", error);
+      program = this.shaderManager.getProgram(
+        `builtin:${shaderName}`,
+        FULLSCREEN_VERTEX_SHADER,
+        getBuiltinShader(shaderName)
+      );
+    }
     const gl = this.gl;
 
     gl.useProgram(program);
@@ -298,3 +311,11 @@ const defaultLayer = (audio) => ({
 });
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+const hashString = (value) => {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash.toString(16);
+};
