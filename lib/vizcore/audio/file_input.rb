@@ -1,13 +1,18 @@
 # frozen_string_literal: true
 
+require "open3"
 require_relative "base_input"
 
 module Vizcore
   module Audio
     class FileInput < BaseInput
-      def initialize(path:, sample_rate: 44_100)
+      SUPPORTED_EXTENSIONS = %w[.wav .mp3 .flac].freeze
+
+      def initialize(path:, sample_rate: 44_100, command_runner: Open3, ffmpeg_checker: nil)
         super(sample_rate: sample_rate)
         @path = path
+        @command_runner = command_runner
+        @ffmpeg_checker = ffmpeg_checker || method(:ffmpeg_available?)
         @cursor = 0
         @samples = load_samples
       end
@@ -31,8 +36,18 @@ module Vizcore
       def load_samples
         return [] unless @path
         return [] unless File.file?(@path)
-        return [] unless File.extname(@path).downcase == ".wav"
+        return [] unless SUPPORTED_EXTENSIONS.include?(extension)
 
+        return load_wav_samples if extension == ".wav"
+
+        load_compressed_samples
+      end
+
+      def extension
+        File.extname(@path).downcase
+      end
+
+      def load_wav_samples
         require "wavefile"
 
         samples = []
@@ -47,6 +62,41 @@ module Vizcore
         samples
       rescue LoadError
         []
+      end
+
+      def load_compressed_samples
+        return [] unless @ffmpeg_checker.call
+
+        stdout, _stderr, status = @command_runner.capture3(*ffmpeg_decode_command)
+        return [] unless status.success?
+
+        stdout.unpack("e*").map { |sample| Float(sample) }
+      rescue StandardError
+        []
+      end
+
+      def ffmpeg_decode_command
+        [
+          "ffmpeg",
+          "-hide_banner",
+          "-loglevel",
+          "error",
+          "-i",
+          @path.to_s,
+          "-f",
+          "f32le",
+          "-ac",
+          "1",
+          "-ar",
+          sample_rate.to_s,
+          "pipe:1"
+        ]
+      end
+
+      def ffmpeg_available?
+        system("ffmpeg", "-version", out: File::NULL, err: File::NULL)
+      rescue StandardError
+        false
       end
     end
   end
