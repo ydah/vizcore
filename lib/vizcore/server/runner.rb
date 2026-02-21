@@ -17,10 +17,8 @@ module Vizcore
         validate_scene_file!
 
         app = RackApp.new(frontend_root: Vizcore.frontend_root)
-        server = Puma::Server.new(app)
+        server = Puma::Server.new(app, nil, min_threads: 0, max_threads: 4)
         server.add_tcp_listener(@config.host, @config.port)
-        server.min_threads = 0
-        server.max_threads = 4
         server.run
 
         broadcaster = FrameBroadcaster.new(scene_name: scene_name)

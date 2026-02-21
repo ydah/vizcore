@@ -2,6 +2,7 @@
 
 require "json"
 require "rack"
+require_relative "websocket_handler"
 
 module Vizcore
   module Server
