@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "vizcore/version"
+require_relative "vizcore/errors"
 require_relative "vizcore/dsl"
 require "pathname"
 

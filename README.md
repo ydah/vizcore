@@ -60,6 +60,11 @@ When `--audio-source file` is selected, `--audio-file` is required.
 bundle exec rspec
 ```
 
+## Error Handling Notes
+
+- Runtime components emit contextual error logs (for example scene reload and MIDI runtime failures).
+- Audio inputs keep diagnostic state in `last_error` while preserving fallback behavior (silence/dummy source).
+
 ## Gem Packaging Policy
 
 - Runtime files only are packaged in the gem: `lib/`, `exe/`, `frontend/index.html`, `frontend/src/`, `examples/`, `sig/`, `README.md`, `GETTING_STARTED.md`, `LICENSE.txt`.

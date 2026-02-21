@@ -2,12 +2,13 @@
 
 require_relative "base_input"
 require_relative "dummy_sine_input"
+require_relative "../errors"
 require_relative "portaudio_ffi"
 
 module Vizcore
   module Audio
     class MicInput < BaseInput
-      attr_reader :device
+      attr_reader :device, :last_error
 
       def initialize(device: :default, sample_rate: 44_100, fallback_input: nil, portaudio_backend: PortAudioFFI, channels: 1, frames_per_buffer: 1024)
         super(sample_rate: sample_rate)
@@ -18,6 +19,7 @@ module Vizcore
         @portaudio_backend = portaudio_backend
         @stream = nil
         @using_fallback = false
+        @last_error = nil
       end
 
       def start
@@ -43,11 +45,13 @@ module Vizcore
 
         if @stream
           samples = @stream.read(count)
+          @last_error = nil
           normalize_samples(samples, count)
         else
           @fallback_input.read(count)
         end
-      rescue StandardError
+      rescue StandardError => e
+        @last_error = AudioSourceError.new("Microphone read failed: #{e.message}")
         switch_to_fallback
         @fallback_input.read(count)
       end
@@ -69,7 +73,8 @@ module Vizcore
 
         @portaudio_backend.close_stream(stream)
         nil
-      rescue StandardError
+      rescue StandardError => e
+        @last_error = AudioSourceError.new("Microphone stream open failed: #{e.message}")
         nil
       end
 

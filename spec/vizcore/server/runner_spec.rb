@@ -40,11 +40,14 @@ RSpec.describe Vizcore::Server::Runner do
       expect(Puma::Server).to have_received(:new).with(rack_app, nil, min_threads: 0, max_threads: 4)
       expect(Vizcore::Audio::InputManager).to have_received(:new).with(source: :mic, file_path: nil)
       expect(Vizcore::Server::FrameBroadcaster).to have_received(:new).with(
-        scene_name: "basic",
-        scene_layers: [hash_including(name: :wireframe_cube, type: :wireframe_cube)],
-        scene_catalog: [hash_including(name: :basic)],
-        transitions: [],
-        input_manager: input_manager
+        hash_including(
+          scene_name: "basic",
+          scene_layers: [hash_including(name: :wireframe_cube, type: :wireframe_cube)],
+          scene_catalog: [hash_including(name: :basic)],
+          transitions: [],
+          input_manager: input_manager,
+          error_reporter: an_instance_of(Proc)
+        )
       )
       expect(Vizcore::DSL::Engine).to have_received(:watch_file).with(scene_file.to_s)
       expect(watcher).to have_received(:start)
@@ -112,7 +115,7 @@ RSpec.describe Vizcore::Server::Runner do
       )
       runner = described_class.new(file_config, output: output)
 
-      expect { runner.run }.to raise_error(ArgumentError, /Audio file not found/)
+      expect { runner.run }.to raise_error(Vizcore::ConfigurationError, /Audio file not found/)
     end
 
     it "raises when scene references missing glsl file" do
@@ -133,7 +136,7 @@ RSpec.describe Vizcore::Server::Runner do
         broken_config = Vizcore::Config.new(scene_file: missing_scene, host: "127.0.0.1", port: 4567)
         runner = described_class.new(broken_config, output: output)
 
-        expect { runner.run }.to raise_error(ArgumentError, /GLSL file not found/)
+        expect { runner.run }.to raise_error(Vizcore::SceneLoadError, /GLSL file not found/)
       end
     end
 
