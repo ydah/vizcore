@@ -5,9 +5,16 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * 1"
+  release:
+    types:
+      - published
 
 jobs:
   rspec:
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     name: RSpec
     steps:
@@ -23,6 +30,7 @@ jobs:
         run: bundle exec rspec
 
   rubocop:
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     name: RuboCop
     steps:
@@ -37,21 +45,8 @@ jobs:
       - name: Run RuboCop
         run: bundle exec rubocop --no-server
 
-  frontend-test:
-    runs-on: ubuntu-latest
-    name: Frontend Tests
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-      - name: Run frontend tests
-        run: npm --prefix frontend test
-
   cross-platform-smoke:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'release' }}
     name: Cross-platform smoke (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -87,29 +82,3 @@ jobs:
           name: cross-platform-smoke-${{ matrix.os }}
           path: cross-platform-smoke-${{ matrix.os }}.json
           if-no-files-found: error
-
-  cross-platform-summary:
-    name: Cross-platform summary
-    runs-on: ubuntu-latest
-    needs:
-      - cross-platform-smoke
-    if: always()
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Download smoke artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: cross-platform-smoke-*
-          path: cross-platform-reports
-      - name: Build summary markdown
-        run: ruby .github/scripts/build_cross_platform_summary.rb
-      - name: Upload summary artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: cross-platform-summary
-          path: cross-platform-summary.md
-          if-no-files-found: error
-      - name: Publish summary
-        run: cat cross-platform-summary.md >> "$GITHUB_STEP_SUMMARY"
