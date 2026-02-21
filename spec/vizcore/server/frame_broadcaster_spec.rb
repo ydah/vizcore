@@ -119,4 +119,61 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
       expect(frame.dig(:scene, :layers, 0, :type)).to eq("shader")
     end
   end
+
+  describe "#tick" do
+    it "broadcasts scene_change when a transition condition is met" do
+      input_manager = instance_double(
+        Vizcore::Audio::InputManager,
+        frame_size: 1024,
+        sample_rate: 44_100,
+        capture_frame: Array.new(1024, 0.0),
+        start: nil,
+        stop: nil
+      )
+      pipeline = instance_double(
+        Vizcore::Analysis::Pipeline,
+        call: {
+          amplitude: 0.7,
+          bands: { sub: 0.1, low: 0.9, mid: 0.2, high: 0.1 },
+          fft: Array.new(32, 0.05),
+          beat: true,
+          beat_count: 64,
+          bpm: 128.0
+        }
+      )
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+
+      broadcaster = described_class.new(
+        scene_name: "intro",
+        scene_layers: [{ name: :intro_layer, type: :geometry, params: {} }],
+        scene_catalog: [
+          { name: :intro, layers: [{ name: :intro_layer, type: :geometry, params: {} }] },
+          { name: :drop, layers: [{ name: :drop_layer, type: :shader, params: {} }] }
+        ],
+        transitions: [
+          {
+            from: :intro,
+            to: :drop,
+            trigger: proc { beat_count >= 64 },
+            effect: { name: :crossfade, options: { duration: 2.0 } }
+          }
+        ],
+        input_manager: input_manager,
+        analysis_pipeline: pipeline
+      )
+
+      broadcaster.tick(0.5, Array.new(1024, 0.0))
+      next_frame = broadcaster.build_frame(0.6, Array.new(1024, 0.0))
+
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "scene_change",
+        payload: {
+          from: "intro",
+          to: "drop",
+          effect: { name: :crossfade, options: { duration: 2.0 } }
+        }
+      )
+      expect(next_frame.dig(:scene, :name)).to eq("drop")
+    end
+  end
 end

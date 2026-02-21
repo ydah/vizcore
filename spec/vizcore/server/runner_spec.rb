@@ -11,7 +11,15 @@ RSpec.describe Vizcore::Server::Runner do
     let(:output) { StringIO.new }
     let(:rack_app) { instance_double(Vizcore::Server::RackApp) }
     let(:puma_server) { instance_double(Puma::Server, add_tcp_listener: nil, run: nil, stop: nil) }
-    let(:broadcaster) { instance_double(Vizcore::Server::FrameBroadcaster, start: nil, stop: nil, update_scene: nil) }
+    let(:broadcaster) do
+      instance_double(
+        Vizcore::Server::FrameBroadcaster,
+        start: nil,
+        stop: nil,
+        update_scene: nil,
+        update_transition_definition: nil
+      )
+    end
     let(:input_manager) { instance_double(Vizcore::Audio::InputManager) }
     let(:watcher) { instance_double(Vizcore::DSL::FileWatcher, start: nil, stop: nil) }
 
@@ -32,6 +40,8 @@ RSpec.describe Vizcore::Server::Runner do
       expect(Vizcore::Server::FrameBroadcaster).to have_received(:new).with(
         scene_name: "basic",
         scene_layers: [hash_including(name: :wireframe_cube, type: :wireframe_cube)],
+        scene_catalog: [hash_including(name: :basic)],
+        transitions: [],
         input_manager: input_manager
       )
       expect(Vizcore::DSL::Engine).to have_received(:watch_file).with(scene_file.to_s)
@@ -77,6 +87,10 @@ RSpec.describe Vizcore::Server::Runner do
       expect(broadcaster).to have_received(:update_scene).with(
         scene_name: :updated,
         scene_layers: [hash_including(name: :layer, type: :shader)]
+      )
+      expect(broadcaster).to have_received(:update_transition_definition).with(
+        scenes: [hash_including(name: :updated)],
+        transitions: []
       )
       expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
         type: "config_update",

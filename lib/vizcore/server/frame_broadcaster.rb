@@ -17,7 +17,10 @@ module Vizcore
         analysis_pipeline: nil,
         mapping_resolver: nil,
         scene_serializer: nil,
-        frame_scheduler: nil
+        frame_scheduler: nil,
+        scene_catalog: nil,
+        transitions: nil,
+        transition_controller: nil
       )
         @scene_name = scene_name
         @scene_layers = Array(scene_layers)
@@ -30,9 +33,12 @@ module Vizcore
         )
         @mapping_resolver = mapping_resolver || Vizcore::DSL::MappingResolver.new
         @scene_serializer = scene_serializer || Vizcore::Renderer::SceneSerializer.new
+        @transition_controller = transition_controller || Vizcore::DSL::TransitionController.new(
+          scenes: scene_catalog || [],
+          transitions: transitions || []
+        )
         @frame_scheduler = frame_scheduler || Vizcore::Renderer::FrameScheduler.new(frame_rate: FRAME_RATE) do |elapsed|
-          frame = build_frame(elapsed)
-          WebSocketHandler.broadcast(type: "audio_frame", payload: frame)
+          tick(elapsed)
         end
       end
 
@@ -57,10 +63,23 @@ module Vizcore
         @frame_scheduler.running?
       end
 
+      def tick(elapsed_seconds, samples = nil)
+        frame = build_frame(elapsed_seconds, samples)
+        WebSocketHandler.broadcast(type: "audio_frame", payload: frame)
+        evaluate_transition(frame[:audio])
+        frame
+      end
+
       def update_scene(scene_name:, scene_layers:)
         @scene_mutex.synchronize do
           @scene_name = scene_name.to_s
           @scene_layers = Array(scene_layers)
+        end
+      end
+
+      def update_transition_definition(scenes:, transitions:)
+        @scene_mutex.synchronize do
+          @transition_controller.update(scenes: scenes, transitions: transitions)
         end
       end
 
@@ -130,6 +149,24 @@ module Vizcore
             layers: Array(@scene_layers)
           }
         end
+      end
+
+      def evaluate_transition(audio)
+        scene = current_scene
+        transition = @scene_mutex.synchronize do
+          @transition_controller.next_transition(scene_name: scene[:name], audio: audio)
+        end
+        return unless transition
+
+        update_scene(scene_name: transition[:to], scene_layers: transition.dig(:scene, :layers))
+        WebSocketHandler.broadcast(
+          type: "scene_change",
+          payload: {
+            from: transition[:from].to_s,
+            to: transition[:to].to_s,
+            effect: transition[:effect]
+          }
+        )
       end
 
     end

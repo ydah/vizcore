@@ -18,7 +18,8 @@ module Vizcore
       def run
         validate_scene_file!
         validate_audio_settings!
-        scene = load_scene!
+        definition = load_definition!
+        scene = first_scene(definition) || fallback_scene
 
         app = RackApp.new(frontend_root: Vizcore.frontend_root)
         server = Puma::Server.new(app, nil, min_threads: 0, max_threads: 4)
@@ -32,6 +33,8 @@ module Vizcore
         broadcaster = FrameBroadcaster.new(
           scene_name: scene[:name].to_s,
           scene_layers: scene[:layers],
+          scene_catalog: definition[:scenes],
+          transitions: definition[:transitions],
           input_manager: input_manager
         )
         broadcaster.start
@@ -62,12 +65,8 @@ module Vizcore
         raise ArgumentError, message
       end
 
-      def load_scene!
-        definition = Vizcore::DSL::Engine.load_file(@config.scene_file.to_s)
-        first_scene = first_scene(definition)
-        return first_scene if first_scene
-
-        fallback_scene
+      def load_definition!
+        Vizcore::DSL::Engine.load_file(@config.scene_file.to_s)
       rescue StandardError => e
         raise ArgumentError, "Failed to load scene file: #{e.message}"
       end
@@ -92,6 +91,10 @@ module Vizcore
       def start_scene_watcher(broadcaster)
         watcher = Vizcore::DSL::Engine.watch_file(@config.scene_file.to_s) do |definition, _changed_path|
           scene = first_scene(definition) || fallback_scene
+          broadcaster.update_transition_definition(
+            scenes: Array(definition[:scenes]),
+            transitions: Array(definition[:transitions])
+          )
           broadcaster.update_scene(scene_name: scene[:name], scene_layers: scene[:layers])
           WebSocketHandler.broadcast(type: "config_update", payload: { scene: scene })
           @output.puts("Scene reloaded: #{scene[:name]}")
