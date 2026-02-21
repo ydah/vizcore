@@ -34,10 +34,8 @@ jobs:
         with:
           ruby-version: "3.2"
           bundler-cache: true
-      - name: Install RuboCop
-        run: gem install rubocop -N
       - name: Run RuboCop
-        run: RUBOCOP_CACHE_ROOT=.rubocop_cache rubocop --no-server
+        run: bundle exec rubocop --no-server
 
   frontend-test:
     runs-on: ubuntu-latest
