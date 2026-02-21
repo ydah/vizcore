@@ -5,7 +5,8 @@ RSpec.describe Vizcore do
     expect(Vizcore::VERSION).not_to be nil
   end
 
-  it "does something useful" do
-    expect(false).to eq(true)
+  it "exposes the project root path" do
+    expect(Vizcore.root).to be_a(Pathname)
+    expect(Vizcore.root.join("lib", "vizcore.rb")).to exist
   end
 end
