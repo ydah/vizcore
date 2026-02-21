@@ -4,6 +4,8 @@ export class WebSocketClient {
   constructor(url, callbacks = {}) {
     this.url = url;
     this.onFrame = callbacks.onFrame || (() => {});
+    this.onSceneChange = callbacks.onSceneChange || (() => {});
+    this.onConfigUpdate = callbacks.onConfigUpdate || (() => {});
     this.onStatus = callbacks.onStatus || (() => {});
     this.socket = null;
     this.reconnectTimer = null;
@@ -44,8 +46,22 @@ export class WebSocketClient {
       return;
     }
 
-    if (message.type === "audio_frame" && message.payload) {
+    if (!message || !message.type || !message.payload) {
+      return;
+    }
+
+    if (message.type === "audio_frame") {
       this.onFrame(message.payload);
+      return;
+    }
+
+    if (message.type === "scene_change") {
+      this.onSceneChange(message.payload);
+      return;
+    }
+
+    if (message.type === "config_update") {
+      this.onConfigUpdate(message.payload);
     }
   }
 }
