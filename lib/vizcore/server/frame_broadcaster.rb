@@ -63,6 +63,10 @@ module Vizcore
         @frame_scheduler.running?
       end
 
+      def current_scene_snapshot
+        current_scene
+      end
+
       def tick(elapsed_seconds, samples = nil)
         frame = build_frame(elapsed_seconds, samples)
         WebSocketHandler.broadcast(type: "audio_frame", payload: frame)

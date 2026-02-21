@@ -38,7 +38,10 @@ module Vizcore
           input_manager: input_manager
         )
         broadcaster.start
-        watcher = start_scene_watcher(broadcaster)
+        midi_runtime = start_midi_runtime(definition, broadcaster)
+        watcher = start_scene_watcher(broadcaster) do |updated_definition|
+          midi_runtime = refresh_midi_runtime(midi_runtime, updated_definition, broadcaster)
+        end
 
         @output.puts("Vizcore server listening at http://#{@config.host}:#{@config.port}")
         @output.puts("Scene: #{scene[:name]}")
@@ -46,6 +49,7 @@ module Vizcore
 
         wait_for_interrupt
       ensure
+        stop_midi_runtime(midi_runtime)
         watcher&.stop
         broadcaster&.stop
         server&.stop(true)
@@ -88,7 +92,7 @@ module Vizcore
         sleep(0.1) until stop_requested
       end
 
-      def start_scene_watcher(broadcaster)
+      def start_scene_watcher(broadcaster, &on_reload)
         watcher = Vizcore::DSL::Engine.watch_file(@config.scene_file.to_s) do |definition, _changed_path|
           scene = first_scene(definition) || fallback_scene
           broadcaster.update_transition_definition(
@@ -96,6 +100,7 @@ module Vizcore
             transitions: Array(definition[:transitions])
           )
           broadcaster.update_scene(scene_name: scene[:name], scene_layers: scene[:layers])
+          on_reload&.call(definition)
           WebSocketHandler.broadcast(type: "config_update", payload: { scene: scene })
           @output.puts("Scene reloaded: #{scene[:name]}")
         rescue StandardError => e
@@ -116,6 +121,109 @@ module Vizcore
         {
           name: @config.scene_file.basename(".rb").to_sym,
           layers: []
+        }
+      end
+
+      def start_midi_runtime(definition, broadcaster)
+        settings = midi_runtime_settings(definition)
+        return nil unless settings[:enabled]
+
+        midi_input = Vizcore::Audio::MidiInput.new(device: settings[:device])
+        executor = Vizcore::DSL::MidiMapExecutor.new(
+          midi_maps: settings[:midi_maps],
+          scenes: settings[:scenes],
+          globals: settings[:globals]
+        )
+        midi_input.start { |event| handle_midi_event(executor, event, broadcaster) }
+        @output.puts("MIDI mapping enabled#{settings[:device] ? " (device=#{settings[:device]})" : ""}")
+
+        {
+          input: midi_input,
+          executor: executor,
+          device: settings[:device]
+        }
+      rescue StandardError => e
+        @output.puts("MIDI runtime disabled: #{e.message}")
+        midi_input&.stop
+        nil
+      end
+
+      def refresh_midi_runtime(runtime, definition, broadcaster)
+        settings = midi_runtime_settings(definition)
+        return stop_midi_runtime(runtime) unless settings[:enabled]
+        return start_midi_runtime(definition, broadcaster) unless runtime
+
+        if runtime[:device] != settings[:device]
+          stop_midi_runtime(runtime)
+          return start_midi_runtime(definition, broadcaster)
+        end
+
+        runtime[:executor].update(
+          midi_maps: settings[:midi_maps],
+          scenes: settings[:scenes],
+          globals: settings[:globals]
+        )
+        runtime
+      rescue StandardError => e
+        @output.puts("MIDI runtime update failed: #{e.message}")
+        runtime
+      end
+
+      def stop_midi_runtime(runtime)
+        return nil unless runtime
+
+        runtime[:input]&.stop
+        nil
+      rescue StandardError
+        nil
+      end
+
+      def handle_midi_event(executor, event, broadcaster)
+        actions = executor.handle_event(event)
+        actions.each do |action|
+          apply_midi_action(action, executor, broadcaster)
+        end
+      rescue StandardError => e
+        @output.puts("MIDI action failed: #{e.message}")
+      end
+
+      def apply_midi_action(action, executor, broadcaster)
+        case action[:type]
+        when :switch_scene
+          target_scene = action[:scene]
+          return unless target_scene
+
+          current = broadcaster.current_scene_snapshot
+          from_scene = current[:name]
+          broadcaster.update_scene(scene_name: target_scene[:name], scene_layers: target_scene[:layers])
+          WebSocketHandler.broadcast(
+            type: "scene_change",
+            payload: {
+              from: from_scene.to_s,
+              to: target_scene[:name].to_s,
+              effect: action[:effect],
+              source: "midi"
+            }
+          )
+        when :set_global
+          WebSocketHandler.broadcast(
+            type: "config_update",
+            payload: {
+              globals: executor.globals
+            }
+          )
+        end
+      end
+
+      def midi_runtime_settings(definition)
+        midi_inputs = Array(definition[:midi])
+
+        {
+          enabled: !Array(definition[:midi_maps]).empty?,
+          midi_maps: Array(definition[:midi_maps]),
+          scenes: Array(definition[:scenes]),
+          globals: Hash(definition[:globals] || {}),
+          device: midi_inputs.first&.dig(:options, :device)
         }
       end
     end
