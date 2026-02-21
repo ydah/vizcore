@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../audio"
+require_relative "../analysis"
 
 module Vizcore
   module Server
@@ -8,12 +9,16 @@ module Vizcore
       FRAME_RATE = 60.0
       FRAME_INTERVAL = 1.0 / FRAME_RATE
 
-      def initialize(scene_name: "basic", input_manager: nil)
+      def initialize(scene_name: "basic", input_manager: nil, analysis_pipeline: nil)
         @scene_name = scene_name
         @input_manager = input_manager || Vizcore::Audio::InputManager.new(source: :mic)
+        fft_size = supported_fft_size(@input_manager.frame_size)
+        @analysis_pipeline = analysis_pipeline || Vizcore::Analysis::Pipeline.new(
+          sample_rate: @input_manager.sample_rate,
+          fft_size: fft_size
+        )
         @running = false
         @thread = nil
-        @beat_count = 0
       end
 
       def start
@@ -41,24 +46,20 @@ module Vizcore
 
       def build_frame(_elapsed_seconds, samples = nil)
         audio_samples = samples || capture_samples
-        amplitude = rms(audio_samples)
-        bands = split_bands(audio_samples)
-        bass = bands[:low]
-        mid = bands[:mid]
+        analyzed = @analysis_pipeline.call(audio_samples)
+        amplitude = analyzed[:amplitude]
+        bands = analyzed[:bands]
         high = bands[:high]
-
-        beat = amplitude > 0.72
-        @beat_count += 1 if beat
 
         {
           timestamp: Time.now.to_f,
           audio: {
             amplitude: amplitude.round(4),
             bands: bands.transform_values { |value| value.round(4) },
-            fft: fft_preview(audio_samples),
-            beat: beat,
-            beat_count: @beat_count,
-            bpm: 128.0
+            fft: analyzed[:fft].map { |value| value.round(4) },
+            beat: analyzed[:beat],
+            beat_count: analyzed[:beat_count],
+            bpm: analyzed[:bpm]
           },
           scene: {
             name: @scene_name,
@@ -104,39 +105,17 @@ module Vizcore
         Array.new(1024, 0.0)
       end
 
-      def split_bands(samples)
-        abs = samples.map { |sample| sample.abs.clamp(0.0, 1.0) }
-        chunk_size = [abs.length / 4, 1].max
-        sub = average(abs[0, chunk_size]) * 0.7
-        low = average(abs[chunk_size, chunk_size])
-        mid = average(abs[chunk_size * 2, chunk_size])
-        high = average(abs[chunk_size * 3, chunk_size])
+      def supported_fft_size(size)
+        value = Integer(size)
+        return value if power_of_two?(value)
 
-        { sub: sub, low: low, mid: mid, high: high }
+        1024
+      rescue StandardError
+        1024
       end
 
-      def fft_preview(samples)
-        values = samples.map { |sample| sample.abs.clamp(0.0, 1.0) }
-        step = [values.length / 32, 1].max
-
-        Array.new(32) do |index|
-          window = values[index * step, step]
-          average(window).round(4)
-        end
-      end
-
-      def rms(samples)
-        return 0.0 if samples.empty?
-
-        sum = samples.reduce(0.0) { |acc, sample| acc + (sample * sample) }
-        Math.sqrt(sum / samples.length.to_f).clamp(0.0, 1.0)
-      end
-
-      def average(values)
-        normalized = Array(values).compact
-        return 0.0 if normalized.empty?
-
-        normalized.sum / normalized.length.to_f
+      def power_of_two?(value)
+        value.positive? && (value & (value - 1)).zero?
       end
     end
   end
