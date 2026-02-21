@@ -9,6 +9,7 @@ require_relative "config"
 require_relative "server"
 
 module Vizcore
+  # Thor-based CLI entrypoint for Vizcore.
   class CLI < Thor
     package_name "vizcore"
 
@@ -19,6 +20,11 @@ module Vizcore
     option :port, type: :numeric, default: Config::DEFAULT_PORT, desc: "Bind port"
     option :audio_source, type: :string, default: Config::DEFAULT_AUDIO_SOURCE.to_s, desc: "Audio source: mic, file, dummy"
     option :audio_file, type: :string, desc: "Path to audio file used when --audio-source file (wav/mp3/flac)"
+    # Start the Vizcore server with the given scene file.
+    #
+    # @param scene_file [String] path to a Ruby scene DSL file
+    # @raise [Thor::Error] when CLI arguments are invalid
+    # @return [void]
     def start(scene_file)
       config = Config.new(
         scene_file: scene_file,
@@ -33,6 +39,10 @@ module Vizcore
     end
 
     desc "new NAME", "Create a starter project scaffold"
+    # Generate a new Vizcore project scaffold.
+    #
+    # @param name [String] directory name for the new project
+    # @return [void]
     def new(name)
       root = Pathname.new(name).expand_path
       FileUtils.mkdir_p(root.join("scenes"))
@@ -50,6 +60,11 @@ module Vizcore
     end
 
     desc "devices [TYPE]", "Show available devices (audio or midi)"
+    # Print audio and/or MIDI devices detected by the runtime.
+    #
+    # @param type [String, nil] `audio`, `midi`, or nil for both
+    # @raise [Thor::Error] when an unknown type is provided
+    # @return [void]
     def devices(type = nil)
       case type
       when nil
