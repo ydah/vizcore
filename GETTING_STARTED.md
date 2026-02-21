@@ -7,14 +7,16 @@ This guide covers local setup and first-run commands for `vizcore`.
 ### macOS (Homebrew)
 
 ```bash
-brew install portaudio fftw ffmpeg
+brew install portaudio ffmpeg
+# optional (recommended for faster FFT): brew install fftw
 ```
 
 ### Ubuntu/Debian
 
 ```bash
 sudo apt update
-sudo apt install -y libportaudio2 libportaudio-dev libfftw3-dev ffmpeg
+sudo apt install -y libportaudio2 libportaudio-dev ffmpeg
+# optional (recommended for faster FFT): sudo apt install -y libfftw3-dev
 ```
 
 ### Ruby

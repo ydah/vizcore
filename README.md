@@ -45,6 +45,7 @@ When `--audio-source file` is selected, `--audio-file` is required.
 
 - Ruby `>= 3.2`
 - `ffmpeg` on `PATH` when using file source with `.mp3` / `.flac`
+- `fftw3` is optional for faster FFT processing; when unavailable, Vizcore uses a Pure Ruby FFT fallback automatically.
 
 ## Examples
 
