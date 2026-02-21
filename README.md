@@ -60,6 +60,16 @@ When `--audio-source file` is selected, `--audio-file` is required.
 bundle exec rspec
 ```
 
+## API Documentation
+
+- YARD generation and stats commands are documented in `docs/YARD.md`.
+
+## Demo
+
+![Vizcore demo placeholder](docs/assets/demo-placeholder.svg)
+
+Capture flow and replacement steps are documented in `docs/DEMO_CAPTURE.md`.
+
 ## Error Handling Notes
 
 - Runtime components emit contextual error logs (for example scene reload and MIDI runtime failures).
@@ -74,6 +84,7 @@ bundle exec rspec
 - Release checklist: `docs/RELEASE.md`
 - Demo capture checklist (README embed asset prep): `docs/DEMO_CAPTURE.md`
 - Changelog: `CHANGELOG.md`
+- Tag-driven release workflow: `.github/workflows/release.yml`
 
 ## Gem Packaging Policy
 

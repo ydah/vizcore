@@ -38,3 +38,4 @@ This document covers Phase 5 demo-video preparation (`5-11`).
 - Add demo section to README with:
   - short caption
   - link to full video
+- Replace `docs/assets/demo-placeholder.svg` with captured GIF thumbnail or static poster frame.
