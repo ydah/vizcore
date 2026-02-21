@@ -15,13 +15,18 @@ module Vizcore
 
       def run
         validate_scene_file!
+        validate_audio_settings!
 
         app = RackApp.new(frontend_root: Vizcore.frontend_root)
         server = Puma::Server.new(app, nil, min_threads: 0, max_threads: 4)
         server.add_tcp_listener(@config.host, @config.port)
         server.run
 
-        broadcaster = FrameBroadcaster.new(scene_name: scene_name)
+        input_manager = Vizcore::Audio::InputManager.new(
+          source: @config.audio_source,
+          file_path: @config.audio_file&.to_s
+        )
+        broadcaster = FrameBroadcaster.new(scene_name: scene_name, input_manager: input_manager)
         broadcaster.start
 
         @output.puts("Vizcore server listening at http://#{@config.host}:#{@config.port}")
@@ -50,6 +55,13 @@ module Vizcore
 
       def scene_name
         @config.scene_file.basename(".rb").to_s
+      end
+
+      def validate_audio_settings!
+        return unless @config.audio_source == :file
+        return if @config.audio_file && @config.audio_file.file?
+
+        raise ArgumentError, "Audio file not found: #{@config.audio_file || '(nil)'}"
       end
 
       def wait_for_interrupt

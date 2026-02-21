@@ -17,8 +17,16 @@ module Vizcore
     desc "start SCENE_FILE", "Start vizcore HTTP/WebSocket server"
     option :host, type: :string, default: Config::DEFAULT_HOST, desc: "Bind host"
     option :port, type: :numeric, default: Config::DEFAULT_PORT, desc: "Bind port"
+    option :audio_source, type: :string, default: Config::DEFAULT_AUDIO_SOURCE.to_s, desc: "Audio source: mic, file, dummy"
+    option :audio_file, type: :string, desc: "Path to WAV file used when --audio-source file"
     def start(scene_file)
-      config = Config.new(scene_file: scene_file, host: options.fetch(:host), port: options.fetch(:port))
+      config = Config.new(
+        scene_file: scene_file,
+        host: options.fetch(:host),
+        port: options.fetch(:port),
+        audio_source: options.fetch(:audio_source),
+        audio_file: options[:audio_file]
+      )
       Server::Runner.new(config).run
     rescue ArgumentError => e
       raise Thor::Error, e.message
