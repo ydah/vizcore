@@ -9,9 +9,8 @@ Vizcore.define do
       map amplitude => :param_intensity
       map frequency_band(:low) => :param_bass
       map beat? => :param_flash
-      effect "chromatic"
-      effect_intensity 0.35
       vj_effect "pixelate"
+      effect_intensity 0.2
     end
 
     layer :title do
