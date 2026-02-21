@@ -66,9 +66,21 @@ bundle exec rspec
 
 ## Demo
 
-![Vizcore demo placeholder](docs/assets/demo-placeholder.svg)
+![Vizcore demo](docs/assets/demo.gif)
 
-Capture flow and replacement steps are documented in `docs/DEMO_CAPTURE.md`.
+Try the same scenes locally:
+
+```bash
+vizcore start examples/intro_drop.rb --audio-source file --audio-file spec/fixtures/audio/pulse16_mono.wav
+vizcore start examples/midi_scene_switch.rb --audio-source dummy
+vizcore start examples/custom_shader.rb --audio-source file --audio-file spec/fixtures/audio/pulse16_mono.wav
+```
+
+Re-generate demo assets with:
+
+```bash
+scripts/generate_demo_assets.sh
+```
 
 ## Error Handling Notes
 
