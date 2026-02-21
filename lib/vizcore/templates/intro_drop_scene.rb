@@ -4,24 +4,24 @@
 Vizcore.define do
   scene :intro do
     layer :background do
-      shader :gradient_pulse
-      map frequency_band(:low) => :intensity
-      map beat? => :flash
+      shader :neon_grid
+      opacity 0.82
     end
 
     layer :geometry do
       type :wireframe_cube
       map fft_spectrum => :deform
       map amplitude => :rotation_speed
+      map frequency_band(:high) => :color_shift
     end
   end
 
   scene :drop do
     layer :particles do
       type :particle_field
-      count 5000
+      count 3600
       map amplitude => :speed
-      map frequency_band(:high) => :size
+      map frequency_band(:low) => :size
       map beat? => :flash
     end
 
@@ -34,7 +34,7 @@ Vizcore.define do
   end
 
   transition from: :intro, to: :drop do
-    trigger { beat_count >= 64 }
-    effect :crossfade, duration: 2.0
+    trigger { beat_count >= 64 || frame_count >= 360 }
+    effect :crossfade, duration: 1.4
   end
 end

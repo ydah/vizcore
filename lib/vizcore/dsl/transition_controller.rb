@@ -20,11 +20,12 @@ module Vizcore
 
       # @param scene_name [String, Symbol]
       # @param audio [Hash]
+      # @param frame_count [Integer]
       # @return [Hash, nil] transition payload when condition matches
-      def next_transition(scene_name:, audio:)
+      def next_transition(scene_name:, audio:, frame_count: 0)
         current = scene_name.to_sym
         transition = @transitions.find do |entry|
-          entry[:from] == current && trigger_match?(entry[:trigger], audio)
+          entry[:from] == current && trigger_match?(entry[:trigger], audio, frame_count)
         end
         return nil unless transition
 
@@ -70,10 +71,10 @@ module Vizcore
         end
       end
 
-      def trigger_match?(trigger, audio)
+      def trigger_match?(trigger, audio, frame_count)
         return false unless trigger.respond_to?(:call)
 
-        TriggerContext.new(audio).instance_exec(&trigger)
+        TriggerContext.new(audio, frame_count: frame_count).instance_exec(&trigger)
       rescue StandardError
         false
       end
@@ -103,9 +104,13 @@ module Vizcore
       # @api private
       class TriggerContext
         # @param audio [Hash]
-        def initialize(audio)
+        # @param frame_count [Integer]
+        def initialize(audio, frame_count:)
           @audio = symbolize_hash(audio)
           @bands = symbolize_hash(@audio[:bands])
+          @frame_count = Integer(frame_count)
+        rescue StandardError
+          @frame_count = 0
         end
 
         # @return [Float]
@@ -139,6 +144,11 @@ module Vizcore
         # @return [Float]
         def bpm
           @audio[:bpm].to_f
+        end
+
+        # @return [Integer]
+        def frame_count
+          @frame_count
         end
 
         private

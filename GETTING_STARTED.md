@@ -84,7 +84,7 @@ vizcore start examples/midi_scene_switch.rb --audio-source dummy
 vizcore start examples/custom_shader.rb --audio-source dummy
 ```
 
-`intro_drop` transition is beat-driven, so for visible scene changes use a rhythmic file input:
+`intro_drop` falls back to a time-based transition after about 6 seconds when beats are not detected. For beat-synced scene changes, use rhythmic file input:
 
 ```bash
 vizcore start examples/intro_drop.rb --audio-source file --audio-file spec/fixtures/audio/pulse16_mono.wav

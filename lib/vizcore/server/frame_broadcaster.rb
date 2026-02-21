@@ -54,6 +54,7 @@ module Vizcore
         )
         @error_reporter = error_reporter || ->(_message) {}
         @last_error = nil
+        @frame_count = 0
         @frame_scheduler = frame_scheduler || Vizcore::Renderer::FrameScheduler.new(frame_rate: FRAME_RATE) do |elapsed|
           tick(elapsed)
         end
@@ -97,9 +98,10 @@ module Vizcore
       # @param samples [Array<Float>, nil]
       # @return [Hash] serialized frame
       def tick(elapsed_seconds, samples = nil)
+        @frame_count += 1
         frame = build_frame(elapsed_seconds, samples)
         WebSocketHandler.broadcast(type: "audio_frame", payload: frame)
-        evaluate_transition(frame[:audio])
+        evaluate_transition(frame[:audio], frame_count: @frame_count)
         frame
       end
 
@@ -205,10 +207,14 @@ module Vizcore
         end
       end
 
-      def evaluate_transition(audio)
+      def evaluate_transition(audio, frame_count:)
         scene = current_scene
         transition = @scene_mutex.synchronize do
-          @transition_controller.next_transition(scene_name: scene[:name], audio: audio)
+          @transition_controller.next_transition(
+            scene_name: scene[:name],
+            audio: audio,
+            frame_count: frame_count
+          )
         end
         return unless transition
 
