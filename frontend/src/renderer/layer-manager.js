@@ -2,6 +2,8 @@ import { getBuiltinShader } from "../shaders/builtins.js";
 import { getPostEffectShader } from "../shaders/post-effects.js";
 import { buildWireframeLines, estimateDeformFromSpectrum } from "../visuals/geometry.js";
 import { ParticleSystem } from "../visuals/particle-system.js";
+import { TextRenderer } from "../visuals/text-renderer.js";
+import { getVJEffectShader } from "../visuals/vj-effects.js";
 import { FULLSCREEN_VERTEX_SHADER } from "./shader-manager.js";
 
 const GEOMETRY_VERTEX_SHADER = `#version 300 es
@@ -71,6 +73,7 @@ export class LayerManager {
     this.layerTargetHeight = 0;
 
     this.particleSystem = new ParticleSystem(this.gl, this.shaderManager);
+    this.textRenderer = new TextRenderer(this.gl, this.shaderManager);
 
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.fullscreenBuffer);
     this.gl.bufferData(this.gl.ARRAY_BUFFER, FULLSCREEN_VERTICES, this.gl.STATIC_DRAW);
@@ -100,6 +103,10 @@ export class LayerManager {
   renderLayer(layer, audio, time, rotation, resolution) {
     if (isParticleLayer(layer)) {
       this.renderParticleLayer(layer, audio, time);
+      return;
+    }
+    if (isTextLayer(layer)) {
+      this.renderTextLayer(layer, audio, time);
       return;
     }
     if (isShaderLayer(layer)) {
@@ -199,19 +206,34 @@ export class LayerManager {
     });
   }
 
+  renderTextLayer(layer, audio, time) {
+    const params = layer?.params || {};
+    this.textRenderer.render({
+      content: params.content || "VIZCORE",
+      fontSize: Number(params.font_size || 120),
+      color: params.color || "#e5f3ff",
+      audio,
+      time
+    });
+  }
+
   compositeLayer(layer, { audio, time, resolution }) {
     const gl = this.gl;
     const params = layer?.params || {};
     const opacity = clamp(Number(params.opacity || 1), 0, 1);
     const blend = String(params.blend || "alpha").toLowerCase();
     const effectName = String(params.effect || "");
+    const vjEffectName = String(params.vj_effect || "");
     const effectIntensity = clamp(Number(params.effect_intensity || audio?.amplitude || 0.35), 0, 1);
     const effectShader = getPostEffectShader(effectName);
-    const program = effectShader
+    const vjShader = getVJEffectShader(vjEffectName);
+    const selectedShader = vjShader || effectShader;
+    const selectedEffectName = vjShader ? `vj:${vjEffectName}` : `post:${effectName}`;
+    const program = selectedShader
       ? this.shaderManager.getProgram(
-        `post:${effectName}`,
+        selectedEffectName,
         FULLSCREEN_VERTEX_SHADER,
-        effectShader
+        selectedShader
       )
       : this.compositeProgram;
 
@@ -322,6 +344,11 @@ const isShaderLayer = (layer) => {
 const isParticleLayer = (layer) => {
   const type = String(layer?.type || "").toLowerCase();
   return type === "particle_field" || type === "particles" || type === "particle";
+};
+
+const isTextLayer = (layer) => {
+  const type = String(layer?.type || "").toLowerCase();
+  return type === "text" || type === "text_layer";
 };
 
 const defaultLayer = (audio) => ({
