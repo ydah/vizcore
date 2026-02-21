@@ -1,4 +1,5 @@
 import { getBuiltinShader } from "../shaders/builtins.js";
+import { getPostEffectShader } from "../shaders/post-effects.js";
 import { buildWireframeLines, estimateDeformFromSpectrum } from "../visuals/geometry.js";
 import { ParticleSystem } from "../visuals/particle-system.js";
 import { FULLSCREEN_VERTEX_SHADER } from "./shader-manager.js";
@@ -91,7 +92,7 @@ export class LayerManager {
 
       this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
       this.gl.viewport(0, 0, width, height);
-      this.compositeLayer(layer);
+      this.compositeLayer(layer, { audio, time, resolution: [width, height] });
     }
     this.setBlendMode("alpha");
   }
@@ -198,23 +199,37 @@ export class LayerManager {
     });
   }
 
-  compositeLayer(layer) {
+  compositeLayer(layer, { audio, time, resolution }) {
     const gl = this.gl;
     const params = layer?.params || {};
     const opacity = clamp(Number(params.opacity || 1), 0, 1);
     const blend = String(params.blend || "alpha").toLowerCase();
+    const effectName = String(params.effect || "");
+    const effectIntensity = clamp(Number(params.effect_intensity || audio?.amplitude || 0.35), 0, 1);
+    const effectShader = getPostEffectShader(effectName);
+    const program = effectShader
+      ? this.shaderManager.getProgram(
+        `post:${effectName}`,
+        FULLSCREEN_VERTEX_SHADER,
+        effectShader
+      )
+      : this.compositeProgram;
 
     this.setBlendMode(blend);
 
-    gl.useProgram(this.compositeProgram);
+    gl.useProgram(program);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.fullscreenBuffer);
-    gl.enableVertexAttribArray(this.compositePositionLocation);
-    gl.vertexAttribPointer(this.compositePositionLocation, 2, gl.FLOAT, false, 0, 0);
+    const positionLocation = gl.getAttribLocation(program, "a_position");
+    gl.enableVertexAttribArray(positionLocation);
+    gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.layerTexture);
-    gl.uniform1i(this.compositeTextureLocation, 0);
-    gl.uniform1f(this.compositeOpacityLocation, opacity);
+    this.setUniform1i(program, "u_texture", 0);
+    this.setUniform1f(program, "u_opacity", opacity);
+    this.setUniform1f(program, "u_time", time);
+    this.setUniform1f(program, "u_intensity", effectIntensity);
+    this.setUniform2f(program, "u_resolution", resolution[0], resolution[1]);
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
@@ -288,6 +303,14 @@ export class LayerManager {
       return;
     }
     this.gl.uniform2f(location, Number(x || 0), Number(y || 0));
+  }
+
+  setUniform1i(program, uniformName, value) {
+    const location = this.gl.getUniformLocation(program, uniformName);
+    if (location === null) {
+      return;
+    }
+    this.gl.uniform1i(location, Number(value || 0));
   }
 }
 
