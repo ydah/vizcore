@@ -59,6 +59,12 @@ When `--audio-source file` is selected, `--audio-file` is required.
 bundle exec rspec
 ```
 
+## Gem Packaging Policy
+
+- Runtime files only are packaged in the gem: `lib/`, `exe/`, `frontend/index.html`, `frontend/src/`, `examples/`, `sig/`, `README.md`, `GETTING_STARTED.md`, `LICENSE.txt`.
+- Development-only files are excluded from gem payload (for example `spec/`, `.github/`, and `frontend/test/`).
+- RubyGems MFA is required for release operations (`rubygems_mfa_required=true`).
+
 ## License
 
 MIT
