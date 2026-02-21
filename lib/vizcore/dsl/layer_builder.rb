@@ -2,7 +2,9 @@
 
 module Vizcore
   module DSL
+    # Builder for one render layer in a scene.
     class LayerBuilder
+      # @param name [Symbol, String] layer identifier
       def initialize(name:)
         @name = name.to_sym
         @type = nil
@@ -12,37 +14,58 @@ module Vizcore
         @mappings = []
       end
 
+      # Evaluate a layer block.
+      #
+      # @yield Layer DSL methods
+      # @return [Vizcore::DSL::LayerBuilder]
       def evaluate(&block)
         instance_eval(&block) if block
         self
       end
 
+      # @param value [Symbol, String] layer type (`shader`, `particle_field`, etc.)
+      # @return [Symbol]
       def type(value)
         @type = value.to_sym
       end
 
+      # @param value [Symbol, String] built-in shader key
+      # @return [Symbol]
       def shader(value)
         @shader = value.to_sym
         @type ||= :shader
       end
 
+      # @param path [String, Pathname] custom fragment shader path
+      # @return [String]
       def glsl(path)
         @glsl = path.to_s
         @type ||= :shader
       end
 
+      # @param value [Integer] particle count or similar numeric parameter
+      # @return [Integer]
       def count(value)
         @params[:count] = Integer(value)
       end
 
+      # @param value [String] text content
+      # @return [String]
       def content(value)
         @params[:content] = value.to_s
       end
 
+      # @param value [Integer] font size in pixels
+      # @return [Integer]
       def font_size(value)
         @params[:font_size] = Integer(value)
       end
 
+      # Map analysis source(s) to layer parameter target(s).
+      #
+      # @param definition [Hash] mapping pairs (`source` => `target`)
+      # @raise [ArgumentError] when the mapping is empty or invalid
+      # @return [void]
       def map(definition)
         mapping = Hash(definition)
         raise ArgumentError, "map requires at least one mapping pair" if mapping.empty?
@@ -55,30 +78,38 @@ module Vizcore
         end
       end
 
+      # @return [Hash] source descriptor for overall amplitude
       def amplitude
         source(:amplitude)
       end
 
+      # @param name [Symbol, String] band key (`sub`, `low`, `mid`, `high`)
+      # @return [Hash] source descriptor for a frequency band
       def frequency_band(name)
         source(:frequency_band, band: name.to_sym)
       end
 
+      # @return [Hash] source descriptor for FFT spectrum array
       def fft_spectrum
         source(:fft_spectrum)
       end
 
+      # @return [Hash] source descriptor for beat trigger
       def beat?
         source(:beat)
       end
 
+      # @return [Hash] source descriptor for beat counter
       def beat_count
         source(:beat_count)
       end
 
+      # @return [Hash] source descriptor for estimated BPM
       def bpm
         source(:bpm)
       end
 
+      # @return [Hash] serialized layer payload
       def to_h
         layer = {
           name: @name,
