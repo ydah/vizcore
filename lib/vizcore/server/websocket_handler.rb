@@ -28,11 +28,7 @@ module Vizcore
           message = JSON.generate(type: type, payload: payload)
 
           each_socket do |socket|
-            begin
-              socket.send(message)
-            rescue StandardError
-              unregister(socket)
-            end
+            send_message(socket, message)
           end
 
           true
@@ -49,6 +45,27 @@ module Vizcore
           Faye::WebSocket
         rescue LoadError
           nil
+        end
+
+        def send_message(socket, message)
+          if event_machine_reactor_running?
+            EventMachine.schedule { safe_send(socket, message) }
+          else
+            safe_send(socket, message)
+          end
+        end
+
+        def safe_send(socket, message)
+          socket.send(message)
+        rescue StandardError
+          unregister(socket)
+        end
+
+        def event_machine_reactor_running?
+          require "eventmachine"
+          EventMachine.reactor_running?
+        rescue LoadError
+          false
         end
 
         def dependency_error_response

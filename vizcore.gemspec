@@ -32,7 +32,7 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   spec.add_dependency "faye-websocket", "~> 0.11"
-  spec.add_dependency "puma", ">= 6.0", "< 8.0"
-  spec.add_dependency "rack", ">= 2.2", "< 4.0"
+  spec.add_dependency "puma", "~> 6.0"
+  spec.add_dependency "rack", "~> 2.2.0"
   spec.add_dependency "thor", "~> 1.3"
 end
