@@ -61,7 +61,7 @@ module Vizcore
         devices = MidiInput.available_devices
         return devices unless devices.empty?
 
-        [{ name: "virtual-midi (optional dependency: unimidi)" }]
+        [{ id: "virtual-0", name: "virtual-midi (optional dependency: unimidi)" }]
       end
 
       private

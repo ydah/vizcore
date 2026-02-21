@@ -18,7 +18,7 @@ module Vizcore
     option :host, type: :string, default: Config::DEFAULT_HOST, desc: "Bind host"
     option :port, type: :numeric, default: Config::DEFAULT_PORT, desc: "Bind port"
     option :audio_source, type: :string, default: Config::DEFAULT_AUDIO_SOURCE.to_s, desc: "Audio source: mic, file, dummy"
-    option :audio_file, type: :string, desc: "Path to WAV file used when --audio-source file"
+    option :audio_file, type: :string, desc: "Path to audio file used when --audio-source file (wav/mp3/flac)"
     def start(scene_file)
       config = Config.new(
         scene_file: scene_file,
@@ -82,7 +82,7 @@ module Vizcore
     def print_midi_devices
       say("MIDI devices:")
       Vizcore::Audio::InputManager.available_midi_devices.each do |device|
-        say("  - #{device[:name]}")
+        say("  - #{device[:id]}: #{device[:name]}")
       end
     end
   end

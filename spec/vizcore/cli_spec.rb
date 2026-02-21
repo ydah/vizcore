@@ -33,9 +33,12 @@ RSpec.describe Vizcore::CLI do
     end
 
     it "prints midi devices" do
+      allow(Vizcore::Audio::InputManager).to receive(:available_midi_devices)
+        .and_return([{ id: "2", name: "Launchpad Mini MK3" }])
+
       expect do
         described_class.start(["devices", "midi"])
-      end.to output(/MIDI devices:/).to_stdout
+      end.to output(/MIDI devices:\n  - 2: Launchpad Mini MK3/).to_stdout
     end
 
     it "passes --audio-source and --audio-file to config" do
