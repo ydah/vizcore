@@ -71,10 +71,12 @@ bundle exec rspec
 Try the same scenes locally:
 
 ```bash
-vizcore start examples/intro_drop.rb --audio-source file --audio-file spec/fixtures/audio/pulse16_mono.wav
+vizcore start examples/intro_drop.rb --audio-source dummy
 vizcore start examples/midi_scene_switch.rb --audio-source dummy
-vizcore start examples/custom_shader.rb --audio-source file --audio-file spec/fixtures/audio/pulse16_mono.wav
+vizcore start examples/custom_shader.rb --audio-source dummy
 ```
+
+For beat-sensitive transitions (like `intro_drop`), file input with a rhythmic track is recommended.
 
 Re-generate demo assets with:
 

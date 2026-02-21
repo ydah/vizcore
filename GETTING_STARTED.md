@@ -79,9 +79,15 @@ vizcore devices midi
 ## 5. Useful Example Scenes
 
 ```bash
-vizcore start examples/intro_drop.rb
-vizcore start examples/midi_scene_switch.rb
-vizcore start examples/custom_shader.rb
+vizcore start examples/intro_drop.rb --audio-source dummy
+vizcore start examples/midi_scene_switch.rb --audio-source dummy
+vizcore start examples/custom_shader.rb --audio-source dummy
+```
+
+`intro_drop` transition is beat-driven, so for visible scene changes use a rhythmic file input:
+
+```bash
+vizcore start examples/intro_drop.rb --audio-source file --audio-file spec/fixtures/audio/pulse16_mono.wav
 ```
 
 ## 6. Troubleshooting
