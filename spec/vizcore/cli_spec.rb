@@ -21,6 +21,10 @@ RSpec.describe Vizcore::CLI do
 
           expect(Pathname("my_show/README.md")).to exist
           expect(Pathname("my_show/scenes/basic.rb")).to exist
+          expect(Pathname("my_show/scenes/intro_drop.rb")).to exist
+          expect(Pathname("my_show/scenes/midi_control.rb")).to exist
+          expect(Pathname("my_show/scenes/custom_shader.rb")).to exist
+          expect(Pathname("my_show/shaders/custom_wave.frag")).to exist
           expect(Pathname("my_show/shaders")).to exist
         end
       end

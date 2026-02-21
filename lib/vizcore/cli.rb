@@ -40,6 +40,10 @@ module Vizcore
 
       write_template("project_readme.md", root.join("README.md"), project_name: name)
       write_template("basic_scene.rb", root.join("scenes", "basic.rb"), project_name: name)
+      write_template("intro_drop_scene.rb", root.join("scenes", "intro_drop.rb"), project_name: name)
+      write_template("midi_control_scene.rb", root.join("scenes", "midi_control.rb"), project_name: name)
+      write_template("custom_shader_scene.rb", root.join("scenes", "custom_shader.rb"), project_name: name)
+      write_template("custom_wave.frag", root.join("shaders", "custom_wave.frag"), project_name: name)
 
       say("Created project scaffold: #{root}")
       say("Next: cd #{name} && vizcore start scenes/basic.rb")
