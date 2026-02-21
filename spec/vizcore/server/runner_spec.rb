@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "stringio"
+require "tmpdir"
 require "vizcore/config"
 require "vizcore/server/runner"
 
@@ -112,6 +113,28 @@ RSpec.describe Vizcore::Server::Runner do
       runner = described_class.new(file_config, output: output)
 
       expect { runner.run }.to raise_error(ArgumentError, /Audio file not found/)
+    end
+
+    it "raises when scene references missing glsl file" do
+      Dir.mktmpdir("vizcore-runner-glsl") do |dir|
+        missing_scene = File.join(dir, "missing_glsl_scene.rb")
+        File.write(
+          missing_scene,
+          <<~RUBY
+            Vizcore.define do
+              scene :broken do
+                layer :shader_art do
+                  glsl "shaders/not_found.frag"
+                end
+              end
+            end
+          RUBY
+        )
+        broken_config = Vizcore::Config.new(scene_file: missing_scene, host: "127.0.0.1", port: 4567)
+        runner = described_class.new(broken_config, output: output)
+
+        expect { runner.run }.to raise_error(ArgumentError, /GLSL file not found/)
+      end
     end
 
     it "executes midi_map switch_scene action from midi note events" do

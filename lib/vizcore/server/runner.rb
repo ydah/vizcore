@@ -13,6 +13,7 @@ module Vizcore
       def initialize(config, output: $stdout)
         @config = config
         @output = output
+        @shader_source_resolver = Vizcore::DSL::ShaderSourceResolver.new
       end
 
       def run
@@ -70,7 +71,8 @@ module Vizcore
       end
 
       def load_definition!
-        Vizcore::DSL::Engine.load_file(@config.scene_file.to_s)
+        raw_definition = Vizcore::DSL::Engine.load_file(@config.scene_file.to_s)
+        resolve_shader_sources(raw_definition)
       rescue StandardError => e
         raise ArgumentError, "Failed to load scene file: #{e.message}"
       end
@@ -94,6 +96,7 @@ module Vizcore
 
       def start_scene_watcher(broadcaster, &on_reload)
         watcher = Vizcore::DSL::Engine.watch_file(@config.scene_file.to_s) do |definition, _changed_path|
+          definition = resolve_shader_sources(definition)
           scene = first_scene(definition) || fallback_scene
           broadcaster.update_transition_definition(
             scenes: Array(definition[:scenes]),
@@ -225,6 +228,10 @@ module Vizcore
           globals: Hash(definition[:globals] || {}),
           device: midi_inputs.first&.dig(:options, :device)
         }
+      end
+
+      def resolve_shader_sources(definition)
+        @shader_source_resolver.resolve(definition: definition, scene_file: @config.scene_file.to_s)
       end
     end
   end
