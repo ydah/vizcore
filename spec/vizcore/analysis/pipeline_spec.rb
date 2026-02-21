@@ -18,6 +18,7 @@ RSpec.describe Vizcore::Analysis::Pipeline do
     expect(result[:bands].keys).to contain_exactly(:sub, :low, :mid, :high)
     expect(result[:fft].length).to eq(32)
     expect(result[:peak_frequency]).to be_within(50.0).of(440.0)
+    expect(result[:bpm]).to be_a(Float)
   end
 
   it "returns zeroed output for empty samples" do
@@ -27,5 +28,6 @@ RSpec.describe Vizcore::Analysis::Pipeline do
     expect(result[:amplitude]).to eq(0.0)
     expect(result[:bands]).to eq(sub: 0.0, low: 0.0, mid: 0.0, high: 0.0)
     expect(result[:fft]).to eq(Array.new(32, 0.0))
+    expect(result[:bpm]).to be >= 0.0
   end
 end

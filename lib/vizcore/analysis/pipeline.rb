@@ -3,18 +3,21 @@
 module Vizcore
   module Analysis
     class Pipeline
-      attr_reader :fft_processor, :band_splitter, :beat_detector
+      attr_reader :fft_processor, :band_splitter, :beat_detector, :bpm_estimator
 
-      def initialize(sample_rate: 44_100, fft_size: 1024, window: :hamming, beat_detector: nil)
+      def initialize(sample_rate: 44_100, fft_size: 1024, window: :hamming, beat_detector: nil, bpm_estimator: nil)
         @fft_processor = FFTProcessor.new(sample_rate: sample_rate, fft_size: fft_size, window: window)
         @band_splitter = BandSplitter.new(sample_rate: sample_rate, fft_size: fft_size)
         @beat_detector = beat_detector || BeatDetector.new
+        frame_rate = sample_rate.to_f / fft_size.to_f
+        @bpm_estimator = bpm_estimator || BPMEstimator.new(frame_rate: frame_rate)
       end
 
       def call(samples)
         fft = @fft_processor.call(samples)
         bands = @band_splitter.call(fft[:magnitudes])
         beat = @beat_detector.call(samples)
+        bpm = @bpm_estimator.call(beat: beat[:beat])
 
         {
           amplitude: rms(samples),
@@ -22,7 +25,7 @@ module Vizcore
           fft: preview_spectrum(fft[:magnitudes]),
           beat: beat[:beat],
           beat_count: beat[:beat_count],
-          bpm: 128.0,
+          bpm: bpm,
           peak_frequency: fft[:peak_frequency]
         }
       end
