@@ -55,21 +55,33 @@ export class TextRenderer {
     this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
   }
 
-  render({ content, fontSize, audio, time, color }) {
+  render({ content, fontSize, audio, time, color, glowStrength }) {
     const text = String(content || "").trim();
     if (!text) {
       return;
     }
 
+    this.syncCanvasSize();
+
     const amp = clamp(Number(audio?.amplitude || 0), 0, 1);
     const beatBoost = audio?.beat ? 1.0 : 0.0;
-    const dynamicSize = Math.round(clamp(Number(fontSize || 96), 18, 320) * (1 + amp * 0.15 + beatBoost * 0.1));
-    this.drawTextToCanvas({ text, fontSize: dynamicSize, time, color, amplitude: amp });
+    const maxFontSize = Math.max(48, Math.floor(this.canvas.height * 0.22));
+    const dynamicSize = Math.round(
+      clamp(Number(fontSize || 96), 18, maxFontSize) * (1 + amp * 0.08 + beatBoost * 0.04)
+    );
+    this.drawTextToCanvas({
+      text,
+      fontSize: dynamicSize,
+      time,
+      color,
+      amplitude: amp,
+      glowStrength: Number(glowStrength ?? 0.15)
+    });
     this.uploadTexture();
     this.drawQuad({ intensity: 0.85 + amp * 0.15 });
   }
 
-  drawTextToCanvas({ text, fontSize, time, color, amplitude }) {
+  drawTextToCanvas({ text, fontSize, time, color, amplitude, glowStrength }) {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -77,16 +89,26 @@ export class TextRenderer {
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
     const safeColor = typeof color === "string" && color.trim() ? color : "#e5f3ff";
-    const glow = 6 + amplitude * 12;
-    const xShift = Math.sin(time * 2.0) * (4 + amplitude * 8);
+    const glow = clamp(Number(glowStrength || 0), 0, 1) * (1.5 + amplitude * 5.0);
+    const xShift = Math.sin(time * 2.0) * (2 + amplitude * 4);
 
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = `700 ${fontSize}px "IBM Plex Sans", "Noto Sans JP", sans-serif`;
-    ctx.shadowColor = "rgba(110, 208, 255, 0.65)";
+    ctx.shadowColor = "rgba(110, 208, 255, 0.35)";
     ctx.shadowBlur = glow;
     ctx.fillStyle = safeColor;
     ctx.fillText(text, this.canvas.width / 2 + xShift, this.canvas.height / 2);
+  }
+
+  syncCanvasSize() {
+    const width = clamp(Math.floor(this.gl.drawingBufferWidth || 1024), 640, 2048);
+    const height = clamp(Math.floor(this.gl.drawingBufferHeight || 512), 360, 2048);
+    if (this.canvas.width === width && this.canvas.height === height) {
+      return;
+    }
+    this.canvas.width = width;
+    this.canvas.height = height;
   }
 
   uploadTexture() {

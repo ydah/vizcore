@@ -16,7 +16,8 @@ Vizcore.define do
     layer :title do
       type :text
       content "{{project_name}}"
-      font_size 108
+      font_size 84
+      glow_strength 0.08
       color "#f5f9ff"
     end
   end
