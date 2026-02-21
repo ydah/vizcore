@@ -3,6 +3,7 @@
 require_relative "../audio"
 require_relative "../analysis"
 require_relative "../dsl"
+require_relative "../errors"
 require_relative "../renderer"
 
 module Vizcore
@@ -20,7 +21,8 @@ module Vizcore
         frame_scheduler: nil,
         scene_catalog: nil,
         transitions: nil,
-        transition_controller: nil
+        transition_controller: nil,
+        error_reporter: nil
       )
         @scene_name = scene_name
         @scene_layers = Array(scene_layers)
@@ -37,17 +39,22 @@ module Vizcore
           scenes: scene_catalog || [],
           transitions: transitions || []
         )
+        @error_reporter = error_reporter || ->(_message) {}
+        @last_error = nil
         @frame_scheduler = frame_scheduler || Vizcore::Renderer::FrameScheduler.new(frame_rate: FRAME_RATE) do |elapsed|
           tick(elapsed)
         end
       end
+
+      attr_reader :last_error
 
       def start
         return if running?
 
         @input_manager.start
         @frame_scheduler.start
-      rescue StandardError
+      rescue StandardError => e
+        report_error(e, context: "frame broadcaster start failed")
         @input_manager.stop
         raise
       end
@@ -100,6 +107,9 @@ module Vizcore
           scene_layers: layers,
           transition: nil
         )
+      rescue StandardError => e
+        report_error(e, context: "frame build failed")
+        raise Vizcore::FrameBuildError, Vizcore::ErrorFormatting.summarize(e, context: "Frame build failed")
       end
 
       private
@@ -107,8 +117,10 @@ module Vizcore
       def capture_samples
         samples = @input_manager.capture_frame
         samples.empty? ? Array.new(@input_manager.frame_size, 0.0) : samples
-      rescue StandardError
-        Array.new(1024, 0.0)
+      rescue StandardError => e
+        report_error(e, context: "audio capture failed")
+        fallback_frame_size = @input_manager.respond_to?(:frame_size) ? Integer(@input_manager.frame_size) : 1024
+        Array.new(fallback_frame_size, 0.0)
       end
 
       def supported_fft_size(size)
@@ -171,6 +183,13 @@ module Vizcore
             effect: transition[:effect]
           }
         )
+      end
+
+      def report_error(error, context:)
+        @last_error = error
+        @error_reporter.call(Vizcore::ErrorFormatting.summarize(error, context: context))
+      rescue StandardError
+        nil
       end
 
     end

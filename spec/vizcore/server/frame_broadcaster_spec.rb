@@ -118,6 +118,30 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
       expect(frame.dig(:scene, :layers, 0, :name)).to eq("drop_layer")
       expect(frame.dig(:scene, :layers, 0, :type)).to eq("shader")
     end
+
+    it "reports audio capture errors and falls back to silence frame" do
+      input_manager = instance_double(
+        Vizcore::Audio::InputManager,
+        frame_size: 1024,
+        sample_rate: 44_100,
+        start: nil,
+        stop: nil
+      )
+      allow(input_manager).to receive(:capture_frame).and_raise(StandardError.new("device busy"))
+      reports = []
+      broadcaster = described_class.new(
+        scene_name: "basic",
+        input_manager: input_manager,
+        error_reporter: ->(message) { reports << message }
+      )
+
+      frame = broadcaster.build_frame(0.2)
+
+      expect(frame.dig(:audio, :fft)).to be_a(Array)
+      expect(frame.dig(:audio, :fft).length).to eq(32)
+      expect(reports.join("\n")).to include("audio capture failed")
+      expect(broadcaster.last_error).to be_a(StandardError)
+    end
   end
 
   describe "#tick" do

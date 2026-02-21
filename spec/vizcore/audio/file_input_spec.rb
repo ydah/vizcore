@@ -71,7 +71,16 @@ RSpec.describe Vizcore::Audio::FileInput do
       input.start
 
       expect(input.read(4)).to eq([0.0, 0.0, 0.0, 0.0])
+      expect(input.last_error).to be_a(Vizcore::AudioSourceError)
+      expect(input.last_error.message).to include("ffmpeg is unavailable")
       expect(runner).not_to have_received(:capture3)
     end
+  end
+
+  it "records an error when file path does not exist" do
+    input = described_class.new(path: "/tmp/vizcore-missing-audio.wav")
+
+    expect(input.last_error).to be_a(Vizcore::AudioSourceError)
+    expect(input.last_error.message).to include("Audio file not found")
   end
 end

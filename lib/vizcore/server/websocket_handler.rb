@@ -3,6 +3,7 @@
 require "json"
 require "set"
 require "thread"
+require_relative "../errors"
 
 module Vizcore
   module Server
@@ -38,6 +39,10 @@ module Vizcore
           mutex.synchronize { sockets.size }
         end
 
+        def last_error
+          mutex.synchronize { @last_error }
+        end
+
         private
 
         def faye_websocket_class
@@ -57,7 +62,8 @@ module Vizcore
 
         def safe_send(socket, message)
           socket.send(message)
-        rescue StandardError
+        rescue StandardError => e
+          set_last_error(e)
           unregister(socket)
         end
 
@@ -74,7 +80,8 @@ module Vizcore
 
         def handle_message(_socket, raw_message)
           JSON.parse(raw_message)
-        rescue JSON::ParserError
+        rescue JSON::ParserError => e
+          set_last_error(e)
           nil
         end
 
@@ -97,6 +104,10 @@ module Vizcore
 
         def mutex
           @mutex ||= Mutex.new
+        end
+
+        def set_last_error(error)
+          mutex.synchronize { @last_error = error }
         end
 
         def text_headers

@@ -1,12 +1,14 @@
 # frozen_string_literal: true
 
 require "open3"
+require_relative "../errors"
 require_relative "base_input"
 
 module Vizcore
   module Audio
     class FileInput < BaseInput
       SUPPORTED_EXTENSIONS = %w[.wav .mp3 .flac].freeze
+      attr_reader :last_error
 
       def initialize(path:, sample_rate: 44_100, command_runner: Open3, ffmpeg_checker: nil)
         super(sample_rate: sample_rate)
@@ -14,6 +16,7 @@ module Vizcore
         @command_runner = command_runner
         @ffmpeg_checker = ffmpeg_checker || method(:ffmpeg_available?)
         @cursor = 0
+        @last_error = nil
         @samples = load_samples
       end
 
@@ -35,8 +38,8 @@ module Vizcore
 
       def load_samples
         return [] unless @path
-        return [] unless File.file?(@path)
-        return [] unless SUPPORTED_EXTENSIONS.include?(extension)
+        return record_error(AudioSourceError.new("Audio file not found: #{@path}")) unless File.file?(@path)
+        return record_error(AudioSourceError.new("Unsupported audio format: #{extension}")) unless SUPPORTED_EXTENSIONS.include?(extension)
 
         return load_wav_samples if extension == ".wav"
 
@@ -59,20 +62,26 @@ module Vizcore
                  end
           samples.concat(mono.map { |sample| Float(sample) })
         end
+        @last_error = nil
         samples
-      rescue LoadError
-        []
+      rescue LoadError => e
+        record_error(
+          AudioSourceError.new(
+            "wavefile gem is required for WAV input: #{e.message}"
+          )
+        )
       end
 
       def load_compressed_samples
-        return [] unless @ffmpeg_checker.call
+        return record_error(AudioSourceError.new("ffmpeg is unavailable")) unless @ffmpeg_checker.call
 
         stdout, _stderr, status = @command_runner.capture3(*ffmpeg_decode_command)
-        return [] unless status.success?
+        return record_error(AudioSourceError.new("ffmpeg decode failed with non-zero status")) unless status.success?
 
+        @last_error = nil
         stdout.unpack("e*").map { |sample| Float(sample) }
-      rescue StandardError
-        []
+      rescue StandardError => e
+        record_error(AudioSourceError.new("ffmpeg decode failed: #{e.message}"))
       end
 
       def ffmpeg_decode_command
@@ -97,6 +106,11 @@ module Vizcore
         system("ffmpeg", "-version", out: File::NULL, err: File::NULL)
       rescue StandardError
         false
+      end
+
+      def record_error(error)
+        @last_error = error
+        []
       end
     end
   end

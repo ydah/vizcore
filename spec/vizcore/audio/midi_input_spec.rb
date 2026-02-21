@@ -102,4 +102,18 @@ RSpec.describe Vizcore::Audio::MidiInput do
   ensure
     midi&.stop
   end
+
+  it "records an error when requested midi device is not found" do
+    device = FakeMidiDevice.new(name: "Primary", device_id: 1, input: FakeMidiInput.new([]))
+    backend = build_backend([device])
+    midi = described_class.new(device: "missing-device", backend: backend)
+
+    midi.start
+
+    expect(midi.running?).to eq(false)
+    expect(midi.last_error).to be_a(Vizcore::AudioSourceError)
+    expect(midi.last_error.message).to include("MIDI device not found")
+  ensure
+    midi&.stop
+  end
 end

@@ -114,6 +114,8 @@ RSpec.describe Vizcore::Audio::MicInput do
 
     expect(mic.read(2)).to eq([0.3, 0.3])
     expect(mic.using_fallback?).to eq(true)
+    expect(mic.last_error).to be_a(Vizcore::AudioSourceError)
+    expect(mic.last_error.message).to include("Microphone read failed")
     expect(backend.closed_streams).to include(stream)
   ensure
     mic&.stop

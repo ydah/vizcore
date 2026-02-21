@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "thread"
+require_relative "../errors"
 
 module Vizcore
   module Audio
@@ -52,7 +53,10 @@ module Vizcore
         @input = nil
         @events = Queue.new
         @callback = nil
+        @last_error = nil
       end
+
+      attr_reader :last_error
 
       def start(&callback)
         return self if running?
@@ -101,10 +105,14 @@ module Vizcore
         return nil if devices.empty?
 
         device = select_device(devices)
-        return nil unless device
+        unless device
+          @last_error = AudioSourceError.new("MIDI device not found: #{@device}")
+          return nil
+        end
 
         device.respond_to?(:open) ? device.open : device
-      rescue StandardError
+      rescue StandardError => e
+        @last_error = AudioSourceError.new("MIDI open failed: #{e.message}")
         nil
       end
 
@@ -134,7 +142,8 @@ module Vizcore
           @events << event
           @callback&.call(event)
         end
-      rescue StandardError
+      rescue StandardError => e
+        @last_error = AudioSourceError.new("MIDI consume loop failed: #{e.message}")
         @running = false
       end
 
@@ -144,7 +153,8 @@ module Vizcore
         return @input.read if @input.respond_to?(:read)
 
         nil
-      rescue StandardError
+      rescue StandardError => e
+        @last_error = AudioSourceError.new("MIDI read failed: #{e.message}")
         nil
       end
 
@@ -177,7 +187,8 @@ module Vizcore
           end
 
         values.map { |value| Integer(value) & 0xFF }
-      rescue StandardError
+      rescue StandardError => e
+        @last_error = AudioSourceError.new("MIDI message parse failed: #{e.message}")
         []
       end
 
@@ -212,7 +223,8 @@ module Vizcore
         return unless input.respond_to?(:close)
 
         input.close
-      rescue StandardError
+      rescue StandardError => e
+        @last_error = AudioSourceError.new("MIDI close failed: #{e.message}")
         nil
       end
     end

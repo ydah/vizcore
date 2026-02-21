@@ -3,6 +3,7 @@
 require "puma"
 require_relative "../config"
 require_relative "../dsl"
+require_relative "../errors"
 require_relative "frame_broadcaster"
 require_relative "rack_app"
 require_relative "websocket_handler"
@@ -36,7 +37,8 @@ module Vizcore
           scene_layers: scene[:layers],
           scene_catalog: definition[:scenes],
           transitions: definition[:transitions],
-          input_manager: input_manager
+          input_manager: input_manager,
+          error_reporter: ->(message) { @output.puts(message) }
         )
         broadcaster.start
         midi_runtime = start_midi_runtime(definition, broadcaster)
@@ -67,21 +69,24 @@ module Vizcore
                     "Scene file is required"
                   end
 
-        raise ArgumentError, message
+        raise Vizcore::ConfigurationError, message
       end
 
       def load_definition!
         raw_definition = Vizcore::DSL::Engine.load_file(@config.scene_file.to_s)
         resolve_shader_sources(raw_definition)
       rescue StandardError => e
-        raise ArgumentError, "Failed to load scene file: #{e.message}"
+        raise Vizcore::SceneLoadError, Vizcore::ErrorFormatting.summarize(
+          e,
+          context: "Failed to load scene file #{@config.scene_file}"
+        )
       end
 
       def validate_audio_settings!
         return unless @config.audio_source == :file
         return if @config.audio_file && @config.audio_file.file?
 
-        raise ArgumentError, "Audio file not found: #{@config.audio_file || '(nil)'}"
+        raise Vizcore::ConfigurationError, "Audio file not found: #{@config.audio_file || '(nil)'}"
       end
 
       def wait_for_interrupt
@@ -107,12 +112,12 @@ module Vizcore
           WebSocketHandler.broadcast(type: "config_update", payload: { scene: scene })
           @output.puts("Scene reloaded: #{scene[:name]}")
         rescue StandardError => e
-          @output.puts("Scene reload failed: #{e.message}")
+          @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "Scene reload failed"))
         end
         watcher.start
         watcher
       rescue StandardError => e
-        @output.puts("Scene watcher disabled: #{e.message}")
+        @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "Scene watcher disabled"))
         nil
       end
 
@@ -146,7 +151,7 @@ module Vizcore
           device: settings[:device]
         }
       rescue StandardError => e
-        @output.puts("MIDI runtime disabled: #{e.message}")
+        @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "MIDI runtime disabled"))
         midi_input&.stop
         nil
       end
@@ -168,7 +173,7 @@ module Vizcore
         )
         runtime
       rescue StandardError => e
-        @output.puts("MIDI runtime update failed: #{e.message}")
+        @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "MIDI runtime update failed"))
         runtime
       end
 
@@ -177,7 +182,8 @@ module Vizcore
 
         runtime[:input]&.stop
         nil
-      rescue StandardError
+      rescue StandardError => e
+        @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "MIDI runtime shutdown failed"))
         nil
       end
 
@@ -187,7 +193,7 @@ module Vizcore
           apply_midi_action(action, executor, broadcaster)
         end
       rescue StandardError => e
-        @output.puts("MIDI action failed: #{e.message}")
+        @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "MIDI action failed"))
       end
 
       def apply_midi_action(action, executor, broadcaster)
