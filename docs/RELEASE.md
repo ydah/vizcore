@@ -53,6 +53,12 @@ gem push vizcore-<version>.gem
 
 `vizcore.gemspec` enforces RubyGems MFA metadata (`rubygems_mfa_required=true`).
 
+Automated path:
+
+- Push tag `v<version>` to trigger `.github/workflows/release.yml`
+- Workflow validates tag/version consistency via `scripts/check_release_tag.rb`
+- Workflow publishes to RubyGems when `RUBYGEMS_API_KEY` secret is configured
+
 ## 5. Post-Release
 
 - Tag release commit (`git tag v<version>`).

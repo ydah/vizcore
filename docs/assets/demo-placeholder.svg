@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" role="img" aria-labelledby="title desc">
+  <title id="title">Vizcore Demo Placeholder</title>
+  <desc id="desc">Placeholder image until demo video and gif are captured.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#08121f"/>
+      <stop offset="100%" stop-color="#13263d"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg)"/>
+  <g fill="none" stroke="#56d4ff" stroke-width="3" opacity="0.6">
+    <path d="M0 520 C200 480 350 560 600 500 C800 450 1000 530 1200 470"/>
+    <path d="M0 560 C220 520 380 600 600 550 C820 500 980 590 1200 530"/>
+  </g>
+  <g fill="#d9f3ff" font-family="monospace" text-anchor="middle">
+    <text x="600" y="290" font-size="46">Vizcore Demo Placeholder</text>
+    <text x="600" y="340" font-size="28">Replace with MP4/GIF after capture</text>
+    <text x="600" y="390" font-size="24">See docs/DEMO_CAPTURE.md</text>
+  </g>
+</svg>
