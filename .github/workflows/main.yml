@@ -57,6 +57,7 @@ jobs:
     name: Cross-platform smoke (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os:
           - ubuntu-latest
@@ -72,4 +73,42 @@ jobs:
           ruby-version: "3.2"
           bundler-cache: true
       - name: Run smoke spec
+        id: smoke
         run: bundle exec rspec spec/vizcore_spec.rb
+      - name: Write smoke report
+        if: always()
+        env:
+          MATRIX_OS: ${{ matrix.os }}
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+          SMOKE_CONCLUSION: ${{ steps.smoke.conclusion }}
+        run: ruby .github/scripts/write_cross_platform_report.rb
+      - name: Upload smoke artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-platform-smoke-${{ matrix.os }}
+          path: cross-platform-smoke-${{ matrix.os }}.json
+          if-no-files-found: error
+
+  cross-platform-summary:
+    name: Cross-platform summary
+    runs-on: ubuntu-latest
+    needs:
+      - cross-platform-smoke
+    if: always()
+    steps:
+      - name: Download smoke artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cross-platform-smoke-*
+          path: cross-platform-reports
+      - name: Build summary markdown
+        run: ruby .github/scripts/build_cross_platform_summary.rb
+      - name: Upload summary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-platform-summary
+          path: cross-platform-summary.md
+          if-no-files-found: error
+      - name: Publish summary
+        run: cat cross-platform-summary.md >> "$GITHUB_STEP_SUMMARY"
