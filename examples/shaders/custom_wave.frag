@@ -18,10 +18,13 @@ void main() {
   float intensity = max(u_param_intensity, u_amplitude);
   float bass = max(u_param_bass, u_bass);
   float wave = sin(centered.x * 9.0 + u_time * (2.4 + bass * 7.0));
-  float glow = smoothstep(0.18 + intensity * 0.2, 0.0, abs(centered.y - wave * 0.34));
+  float lineDistance = abs(centered.y - wave * 0.28);
+  float core = smoothstep(0.045 + intensity * 0.03, 0.0, lineDistance);
+  float halo = smoothstep(0.12 + intensity * 0.06, 0.0, lineDistance);
 
   vec3 color = vec3(0.02, 0.03, 0.08);
-  color += vec3(0.25, 0.72, 0.95) * glow * (0.35 + intensity * 0.9);
-  color += vec3(0.95, 0.28, 0.44) * u_param_flash * 0.3;
+  color += vec3(0.22, 0.68, 0.92) * halo * (0.22 + intensity * 0.45);
+  color += vec3(0.50, 0.92, 1.0) * core * (0.55 + intensity * 0.55);
+  color += vec3(0.95, 0.28, 0.44) * u_param_flash * 0.18;
   outColor = vec4(color, 1.0);
 }

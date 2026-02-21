@@ -8,15 +8,13 @@ Vizcore.define do
       map amplitude => :param_intensity
       map frequency_band(:low) => :param_bass
       map beat? => :param_flash
-      vj_effect "mirror"
-      effect_intensity 0.15
     end
 
     layer :title do
       type :text
       content "VIZCORE"
-      font_size 84
-      glow_strength 0.08
+      font_size 72
+      glow_strength 0.0
       color "#f8fbff"
     end
   end
