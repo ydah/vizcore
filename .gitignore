@@ -11,3 +11,5 @@
 Gemfile.lock
 *.bundle
 *.gem
+
+.rubocop_cache/
