@@ -3,6 +3,7 @@
 require_relative "../audio"
 require_relative "../analysis"
 require_relative "../dsl"
+require_relative "../renderer"
 
 module Vizcore
   module Server
@@ -15,7 +16,8 @@ module Vizcore
         scene_layers: nil,
         input_manager: nil,
         analysis_pipeline: nil,
-        mapping_resolver: nil
+        mapping_resolver: nil,
+        scene_serializer: nil
       )
         @scene_name = scene_name
         @scene_layers = Array(scene_layers)
@@ -26,6 +28,7 @@ module Vizcore
           fft_size: fft_size
         )
         @mapping_resolver = mapping_resolver || Vizcore::DSL::MappingResolver.new
+        @scene_serializer = scene_serializer || Vizcore::Renderer::SceneSerializer.new
         @running = false
         @thread = nil
       end
@@ -58,22 +61,13 @@ module Vizcore
         analyzed = @analysis_pipeline.call(audio_samples)
         layers = build_scene_layers(analyzed)
 
-        {
+        @scene_serializer.audio_frame(
           timestamp: Time.now.to_f,
-          audio: {
-            amplitude: analyzed[:amplitude].round(4),
-            bands: analyzed[:bands].transform_values { |value| value.round(4) },
-            fft: analyzed[:fft].map { |value| value.round(4) },
-            beat: analyzed[:beat],
-            beat_count: analyzed[:beat_count],
-            bpm: analyzed[:bpm]
-          },
-          scene: {
-            name: @scene_name,
-            layers: layers
-          },
+          audio: analyzed,
+          scene_name: @scene_name,
+          scene_layers: layers,
           transition: nil
-        }
+        )
       end
 
       private
