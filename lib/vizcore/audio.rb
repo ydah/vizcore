@@ -1,5 +1,11 @@
 # frozen_string_literal: true
 
+module Vizcore
+  # Audio input/runtime namespace.
+  module Audio
+  end
+end
+
 require_relative "audio/base_input"
 require_relative "audio/dummy_sine_input"
 require_relative "audio/file_input"

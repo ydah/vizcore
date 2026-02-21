@@ -10,13 +10,21 @@ require_relative "websocket_handler"
 
 module Vizcore
   module Server
+    # Bootstraps Rack/Puma, audio pipeline, scene reload, and MIDI runtime.
     class Runner
+      # @param config [Vizcore::Config]
+      # @param output [#puts]
       def initialize(config, output: $stdout)
         @config = config
         @output = output
         @shader_source_resolver = Vizcore::DSL::ShaderSourceResolver.new
       end
 
+      # Run server lifecycle until interrupted.
+      #
+      # @raise [Vizcore::ConfigurationError]
+      # @raise [Vizcore::SceneLoadError]
+      # @return [void]
       def run
         validate_scene_file!
         validate_audio_settings!

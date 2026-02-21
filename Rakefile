@@ -8,6 +8,12 @@ RSpec::Core::RakeTask.new(:spec)
 
 task default: :spec
 
+def ensure_command!(command, install_hint:)
+  return if system("command -v #{command} > /dev/null 2>&1")
+
+  raise "Missing command: #{command}. #{install_hint}"
+end
+
 namespace :release do
   def run_rubocop
     Bundler.with_unbundled_env do
@@ -41,4 +47,22 @@ namespace :release do
 
   desc "Run complete release verification pipeline"
   task verify: %i[preflight verify_package]
+end
+
+namespace :docs do
+  desc "Generate API documentation with YARD"
+  task :yard do
+    ensure_command!("yard", install_hint: "Install with `gem install yard`.")
+    Bundler.with_unbundled_env do
+      sh "yard doc"
+    end
+  end
+
+  desc "Print YARD documentation statistics"
+  task :yard_stats do
+    ensure_command!("yard", install_hint: "Install with `gem install yard`.")
+    Bundler.with_unbundled_env do
+      sh "yard stats --list-undoc"
+    end
+  end
 end
