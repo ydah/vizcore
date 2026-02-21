@@ -3,6 +3,30 @@
 require "vizcore/server/frame_broadcaster"
 
 RSpec.describe Vizcore::Server::FrameBroadcaster do
+  describe "#start / #stop" do
+    it "starts and stops input manager through frame scheduler lifecycle" do
+      input_manager = instance_double(
+        Vizcore::Audio::InputManager,
+        frame_size: 1024,
+        sample_rate: 44_100,
+        capture_frame: Array.new(1024, 0.0),
+        start: nil,
+        stop: nil
+      )
+      scheduler = instance_double(Vizcore::Renderer::FrameScheduler, start: nil, stop: nil, running?: false)
+      allow(scheduler).to receive(:running?).and_return(false, true)
+
+      broadcaster = described_class.new(input_manager: input_manager, frame_scheduler: scheduler)
+      broadcaster.start
+      broadcaster.stop
+
+      expect(input_manager).to have_received(:start)
+      expect(scheduler).to have_received(:start)
+      expect(scheduler).to have_received(:stop)
+      expect(input_manager).to have_received(:stop)
+    end
+  end
+
   describe "#build_frame" do
     it "returns a frame payload compatible with frontend expectations" do
       frame = described_class.new(scene_name: "basic").build_frame(1.25)

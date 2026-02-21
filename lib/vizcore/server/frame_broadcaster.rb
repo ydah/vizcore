@@ -9,7 +9,6 @@ module Vizcore
   module Server
     class FrameBroadcaster
       FRAME_RATE = 60.0
-      FRAME_INTERVAL = 1.0 / FRAME_RATE
 
       def initialize(
         scene_name: "basic",
@@ -17,7 +16,8 @@ module Vizcore
         input_manager: nil,
         analysis_pipeline: nil,
         mapping_resolver: nil,
-        scene_serializer: nil
+        scene_serializer: nil,
+        frame_scheduler: nil
       )
         @scene_name = scene_name
         @scene_layers = Array(scene_layers)
@@ -29,31 +29,31 @@ module Vizcore
         )
         @mapping_resolver = mapping_resolver || Vizcore::DSL::MappingResolver.new
         @scene_serializer = scene_serializer || Vizcore::Renderer::SceneSerializer.new
-        @running = false
-        @thread = nil
+        @frame_scheduler = frame_scheduler || Vizcore::Renderer::FrameScheduler.new(frame_rate: FRAME_RATE) do |elapsed|
+          frame = build_frame(elapsed)
+          WebSocketHandler.broadcast(type: "audio_frame", payload: frame)
+        end
       end
 
       def start
         return if running?
 
         @input_manager.start
-        @running = true
-        started_at = monotonic_time
-        @thread = Thread.new { run_loop(started_at) }
+        @frame_scheduler.start
+      rescue StandardError
+        @input_manager.stop
+        raise
       end
 
       def stop
         return unless running?
 
-        @running = false
-        thread = @thread
-        @thread = nil
-        thread&.join(1.0)
+        @frame_scheduler.stop
         @input_manager.stop
       end
 
       def running?
-        @running
+        @frame_scheduler.running?
       end
 
       def build_frame(_elapsed_seconds, samples = nil)
@@ -71,24 +71,6 @@ module Vizcore
       end
 
       private
-
-      def run_loop(started_at)
-        while running?
-          loop_started = monotonic_time
-          elapsed = loop_started - started_at
-          samples = capture_samples
-          frame = build_frame(elapsed, samples)
-          WebSocketHandler.broadcast(type: "audio_frame", payload: frame)
-
-          duration = monotonic_time - loop_started
-          sleep_time = FRAME_INTERVAL - duration
-          sleep(sleep_time) if sleep_time.positive?
-        end
-      end
-
-      def monotonic_time
-        Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      end
 
       def capture_samples
         samples = @input_manager.capture_frame
