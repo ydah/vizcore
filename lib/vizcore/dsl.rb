@@ -1,5 +1,11 @@
 # frozen_string_literal: true
 
+module Vizcore
+  # DSL builders and runtime helpers.
+  module DSL
+  end
+end
+
 require_relative "dsl/layer_builder"
 require_relative "dsl/file_watcher"
 require_relative "dsl/mapping_resolver"

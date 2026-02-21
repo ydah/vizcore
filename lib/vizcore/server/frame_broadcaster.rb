@@ -8,9 +8,21 @@ require_relative "../renderer"
 
 module Vizcore
   module Server
+    # Produces audio-reactive frame payloads and broadcasts them over WebSocket.
     class FrameBroadcaster
       FRAME_RATE = 60.0
 
+      # @param scene_name [String]
+      # @param scene_layers [Array<Hash>, nil]
+      # @param input_manager [Vizcore::Audio::InputManager, nil]
+      # @param analysis_pipeline [Vizcore::Analysis::Pipeline, nil]
+      # @param mapping_resolver [Vizcore::DSL::MappingResolver, nil]
+      # @param scene_serializer [Vizcore::Renderer::SceneSerializer, nil]
+      # @param frame_scheduler [Vizcore::Renderer::FrameScheduler, nil]
+      # @param scene_catalog [Array<Hash>, nil]
+      # @param transitions [Array<Hash>, nil]
+      # @param transition_controller [Vizcore::DSL::TransitionController, nil]
+      # @param error_reporter [#call, nil]
       def initialize(
         scene_name: "basic",
         scene_layers: nil,
@@ -48,6 +60,7 @@ module Vizcore
 
       attr_reader :last_error
 
+      # @return [void]
       def start
         return if running?
 
@@ -59,6 +72,7 @@ module Vizcore
         raise
       end
 
+      # @return [void]
       def stop
         return unless running?
 
@@ -66,14 +80,21 @@ module Vizcore
         @input_manager.stop
       end
 
+      # @return [Boolean]
       def running?
         @frame_scheduler.running?
       end
 
+      # @return [Hash] current scene snapshot (`name`, `layers`)
       def current_scene_snapshot
         current_scene
       end
 
+      # Run one frame tick and broadcast it.
+      #
+      # @param elapsed_seconds [Float]
+      # @param samples [Array<Float>, nil]
+      # @return [Hash] serialized frame
       def tick(elapsed_seconds, samples = nil)
         frame = build_frame(elapsed_seconds, samples)
         WebSocketHandler.broadcast(type: "audio_frame", payload: frame)
@@ -81,6 +102,11 @@ module Vizcore
         frame
       end
 
+      # Replace active scene and layers.
+      #
+      # @param scene_name [String, Symbol]
+      # @param scene_layers [Array<Hash>]
+      # @return [void]
       def update_scene(scene_name:, scene_layers:)
         @scene_mutex.synchronize do
           @scene_name = scene_name.to_s
@@ -88,12 +114,23 @@ module Vizcore
         end
       end
 
+      # Replace transition catalog used by automatic scene switching.
+      #
+      # @param scenes [Array<Hash>]
+      # @param transitions [Array<Hash>]
+      # @return [void]
       def update_transition_definition(scenes:, transitions:)
         @scene_mutex.synchronize do
           @transition_controller.update(scenes: scenes, transitions: transitions)
         end
       end
 
+      # Build one frame payload for transport to frontend.
+      #
+      # @param _elapsed_seconds [Float]
+      # @param samples [Array<Float>, nil]
+      # @raise [Vizcore::FrameBuildError] when frame construction fails
+      # @return [Hash]
       def build_frame(_elapsed_seconds, samples = nil)
         audio_samples = samples || capture_samples
         analyzed = @analysis_pipeline.call(audio_samples)

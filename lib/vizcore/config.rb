@@ -3,6 +3,7 @@
 require "pathname"
 
 module Vizcore
+  # Runtime configuration for CLI/server startup.
   class Config
     DEFAULT_HOST = "127.0.0.1"
     DEFAULT_PORT = 4567
@@ -11,6 +12,11 @@ module Vizcore
 
     attr_reader :host, :port, :scene_file, :audio_source, :audio_file
 
+    # @param scene_file [String, Pathname] scene DSL file path
+    # @param host [String] bind host
+    # @param port [Integer] bind port
+    # @param audio_source [Symbol, String] one of `:mic`, `:file`, `:dummy`
+    # @param audio_file [String, Pathname, nil] file path used with `audio_source=:file`
     def initialize(scene_file:, host: DEFAULT_HOST, port: DEFAULT_PORT, audio_source: DEFAULT_AUDIO_SOURCE, audio_file: nil)
       @scene_file = Pathname.new(scene_file).expand_path if scene_file
       @host = host
@@ -19,6 +25,7 @@ module Vizcore
       @audio_file = audio_file ? Pathname.new(audio_file).expand_path : nil
     end
 
+    # @return [Boolean] true when the configured scene file exists.
     def scene_exists?
       scene_file && scene_file.file?
     end
