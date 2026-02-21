@@ -122,6 +122,8 @@ module Vizcore
         layer
       end
 
+      # Stores dynamic one-argument setters into `params`.
+      # @api private
       def method_missing(method_name, *args, &block)
         if block.nil? && args.length == 1
           @params[method_name.to_sym] = args.first

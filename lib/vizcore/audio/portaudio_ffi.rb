@@ -2,8 +2,13 @@
 
 module Vizcore
   module Audio
+    # PortAudio FFI bridge for microphone stream access and device discovery.
     module PortAudioFFI
+      # Runtime wrapper for an opened PortAudio input stream.
       class Stream
+        # @param mod [Module] ffi-bound PortAudio module
+        # @param pointer [FFI::Pointer] native stream pointer
+        # @param channels [Integer] input channel count
         def initialize(mod:, pointer:, channels:)
           @mod = mod
           @pointer = pointer
@@ -12,6 +17,7 @@ module Vizcore
           @closed = false
         end
 
+        # @return [Boolean] true when stream start succeeded
         def start
           return true if @started
           return false if @closed
@@ -23,6 +29,8 @@ module Vizcore
           true
         end
 
+        # @param frame_size [Integer]
+        # @return [Array<Float>] mono samples or silence on failure
         def read(frame_size)
           frames = Integer(frame_size)
           return Array.new(frames, 0.0) unless @started
@@ -39,6 +47,7 @@ module Vizcore
           Array.new(frames, 0.0)
         end
 
+        # @return [Boolean] true when stop call succeeded
         def stop
           return true if @closed || !@started
 
@@ -49,6 +58,7 @@ module Vizcore
           false
         end
 
+        # @return [void]
         def close
           return if @closed
 
@@ -78,11 +88,13 @@ module Vizcore
         end
 
         class << self
+          # @return [Module] loaded ffi module
           def ffi_module
             require "ffi"
             FFI
           end
 
+          # @return [Integer]
           def pa_no_error
             0
           end
@@ -91,14 +103,19 @@ module Vizcore
 
       extend self
 
+      # Default mono channel count.
       DEFAULT_CHANNELS = 1
+      # PortAudio no-error status code.
       PA_NO_ERROR = 0
+      # PortAudio float sample format code.
       PA_FLOAT_32 = 0x0000_0001
 
+      # @return [Boolean] true when PortAudio native library can be loaded
       def available?
         !ffi_module.nil?
       end
 
+      # @return [Array<Hash>] available input device descriptors
       def input_devices
         mod = ffi_module
         return [] unless mod
@@ -125,6 +142,10 @@ module Vizcore
         mod&.Pa_Terminate
       end
 
+      # @param sample_rate [Float]
+      # @param channels [Integer]
+      # @param frames_per_buffer [Integer]
+      # @return [Vizcore::Audio::PortAudioFFI::Stream, nil]
       def open_default_input_stream(sample_rate:, channels: DEFAULT_CHANNELS, frames_per_buffer: 1024)
         mod = ffi_module
         return nil unless mod
@@ -153,6 +174,8 @@ module Vizcore
         nil
       end
 
+      # @param stream [Vizcore::Audio::PortAudioFFI::Stream, nil]
+      # @return [nil]
       def close_stream(stream)
         stream&.close
         ffi_module&.Pa_Terminate

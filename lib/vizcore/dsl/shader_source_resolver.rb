@@ -4,7 +4,12 @@ require "pathname"
 
 module Vizcore
   module DSL
+    # Replaces layer `glsl` paths with inlined shader source text.
     class ShaderSourceResolver
+      # @param definition [Hash] DSL definition payload
+      # @param scene_file [String, Pathname] source scene file
+      # @raise [ArgumentError] when a referenced GLSL file is missing
+      # @return [Hash] deep-copied definition with `:glsl_source` entries
       def resolve(definition:, scene_file:)
         scene_path = Pathname.new(scene_file.to_s).expand_path
         base_dir = scene_path.dirname

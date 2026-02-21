@@ -4,9 +4,15 @@ require "pathname"
 
 module Vizcore
   module DSL
+    # Watches one scene file and invokes a callback when it changes.
     class FileWatcher
+      # Default polling interval in seconds when `listen` is unavailable.
       DEFAULT_POLL_INTERVAL = 0.25
 
+      # @param path [String, Pathname]
+      # @param poll_interval [Float]
+      # @param listener_factory [#call, nil]
+      # @yieldparam changed_path [Pathname]
       def initialize(path:, poll_interval: DEFAULT_POLL_INTERVAL, listener_factory: nil, &on_change)
         @path = Pathname.new(path.to_s).expand_path
         @poll_interval = Float(poll_interval)
@@ -17,6 +23,7 @@ module Vizcore
         @thread = nil
       end
 
+      # @return [Boolean]
       def start
         return if running?
 
@@ -24,6 +31,8 @@ module Vizcore
         start_with_listener || start_with_polling
       end
 
+      # @param timeout [Float]
+      # @return [void]
       def stop(timeout: 1.0)
         return unless running?
 
@@ -39,6 +48,7 @@ module Vizcore
         thread.join(timeout)
       end
 
+      # @return [Boolean]
       def running?
         @running
       end

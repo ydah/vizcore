@@ -5,11 +5,16 @@ require_relative "../errors"
 
 module Vizcore
   module Audio
+    # Poll-based MIDI input wrapper using the `unimidi` backend.
     class MidiInput
+      # Normalized MIDI event payload.
       Event = Struct.new(:type, :channel, :data1, :data2, :raw, :timestamp, keyword_init: true)
+      # Poll interval for empty reads in seconds.
       DEFAULT_POLL_INTERVAL = 0.01
 
       class << self
+        # @param backend [Module, nil]
+        # @return [Array<Hash>] available MIDI devices
         def available_devices(backend: nil)
           midi_backend = backend || load_backend
           return [] unless midi_backend
@@ -44,6 +49,9 @@ module Vizcore
         end
       end
 
+      # @param device [Integer, String, Symbol, nil]
+      # @param backend [Module, nil]
+      # @param poll_interval [Float]
       def initialize(device: nil, backend: nil, poll_interval: DEFAULT_POLL_INTERVAL)
         @device = device
         @backend = backend || self.class.send(:load_backend)
@@ -58,6 +66,8 @@ module Vizcore
 
       attr_reader :last_error
 
+      # @yieldparam event [Vizcore::Audio::MidiInput::Event]
+      # @return [Vizcore::Audio::MidiInput]
       def start(&callback)
         return self if running?
 
@@ -70,6 +80,7 @@ module Vizcore
         self
       end
 
+      # @return [Vizcore::Audio::MidiInput]
       def stop
         @running = false
         join_thread
@@ -77,10 +88,13 @@ module Vizcore
         self
       end
 
+      # @return [Boolean]
       def running?
         @running
       end
 
+      # @param max [Integer, nil]
+      # @return [Array<Vizcore::Audio::MidiInput::Event>]
       def poll(max = nil)
         limit = max ? Integer(max) : nil
         result = []

@@ -6,12 +6,17 @@ require_relative "websocket_handler"
 
 module Vizcore
   module Server
+    # Rack app serving frontend assets, health endpoint, and WebSocket upgrade.
     class RackApp
+      # @param frontend_root [Pathname]
+      # @param websocket_path [String]
       def initialize(frontend_root:, websocket_path: "/ws")
         @frontend_root = frontend_root.expand_path
         @websocket_path = websocket_path
       end
 
+      # @param env [Hash]
+      # @return [Array(Integer, Hash, Array<String>)]
       def call(env)
         request = Rack::Request.new(env)
 

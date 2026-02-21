@@ -2,7 +2,11 @@
 
 module Vizcore
   module DSL
+    # Resolves `map` definitions into concrete per-layer parameter values.
     class MappingResolver
+      # @param scene_layers [Array<Hash>]
+      # @param audio [Hash]
+      # @return [Array<Hash>] normalized layer payloads with resolved params
       def resolve_layers(scene_layers:, audio:)
         normalize_scene_layers(scene_layers).map do |layer|
           resolve_layer(layer, audio)

@@ -4,9 +4,11 @@ require "thread"
 
 module Vizcore
   module Audio
+    # Thread-safe circular buffer for recent audio samples.
     class RingBuffer
       attr_reader :capacity
 
+      # @param capacity [Integer]
       def initialize(capacity)
         raise ArgumentError, "capacity must be positive" unless capacity.to_i.positive?
 
@@ -17,6 +19,8 @@ module Vizcore
         @mutex = Mutex.new
       end
 
+      # @param samples [Array<Numeric>]
+      # @return [void]
       def write(samples)
         normalized = normalize_samples(samples)
         return if normalized.empty?
@@ -30,10 +34,14 @@ module Vizcore
         end
       end
 
+      # @param sample [Numeric]
+      # @return [void]
       def push(sample)
         write([sample])
       end
 
+      # @param count [Integer, nil]
+      # @return [Array<Float>] newest values first-in-order
       def latest(count = nil)
         @mutex.synchronize do
           return [] if @size.zero?
@@ -48,10 +56,12 @@ module Vizcore
         end
       end
 
+      # @return [Integer]
       def size
         @mutex.synchronize { @size }
       end
 
+      # @return [void]
       def clear
         @mutex.synchronize do
           @buffer.fill(0.0)

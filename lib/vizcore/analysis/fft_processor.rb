@@ -4,16 +4,24 @@ require_relative "fftw_ffi"
 
 module Vizcore
   module Analysis
+    # Performs FFT analysis with optional FFTW acceleration and Ruby fallback.
     class FFTProcessor
+      # Supported windowing functions applied before FFT.
       SUPPORTED_WINDOWS = %i[hamming hann blackman none].freeze
+      # Supported transform backends.
       SUPPORTED_BACKENDS = %i[auto ruby fftw].freeze
 
       attr_reader :sample_rate, :fft_size, :window, :backend_name
 
+      # @return [Boolean] true when FFTW3 is available.
       def self.fftw_available?
         FFTWFFI.available?
       end
 
+      # @param sample_rate [Integer] input sample rate
+      # @param fft_size [Integer] FFT frame size (power of two)
+      # @param window [Symbol] one of {SUPPORTED_WINDOWS}
+      # @param backend [Symbol] one of {SUPPORTED_BACKENDS}
       def initialize(sample_rate: 44_100, fft_size: 1024, window: :hamming, backend: :auto)
         @sample_rate = Integer(sample_rate)
         @fft_size = Integer(fft_size)
@@ -27,6 +35,8 @@ module Vizcore
         @backend = resolve_backend(@backend_requested)
       end
 
+      # @param samples [Array<Numeric>] PCM frame samples
+      # @return [Hash] FFT result with magnitudes, complex spectrum, and peak info
       def call(samples)
         frame = prepare_frame(samples)
         windowed = apply_window(frame)
@@ -43,6 +53,8 @@ module Vizcore
         }
       end
 
+      # @param bin_index [Integer]
+      # @return [Float] frequency in Hz corresponding to the FFT bin
       def bin_frequency(bin_index)
         Integer(bin_index) * sample_rate.to_f / fft_size.to_f
       end
@@ -122,7 +134,11 @@ module Vizcore
         pair ? pair.last : 0
       end
 
+      # Pure-Ruby Cooley-Tukey FFT backend.
+      # @api private
       class RubyBackend
+        # @param values [Array<Float>]
+        # @return [Array<Complex>]
         def transform(values)
           fft(values.map { |value| Complex(value, 0.0) })
         end
@@ -176,11 +192,16 @@ module Vizcore
         end
       end
 
+      # FFTW3-backed transform backend.
+      # @api private
       class FFTWBackend
+        # @param fft_size [Integer]
         def initialize(fft_size)
           @fft_size = fft_size
         end
 
+        # @param values [Array<Float>]
+        # @return [Array<Complex>]
         def transform(values)
           input = FFI::MemoryPointer.new(:double, @fft_size)
           bins = (@fft_size / 2) + 1

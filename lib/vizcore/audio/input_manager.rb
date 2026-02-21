@@ -11,8 +11,11 @@ module Vizcore
   module Audio
     # High-level coordinator for audio frame capture and ring-buffer storage.
     class InputManager
+      # Default analysis/input sample rate.
       DEFAULT_SAMPLE_RATE = 44_100
+      # Default samples read per frame.
       DEFAULT_FRAME_SIZE = 1024
+      # Default ring buffer capacity in samples.
       DEFAULT_RING_BUFFER_SIZE = 4096
 
       attr_reader :frame_size, :sample_rate, :ring_buffer

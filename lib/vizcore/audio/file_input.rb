@@ -6,10 +6,16 @@ require_relative "base_input"
 
 module Vizcore
   module Audio
+    # File-backed audio input for WAV and ffmpeg-decoded formats.
     class FileInput < BaseInput
+      # Supported file extensions.
       SUPPORTED_EXTENSIONS = %w[.wav .mp3 .flac].freeze
       attr_reader :last_error
 
+      # @param path [String, Pathname]
+      # @param sample_rate [Integer]
+      # @param command_runner [#capture3]
+      # @param ffmpeg_checker [#call, nil]
       def initialize(path:, sample_rate: 44_100, command_runner: Open3, ffmpeg_checker: nil)
         super(sample_rate: sample_rate)
         @path = path
@@ -20,6 +26,8 @@ module Vizcore
         @samples = load_samples
       end
 
+      # @param frame_size [Integer]
+      # @return [Array<Float>] file samples (looped), or silence when unavailable
       def read(frame_size)
         count = Integer(frame_size)
         return Array.new(count, 0.0) unless running?

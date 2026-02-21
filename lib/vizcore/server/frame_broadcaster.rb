@@ -10,6 +10,7 @@ module Vizcore
   module Server
     # Produces audio-reactive frame payloads and broadcasts them over WebSocket.
     class FrameBroadcaster
+      # Target broadcast frame rate.
       FRAME_RATE = 60.0
 
       # @param scene_name [String]
