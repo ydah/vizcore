@@ -1,0 +1,74 @@
+# frozen_string_literal: true
+
+require "fileutils"
+require "pathname"
+require "thor"
+require_relative "../vizcore"
+require_relative "config"
+require_relative "server"
+
+module Vizcore
+  class CLI < Thor
+    package_name "vizcore"
+
+    default_command :help
+
+    desc "start SCENE_FILE", "Start vizcore HTTP/WebSocket server"
+    option :host, type: :string, default: Config::DEFAULT_HOST, desc: "Bind host"
+    option :port, type: :numeric, default: Config::DEFAULT_PORT, desc: "Bind port"
+    def start(scene_file)
+      config = Config.new(scene_file: scene_file, host: options.fetch(:host), port: options.fetch(:port))
+      Server::Runner.new(config).run
+    rescue ArgumentError => e
+      raise Thor::Error, e.message
+    end
+
+    desc "new NAME", "Create a starter project scaffold"
+    def new(name)
+      root = Pathname.new(name).expand_path
+      FileUtils.mkdir_p(root.join("scenes"))
+      FileUtils.mkdir_p(root.join("shaders"))
+
+      write_template("project_readme.md", root.join("README.md"), project_name: name)
+      write_template("basic_scene.rb", root.join("scenes", "basic.rb"), project_name: name)
+
+      say("Created project scaffold: #{root}")
+      say("Next: cd #{name} && vizcore start scenes/basic.rb")
+    end
+
+    desc "devices [TYPE]", "Show available devices (audio or midi)"
+    def devices(type = nil)
+      case type
+      when nil
+        print_audio_devices
+        print_midi_devices
+      when "audio"
+        print_audio_devices
+      when "midi"
+        print_midi_devices
+      else
+        raise Thor::Error, "Unknown type: #{type}. Use `audio` or `midi`."
+      end
+    end
+
+    private
+
+    def write_template(template_name, destination, project_name:)
+      template_path = Vizcore.templates_root.join(template_name)
+      body = template_path.read.gsub("{{project_name}}", project_name)
+      destination.write(body)
+    end
+
+    def print_audio_devices
+      say("Audio devices:")
+      say("  - default (placeholder)")
+      say("  - usb-audio (placeholder)")
+    end
+
+    def print_midi_devices
+      say("MIDI devices:")
+      say("  - launchpad (placeholder)")
+      say("  - virtual-midi (placeholder)")
+    end
+  end
+end
