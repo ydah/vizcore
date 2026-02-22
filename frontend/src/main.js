@@ -17,16 +17,19 @@ engine.start();
 
 let currentSceneName = "unknown";
 let audioElement = null;
+let frameCount = 0;
+let lastConnectedAt = null;
 
 const websocketUrl = buildWebSocketUrl();
 const client = new WebSocketClient(websocketUrl, {
   onFrame: (frame) => {
     engine.setAudioFrame(frame);
+    frameCount += 1;
     const sceneName = String(frame?.scene?.name || currentSceneName);
     currentSceneName = sceneName;
     const amplitude = Number(frame?.audio?.amplitude || 0).toFixed(4);
     sceneStatusElement.textContent = `Scene: ${sceneName}`;
-    frameStatusElement.textContent = `Amplitude: ${amplitude}`;
+    frameStatusElement.textContent = `Amplitude: ${amplitude} | Frames: ${frameCount}`;
   },
   onSceneChange: (payload) => {
     const from = String(payload?.from || "unknown");
@@ -43,7 +46,11 @@ const client = new WebSocketClient(websocketUrl, {
     }
   },
   onStatus: (status) => {
-    wsStatusElement.textContent = `WebSocket: ${status}`;
+    if (status === "connected") {
+      lastConnectedAt = new Date();
+    }
+    const connectedAt = lastConnectedAt ? ` | Last connected: ${formatClock(lastConnectedAt)}` : "";
+    wsStatusElement.textContent = `WebSocket: ${status}${connectedAt}`;
   }
 });
 
@@ -147,6 +154,13 @@ function formatSeconds(value) {
   const minutes = Math.floor(seconds / 60);
   const remain = seconds % 60;
   return `${String(minutes).padStart(2, "0")}:${String(remain).padStart(2, "0")}`;
+}
+
+function formatClock(date) {
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${hours}:${minutes}:${seconds}`;
 }
 
 function buildWebSocketUrl() {
