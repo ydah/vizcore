@@ -1,61 +1,162 @@
-# Vizcore
+# Vizcore [![Gem Version](https://badge.fury.io/rb/vizcore.svg)](https://badge.fury.io/rb/vizcore) [![CI](https://github.com/ydah/vizcore/actions/workflows/main.yml/badge.svg)](https://github.com/ydah/vizcore/actions/workflows/main.yml)
 
-Vizcore is a Ruby gem for building audio-reactive visuals with a Ruby DSL.
+Vizcore is a Ruby gem for building audio-reactive visuals with a Ruby DSL. Define scenes in pure Ruby, stream frames to the browser over WebSocket, and react to audio, beat, and MIDI in real time.
 
-## What You Get
+## Installation
 
-- `vizcore start` to run Rack + WebSocket server and stream frames to browser WebGL.
-- Audio input sources: `mic`, `file`, `dummy`.
-- File input supports `.wav` directly and `.mp3`/`.flac` via `ffmpeg`.
-- MIDI device listing and `midi_map` runtime actions.
-- Scene transitions, hot-reload, built-in shaders, custom GLSL layers.
+```bash
+gem install vizcore
+```
+
+Or add to your Gemfile:
+
+```bash
+bundle add vizcore
+```
+
+**System dependencies:**
+
+macOS:
+```bash
+brew install portaudio ffmpeg   # ffmpeg only needed for MP3/FLAC input
+brew install fftw               # optional: faster FFT
+```
+
+Ubuntu/Debian:
+```bash
+sudo apt install -y libportaudio2 libportaudio-dev ffmpeg
+sudo apt install -y libfftw3-dev   # optional: faster FFT
+```
 
 ## Quick Start
 
 ```bash
-# from repository root
-bundle exec ruby -Ilib exe/vizcore start examples/basic.rb
+vizcore start examples/basic.rb
 ```
 
 Then open `http://127.0.0.1:4567`.
 
-For full setup (system dependencies, scaffold flow, troubleshooting), see `GETTING_STARTED.md`.
+For full setup, device listing, and troubleshooting, see [GETTING_STARTED.md](GETTING_STARTED.md).
+
+## Scene DSL
+
+Scenes are written in plain Ruby. Layers map audio analysis values to visual parameters:
+
+```ruby
+Vizcore.define do
+  scene :intro do
+    layer :wireframe do
+      type :wireframe_cube
+      map amplitude => :rotation_speed
+      map fft_spectrum => :deform
+      map frequency_band(:high) => :color_shift
+    end
+  end
+
+  scene :drop do
+    layer :particles do
+      type :particle_field
+      count 3600
+      map amplitude => :speed
+      map frequency_band(:low) => :size
+    end
+
+    layer :title do
+      type :text
+      content "DROP"
+      font_size 96
+      map beat? => :flash
+    end
+  end
+
+  transition from: :intro, to: :drop do
+    trigger { beat_count >= 64 }
+    effect :crossfade, duration: 1.4
+  end
+end
+```
+
+### Custom GLSL Shaders
+
+```ruby
+layer :wave_shader do
+  type :shader
+  glsl "shaders/custom_wave.frag"
+  map amplitude => :param_intensity
+  map frequency_band(:low) => :param_bass
+  map beat? => :param_flash
+end
+```
+
+### MIDI Scene Switching
+
+```ruby
+Vizcore.define do
+  midi :controller, device: :default
+
+  scene :warmup do
+    layer :grid do
+      shader :neon_grid
+      map frequency_band(:mid) => :intensity
+    end
+  end
+
+  midi_map note: 36 do
+    switch_scene :impact
+  end
+
+  midi_map cc: 1 do |value|
+    set :global_intensity, value / 127.0
+  end
+end
+```
 
 ## CLI
 
 ```bash
-vizcore start SCENE_FILE [--host 127.0.0.1] [--port 4567] [--audio-source mic|file|dummy] [--audio-file path]
+vizcore start SCENE_FILE [--host 127.0.0.1] [--port 4567] [--audio-source mic|file|dummy] [--audio-file PATH]
 vizcore new PROJECT_NAME
 vizcore devices [audio|midi]
 ```
 
-### File Audio Source
+### Audio Sources
+
+| Source | Description |
+|--------|-------------|
+| `mic` | Live microphone input (default) |
+| `file` | File playback — `.wav` directly, `.mp3`/`.flac` via `ffmpeg` |
+| `dummy` | Silent source for layout testing |
 
 ```bash
-# WAV
-vizcore start examples/basic.rb --audio-source file --audio-file spec/fixtures/audio/kick_120bpm.wav
+# Microphone
+vizcore start scene.rb --audio-source mic
 
-# MP3/FLAC (decoded through ffmpeg)
-vizcore start examples/basic.rb --audio-source file --audio-file path/to/set.mp3
+# WAV file
+vizcore start scene.rb --audio-source file --audio-file track.wav
+
+# MP3/FLAC (requires ffmpeg)
+vizcore start scene.rb --audio-source file --audio-file set.mp3
 ```
 
-When `--audio-source file` is selected, `--audio-file` is required.
-When file source is active, the frontend receives runtime metadata from `/runtime` and can play the same track via `/audio-file`.
+When using file source, the HUD exposes **Play Audio** / **Pause Audio** controls and shows BPM, Beat, and Beat Count.
 
 ## Requirements
 
 - Ruby `>= 3.2`
-- `ffmpeg` on `PATH` when using file source with `.mp3` / `.flac`
-- `fftw3` is optional for faster FFT processing; when unavailable, Vizcore uses a Pure Ruby FFT fallback automatically.
+- `portaudio` for microphone input
+- `ffmpeg` on `PATH` when using `.mp3` or `.flac` file input
+- `fftw3` (optional) — Vizcore falls back to pure-Ruby FFT automatically when unavailable
 
 ## Examples
 
-- `examples/basic.rb`
-- `examples/intro_drop.rb`
-- `examples/file_audio_demo.rb`
-- `examples/complex_audio_showcase.rb`
-- `examples/midi_scene_switch.rb`
-- `examples/custom_shader.rb`
+| File | Description |
+|------|-------------|
+| `examples/basic.rb` | Single wireframe cube layer |
+| `examples/intro_drop.rb` | Beat-triggered scene transition |
+| `examples/file_audio_demo.rb` | File audio source walkthrough |
+| `examples/complex_audio_showcase.rb` | Dense multi-layer showcase |
+| `examples/midi_scene_switch.rb` | MIDI-driven scene switching |
+| `examples/custom_shader.rb` | Custom GLSL shader with audio mapping |
 
 ## Development
 
@@ -63,30 +164,8 @@ When file source is active, the frontend receives runtime metadata from `/runtim
 bundle exec rspec
 ```
 
-## API Documentation
-
-- YARD generation and stats commands are documented in `docs/YARD.md`.
-
-## Error Handling Notes
-
-- Runtime components emit contextual error logs (for example scene reload and MIDI runtime failures).
-- Audio inputs keep diagnostic state in `last_error` while preserving fallback behavior (silence/dummy source).
-
-## Cross-Platform Validation
-
-- Cross-platform smoke verification and artifact format are documented in `docs/CROSS_PLATFORM_TESTING.md`.
-
-## Release Process
-
-- Release checklist: `docs/RELEASE.md`
-- Changelog: `CHANGELOG.md`
-- Tag-driven release workflow: `.github/workflows/release.yml`
-
-## Gem Packaging Policy
-
-- Runtime files only are packaged in the gem: `lib/`, `exe/`, `frontend/index.html`, `frontend/src/`, `examples/`, `sig/`, `README.md`, `GETTING_STARTED.md`, `LICENSE.txt`.
-- Development-only files are excluded from gem payload (for example `spec/`, `.github/`, and `frontend/test/`).
-- RubyGems MFA is required for release operations (`rubygems_mfa_required=true`).
+API documentation commands: `docs/YARD.md`
+Release checklist: `docs/RELEASE.md`
 
 ## License
 
