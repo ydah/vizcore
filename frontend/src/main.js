@@ -6,6 +6,8 @@ const wsStatusElement = document.querySelector("#ws-status");
 const sceneStatusElement = document.querySelector("#scene-status");
 const transitionStatusElement = document.querySelector("#transition-status");
 const frameStatusElement = document.querySelector("#frame-status");
+const bpmStatusElement = document.querySelector("#bpm-status");
+const beatStatusElement = document.querySelector("#beat-status");
 const audioSourceStatusElement = document.querySelector("#audio-source-status");
 const audioTrackStatusElement = document.querySelector("#audio-track-status");
 const audioPlaybackStatusElement = document.querySelector("#audio-playback-status");
@@ -20,6 +22,7 @@ let audioElement = null;
 let frameCount = 0;
 let lastConnectedAt = null;
 let lastTransportSyncAt = 0;
+let beatFlashUntil = 0;
 
 const websocketUrl = buildWebSocketUrl();
 const client = new WebSocketClient(websocketUrl, {
@@ -29,8 +32,18 @@ const client = new WebSocketClient(websocketUrl, {
     const sceneName = String(frame?.scene?.name || currentSceneName);
     currentSceneName = sceneName;
     const amplitude = Number(frame?.audio?.amplitude || 0).toFixed(4);
+    const bpm = Number(frame?.audio?.bpm || 0);
+    const beat = !!frame?.audio?.beat;
+    const beatCount = Math.max(0, Number(frame?.audio?.beat_count || 0) || 0);
+    if (beat) {
+      beatFlashUntil = performance.now() + 180;
+    }
+    const beatVisible = performance.now() < beatFlashUntil;
     sceneStatusElement.textContent = `Scene: ${sceneName}`;
     frameStatusElement.textContent = `Amplitude: ${amplitude} | Frames: ${frameCount}`;
+    bpmStatusElement.textContent = `BPM: ${bpm > 0 ? bpm.toFixed(1) : "--"}`;
+    beatStatusElement.textContent = `Beat: ${beatVisible ? "ON" : "off"} | Count: ${beatCount}`;
+    beatStatusElement.classList.toggle("is-beat", beatVisible);
   },
   onSceneChange: (payload) => {
     const from = String(payload?.from || "unknown");
