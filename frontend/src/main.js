@@ -88,6 +88,12 @@ const client = new WebSocketClient(websocketUrl, {
     if (status === "connected") {
       lastConnectedAt = new Date();
       syncAudioTransportToServer({ force: true });
+    } else {
+      pendingSceneName = null;
+      pendingSceneRequestedAt = 0;
+      currentSceneName = "unknown";
+      sceneStatusElement.textContent = "Scene: unknown";
+      renderSceneButtons();
     }
     const connectedAt = lastConnectedAt ? ` | Last connected: ${formatClock(lastConnectedAt)}` : "";
     wsStatusElement.textContent = `WebSocket: ${status}${connectedAt}`;
