@@ -18,6 +18,8 @@ module Vizcore
         @config = config
         @output = output
         @shader_source_resolver = Vizcore::DSL::ShaderSourceResolver.new
+        @scene_catalog_mutex = Mutex.new
+        @scene_catalog = []
       end
 
       # Run server lifecycle until interrupted.
@@ -34,7 +36,8 @@ module Vizcore
         app = RackApp.new(
           frontend_root: Vizcore.frontend_root,
           audio_source: @config.audio_source,
-          audio_file: @config.audio_file
+          audio_file: @config.audio_file,
+          scene_names: scene_names_for(definition)
         )
         server = Puma::Server.new(app, nil, min_threads: 0, max_threads: 4)
         server.add_tcp_listener(@config.host, @config.port)
@@ -52,6 +55,10 @@ module Vizcore
           input_manager: input_manager,
           error_reporter: ->(message) { @output.puts(message) }
         )
+        replace_scene_catalog(definition[:scenes])
+        if @config.audio_source == :file
+          broadcaster.sync_transport(playing: false, position_seconds: 0.0)
+        end
         broadcaster.start
         register_client_message_handler(broadcaster)
         midi_runtime = start_midi_runtime(definition, broadcaster)
@@ -117,6 +124,7 @@ module Vizcore
       def start_scene_watcher(broadcaster, &on_reload)
         watcher = Vizcore::DSL::Engine.watch_file(@config.scene_file.to_s) do |definition, _changed_path|
           definition = resolve_shader_sources(definition)
+          replace_scene_catalog(definition[:scenes])
           scene = first_scene(definition) || fallback_scene
           broadcaster.update_transition_definition(
             scenes: Array(definition[:scenes]),
@@ -124,7 +132,13 @@ module Vizcore
           )
           broadcaster.update_scene(scene_name: scene[:name], scene_layers: scene[:layers])
           on_reload&.call(definition)
-          WebSocketHandler.broadcast(type: "config_update", payload: { scene: scene })
+          WebSocketHandler.broadcast(
+            type: "config_update",
+            payload: {
+              scene: scene,
+              scenes: scene_names_for(definition)
+            }
+          )
           @output.puts("Scene reloaded: #{scene[:name]}")
         rescue StandardError => e
           @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "Scene reload failed"))
@@ -212,8 +226,6 @@ module Vizcore
       end
 
       def register_client_message_handler(broadcaster)
-        return unless @config.audio_source == :file
-
         Vizcore::Server::WebSocketHandler.on_message do |message|
           handle_client_message(message, broadcaster)
         end
@@ -221,16 +233,23 @@ module Vizcore
 
       def handle_client_message(message, broadcaster)
         type = message["type"] || message[:type]
-        return unless type.to_s == "transport_sync"
-
         payload = message["payload"] || message[:payload]
-        values = Hash(payload)
-        broadcaster.sync_transport(
-          playing: values.fetch("playing", values.fetch(:playing, false)),
-          position_seconds: values.fetch("position_seconds", values.fetch(:position_seconds, 0.0))
-        )
+        case type.to_s
+        when "transport_sync"
+          return unless @config.audio_source == :file
+
+          values = Hash(payload)
+          broadcaster.sync_transport(
+            playing: values.fetch("playing", values.fetch(:playing, false)),
+            position_seconds: values.fetch("position_seconds", values.fetch(:position_seconds, 0.0))
+          )
+        when "switch_scene"
+          values = Hash(payload)
+          target_name = values.fetch("scene", values.fetch(:scene, values.fetch("scene_name", values.fetch(:scene_name, nil))))
+          switch_scene_from_client(target_name, broadcaster)
+        end
       rescue StandardError => e
-        @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "Client transport message failed"))
+        @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "Client control message failed"))
       end
 
       def apply_midi_action(action, executor, broadcaster)
@@ -275,6 +294,63 @@ module Vizcore
 
       def resolve_shader_sources(definition)
         @shader_source_resolver.resolve(definition: definition, scene_file: @config.scene_file.to_s)
+      end
+
+      def replace_scene_catalog(scenes)
+        @scene_catalog_mutex.synchronize do
+          @scene_catalog = Array(scenes)
+        end
+      end
+
+      def scene_names_for(definition)
+        Array(definition[:scenes]).filter_map do |scene|
+          name = scene.dig(:name) || scene["name"]
+          next if name.nil?
+
+          value = name.to_s.strip
+          next if value.empty?
+
+          value
+        end
+      rescue StandardError
+        []
+      end
+
+      def switch_scene_from_client(target_name, broadcaster)
+        requested = target_name.to_s.strip
+        return if requested.empty?
+
+        target_scene = find_scene_catalog_scene(requested)
+        return unless target_scene
+
+        current = broadcaster.current_scene_snapshot
+        from_scene = current[:name]
+        broadcaster.update_scene(scene_name: target_scene[:name], scene_layers: target_scene[:layers])
+        WebSocketHandler.broadcast(
+          type: "scene_change",
+          payload: {
+            from: from_scene.to_s,
+            to: target_scene[:name].to_s,
+            effect: nil,
+            source: "ui"
+          }
+        )
+      end
+
+      def find_scene_catalog_scene(name)
+        @scene_catalog_mutex.synchronize do
+          Array(@scene_catalog).each do |scene|
+            raw_name = scene.dig(:name) || scene["name"]
+            next unless raw_name
+            next unless raw_name.to_s == name
+
+            layers = scene.dig(:layers) || scene["layers"]
+            return { name: raw_name.to_sym, layers: Array(layers) }
+          end
+          nil
+        end
+      rescue StandardError
+        nil
       end
     end
   end

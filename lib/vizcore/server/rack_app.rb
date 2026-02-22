@@ -16,11 +16,13 @@ module Vizcore
       # @param websocket_path [String]
       # @param audio_source [Symbol, String, nil]
       # @param audio_file [String, Pathname, nil]
-      def initialize(frontend_root:, websocket_path: "/ws", audio_source: nil, audio_file: nil)
+      # @param scene_names [Array<String, Symbol>, nil]
+      def initialize(frontend_root:, websocket_path: "/ws", audio_source: nil, audio_file: nil, scene_names: nil)
         @frontend_root = frontend_root.expand_path
         @websocket_path = websocket_path
         @audio_source = audio_source&.to_sym
         @audio_file = audio_file ? Pathname.new(audio_file).expand_path : nil
+        @scene_names = normalize_scene_names(scene_names)
       end
 
       # @param env [Hash]
@@ -48,7 +50,8 @@ module Vizcore
           status: "ok",
           audio_source: (@audio_source || :unknown).to_s,
           audio_file_name: nil,
-          audio_file_url: nil
+          audio_file_url: nil,
+          scene_names: @scene_names
         }
 
         if audio_file_available?
@@ -121,6 +124,17 @@ module Vizcore
           "cache-control" => "no-store, max-age=0, must-revalidate",
           "accept-ranges" => "bytes"
         }
+      end
+
+      def normalize_scene_names(values)
+        Array(values).filter_map do |entry|
+          name = entry.to_s.strip
+          next if name.empty?
+
+          name
+        end.uniq
+      rescue StandardError
+        []
       end
 
       def parse_byte_range(raw_range, file_size)

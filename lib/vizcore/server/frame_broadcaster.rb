@@ -55,6 +55,8 @@ module Vizcore
         @error_reporter = error_reporter || ->(_message) {}
         @last_error = nil
         @frame_count = 0
+        @transport_playing = initial_transport_playing_state
+        reset_transition_trigger_counters!
         @frame_scheduler = frame_scheduler || Vizcore::Renderer::FrameScheduler.new(frame_rate: FRAME_RATE) do |elapsed|
           tick(elapsed)
         end
@@ -98,6 +100,10 @@ module Vizcore
       # @param position_seconds [Numeric]
       # @return [void]
       def sync_transport(playing:, position_seconds:)
+        @scene_mutex.synchronize do
+          @transport_playing = !!playing
+          reset_transition_trigger_counters! if transport_position_reset?(position_seconds)
+        end
         return unless @input_manager.respond_to?(:sync_transport)
 
         @input_manager.sync_transport(playing: playing, position_seconds: position_seconds)
@@ -127,6 +133,7 @@ module Vizcore
         @scene_mutex.synchronize do
           @scene_name = scene_name.to_s
           @scene_layers = Array(scene_layers)
+          reset_transition_trigger_counters!
         end
       end
 
@@ -232,12 +239,22 @@ module Vizcore
       end
 
       def evaluate_transition(audio, frame_count:)
-        scene = current_scene
+        return if transition_evaluation_paused?
+
         transition = @scene_mutex.synchronize do
-          @transition_controller.next_transition(
+          scene = {
+            name: @scene_name,
+            layers: Array(@scene_layers)
+          }
+          trigger_frame_count, trigger_audio = transition_trigger_inputs(
             scene_name: scene[:name],
             audio: audio,
             frame_count: frame_count
+          )
+          @transition_controller.next_transition(
+            scene_name: scene[:name],
+            audio: trigger_audio,
+            frame_count: trigger_frame_count
           )
         end
         return unless transition
@@ -251,6 +268,75 @@ module Vizcore
             effect: transition[:effect]
           }
         )
+      end
+
+      def reset_transition_trigger_counters!
+        @transition_counter_scene_name = nil
+        @transition_counter_frame_base = 0
+        @transition_counter_beat_base = 0
+      end
+
+      def transition_evaluation_paused?
+        @scene_mutex.synchronize { file_transport_source? && !@transport_playing }
+      end
+
+      def initial_transport_playing_state
+        file_transport_source? ? false : true
+      end
+
+      def file_transport_source?
+        return false unless @input_manager.is_a?(Vizcore::Audio::InputManager)
+
+        @input_manager.source_name.to_sym == :file
+      rescue StandardError
+        false
+      end
+
+      def transport_position_reset?(position_seconds)
+        Float(position_seconds) <= 0.05
+      rescue StandardError
+        false
+      end
+
+      def transition_trigger_inputs(scene_name:, audio:, frame_count:)
+        sync_transition_trigger_counters(scene_name: scene_name, audio: audio, frame_count: frame_count)
+
+        global_frame_count = Integer(frame_count)
+        scene_frame_count = [global_frame_count - @transition_counter_frame_base, 0].max
+
+        audio_hash = Hash(audio)
+        global_beat_count = extract_beat_count(audio_hash)
+        scene_beat_count = [global_beat_count - @transition_counter_beat_base, 0].max
+
+        [scene_frame_count, audio_hash.merge(beat_count: scene_beat_count)]
+      rescue StandardError
+        [0, { beat_count: 0 }]
+      end
+
+      def sync_transition_trigger_counters(scene_name:, audio:, frame_count:)
+        normalized_scene_name = scene_name.to_s
+        return if @transition_counter_scene_name == normalized_scene_name
+
+        audio_hash = Hash(audio)
+        global_frame_count = Integer(frame_count)
+        global_beat_count = extract_beat_count(audio_hash)
+
+        @transition_counter_scene_name = normalized_scene_name
+        @transition_counter_frame_base = [global_frame_count - 1, 0].max
+        # Include the current frame's beat in the new scene-local counter when a beat is detected.
+        @transition_counter_beat_base = global_beat_count - (truthy_audio_beat?(audio_hash) ? 1 : 0)
+      rescue StandardError
+        reset_transition_trigger_counters!
+      end
+
+      def extract_beat_count(audio)
+        Integer(audio[:beat_count] || audio["beat_count"] || 0)
+      rescue StandardError
+        0
+      end
+
+      def truthy_audio_beat?(audio)
+        !!(audio[:beat] || audio["beat"])
       end
 
       def report_error(error, context:)

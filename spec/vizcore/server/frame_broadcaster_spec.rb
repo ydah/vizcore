@@ -192,7 +192,7 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
           {
             from: :intro,
             to: :drop,
-            trigger: proc { beat_count >= 64 },
+            trigger: proc { beat_count >= 1 },
             effect: { name: :crossfade, options: { duration: 2.0 } }
           }
         ],
@@ -212,6 +212,135 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
         }
       )
       expect(next_frame.dig(:scene, :name)).to eq("drop")
+    end
+
+    it "resets transition counters when a scene is reloaded" do
+      input_manager = instance_double(
+        Vizcore::Audio::InputManager,
+        frame_size: 1024,
+        sample_rate: 44_100,
+        start: nil,
+        stop: nil
+      )
+      pipeline = instance_double(Vizcore::Analysis::Pipeline)
+      allow(pipeline).to receive(:call).and_return(
+        {
+          amplitude: 0.4,
+          bands: { sub: 0.0, low: 0.3, mid: 0.2, high: 0.1 },
+          fft: Array.new(32, 0.02),
+          beat: true,
+          beat_count: 1,
+          bpm: 128.0
+        },
+        {
+          amplitude: 0.4,
+          bands: { sub: 0.0, low: 0.3, mid: 0.2, high: 0.1 },
+          fft: Array.new(32, 0.02),
+          beat: true,
+          beat_count: 2,
+          bpm: 128.0
+        },
+        {
+          amplitude: 0.4,
+          bands: { sub: 0.0, low: 0.3, mid: 0.2, high: 0.1 },
+          fft: Array.new(32, 0.02),
+          beat: true,
+          beat_count: 10,
+          bpm: 128.0
+        },
+        {
+          amplitude: 0.4,
+          bands: { sub: 0.0, low: 0.3, mid: 0.2, high: 0.1 },
+          fft: Array.new(32, 0.02),
+          beat: true,
+          beat_count: 11,
+          bpm: 128.0
+        }
+      )
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+
+      intro_layers = [{ name: :intro_layer, type: :geometry, params: {} }]
+      drop_layers = [{ name: :drop_layer, type: :shader, params: {} }]
+      broadcaster = described_class.new(
+        scene_name: "intro",
+        scene_layers: intro_layers,
+        scene_catalog: [
+          { name: :intro, layers: intro_layers },
+          { name: :drop, layers: drop_layers }
+        ],
+        transitions: [
+          {
+            from: :intro,
+            to: :drop,
+            trigger: proc { beat_count >= 2 && frame_count >= 2 },
+            effect: { name: :crossfade, options: { duration: 1.0 } }
+          }
+        ],
+        input_manager: input_manager,
+        analysis_pipeline: pipeline
+      )
+
+      broadcaster.tick(0.1, Array.new(1024, 0.0))
+      broadcaster.tick(0.2, Array.new(1024, 0.0))
+      expect(broadcaster.current_scene_snapshot[:name]).to eq("drop")
+
+      broadcaster.update_scene(scene_name: :intro, scene_layers: intro_layers)
+      broadcaster.tick(0.3, Array.new(1024, 0.0))
+      expect(broadcaster.current_scene_snapshot[:name]).to eq("intro")
+
+      broadcaster.tick(0.4, Array.new(1024, 0.0))
+      expect(broadcaster.current_scene_snapshot[:name]).to eq("drop")
+    end
+
+    it "does not evaluate transitions for file transport until playback starts" do
+      input_manager = instance_double(
+        Vizcore::Audio::InputManager,
+        frame_size: 1024,
+        sample_rate: 44_100,
+        sync_transport: nil,
+        start: nil,
+        stop: nil
+      )
+      pipeline = instance_double(
+        Vizcore::Analysis::Pipeline,
+        call: {
+          amplitude: 0.4,
+          bands: { sub: 0.0, low: 0.8, mid: 0.3, high: 0.2 },
+          fft: Array.new(32, 0.03),
+          beat: true,
+          beat_count: 99,
+          bpm: 128.0
+        }
+      )
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+
+      broadcaster = described_class.new(
+        scene_name: "intro",
+        scene_layers: [{ name: :intro_layer, type: :geometry, params: {} }],
+        scene_catalog: [
+          { name: :intro, layers: [{ name: :intro_layer, type: :geometry, params: {} }] },
+          { name: :drop, layers: [{ name: :drop_layer, type: :shader, params: {} }] }
+        ],
+        transitions: [
+          {
+            from: :intro,
+            to: :drop,
+            trigger: proc { true },
+            effect: { name: :crossfade, options: { duration: 1.0 } }
+          }
+        ],
+        input_manager: input_manager,
+        analysis_pipeline: pipeline
+      )
+      allow(broadcaster).to receive(:file_transport_source?).and_return(true)
+      broadcaster.sync_transport(playing: false, position_seconds: 0.0)
+
+      broadcaster.tick(0.1, Array.new(1024, 0.0))
+      expect(broadcaster.current_scene_snapshot[:name]).to eq("intro")
+
+      broadcaster.sync_transport(playing: true, position_seconds: 0.0)
+      broadcaster.tick(0.2, Array.new(1024, 0.0))
+      expect(broadcaster.current_scene_snapshot[:name]).to eq("drop")
     end
 
     it "captures approximately real-time sample count before analyzing latest frame window" do

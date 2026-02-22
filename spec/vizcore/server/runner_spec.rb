@@ -16,6 +16,7 @@ RSpec.describe Vizcore::Server::Runner do
       instance_double(
         Vizcore::Server::FrameBroadcaster,
         start: nil,
+        sync_transport: nil,
         stop: nil,
         update_scene: nil,
         update_transition_definition: nil,
@@ -40,7 +41,8 @@ RSpec.describe Vizcore::Server::Runner do
       expect(Vizcore::Server::RackApp).to have_received(:new).with(
         frontend_root: Vizcore.frontend_root,
         audio_source: :mic,
-        audio_file: nil
+        audio_file: nil,
+        scene_names: ["basic"]
       )
       expect(Puma::Server).to have_received(:new).with(rack_app, nil, min_threads: 0, max_threads: 4)
       expect(Vizcore::Audio::InputManager).to have_received(:new).with(source: :mic, file_path: nil)
@@ -87,8 +89,10 @@ RSpec.describe Vizcore::Server::Runner do
       expect(Vizcore::Server::RackApp).to have_received(:new).with(
         frontend_root: Vizcore.frontend_root,
         audio_source: :file,
-        audio_file: file_config.audio_file
+        audio_file: file_config.audio_file,
+        scene_names: ["basic"]
       )
+      expect(broadcaster).to have_received(:sync_transport).with(playing: false, position_seconds: 0.0)
     end
 
     it "hot-reloads scene changes and broadcasts config updates" do
@@ -131,9 +135,46 @@ RSpec.describe Vizcore::Server::Runner do
       )
       expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
         type: "config_update",
-        payload: {
-          scene: hash_including(name: :updated)
-        }
+        payload: hash_including(
+          scene: hash_including(name: :updated),
+          scenes: ["updated"]
+        )
+      )
+    end
+
+    it "switches scene from client websocket message" do
+      runner = described_class.new(config, output: output)
+      broadcaster = instance_double(
+        Vizcore::Server::FrameBroadcaster,
+        current_scene_snapshot: { name: "build", layers: [] },
+        update_scene: nil
+      )
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+      runner.send(
+        :replace_scene_catalog,
+        [
+          { name: :build, layers: [{ name: :a }] },
+          { name: :drop, layers: [{ name: :b }] }
+        ]
+      )
+
+      runner.send(
+        :handle_client_message,
+        { "type" => "switch_scene", "payload" => { "scene" => "drop" } },
+        broadcaster
+      )
+
+      expect(broadcaster).to have_received(:update_scene).with(
+        scene_name: :drop,
+        scene_layers: [hash_including(name: :b)]
+      )
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "scene_change",
+        payload: hash_including(
+          from: "build",
+          to: "drop",
+          source: "ui"
+        )
       )
     end
 

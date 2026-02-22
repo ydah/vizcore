@@ -92,6 +92,32 @@
       background: rgba(58, 98, 151, 0.65);
     }
 
+    .scene-switcher {
+      margin-top: 0.45rem;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.35rem;
+    }
+
+    .scene-switcher[hidden] {
+      display: none;
+    }
+
+    .scene-switcher button {
+      margin-top: 0;
+      width: 100%;
+      padding: 0.35rem 0.45rem;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .scene-switcher button.is-active {
+      border-color: rgba(130, 255, 196, 0.55);
+      background: rgba(20, 104, 73, 0.45);
+      color: #d9ffe8;
+    }
+
     .hud button[disabled] {
       opacity: 0.6;
       cursor: not-allowed;
@@ -112,6 +138,7 @@
       <p id="audio-source-status">Audio Source: unknown</p>
       <p id="audio-track-status">Track: none</p>
       <p id="audio-playback-status">Playback: unavailable</p>
+      <div id="scene-switcher" class="scene-switcher" hidden aria-label="Scene switcher"></div>
       <button id="audio-toggle" type="button" hidden>Play Audio</button>
     </section>
   </div>

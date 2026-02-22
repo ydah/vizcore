@@ -11,6 +11,7 @@ const beatStatusElement = document.querySelector("#beat-status");
 const audioSourceStatusElement = document.querySelector("#audio-source-status");
 const audioTrackStatusElement = document.querySelector("#audio-track-status");
 const audioPlaybackStatusElement = document.querySelector("#audio-playback-status");
+const sceneSwitcherElement = document.querySelector("#scene-switcher");
 const audioToggleButton = document.querySelector("#audio-toggle");
 
 const engine = new Engine(canvas);
@@ -23,6 +24,7 @@ let frameCount = 0;
 let lastConnectedAt = null;
 let lastTransportSyncAt = 0;
 let beatFlashUntil = 0;
+let availableSceneNames = [];
 
 const websocketUrl = buildWebSocketUrl();
 const client = new WebSocketClient(websocketUrl, {
@@ -30,6 +32,7 @@ const client = new WebSocketClient(websocketUrl, {
     engine.setAudioFrame(frame);
     frameCount += 1;
     const sceneName = String(frame?.scene?.name || currentSceneName);
+    const sceneChanged = sceneName !== currentSceneName;
     currentSceneName = sceneName;
     const amplitude = Number(frame?.audio?.amplitude || 0).toFixed(4);
     const bpm = Number(frame?.audio?.bpm || 0);
@@ -40,6 +43,9 @@ const client = new WebSocketClient(websocketUrl, {
     }
     const beatVisible = performance.now() < beatFlashUntil;
     sceneStatusElement.textContent = `Scene: ${sceneName}`;
+    if (sceneChanged) {
+      renderSceneButtons();
+    }
     frameStatusElement.textContent = `Amplitude: ${amplitude} | Frames: ${frameCount}`;
     bpmStatusElement.textContent = `BPM: ${bpm > 0 ? bpm.toFixed(1) : "--"}`;
     beatStatusElement.textContent = `Beat: ${beatVisible ? "ON" : "off"} | Count: ${beatCount}`;
@@ -51,12 +57,15 @@ const client = new WebSocketClient(websocketUrl, {
     currentSceneName = to;
     sceneStatusElement.textContent = `Scene: ${to}`;
     transitionStatusElement.textContent = `Transition: ${from} -> ${to}`;
+    renderSceneButtons();
   },
   onConfigUpdate: (payload) => {
+    updateAvailableScenes(payload?.scenes);
     const sceneName = payload?.scene?.name;
     if (sceneName) {
       currentSceneName = String(sceneName);
       sceneStatusElement.textContent = `Scene: ${currentSceneName}`;
+      renderSceneButtons();
     }
   },
   onStatus: (status) => {
@@ -92,6 +101,7 @@ async function fetchRuntime() {
 function applyRuntime(runtime) {
   const source = String(runtime?.audio_source || "unknown");
   audioSourceStatusElement.textContent = `Audio Source: ${source}`;
+  updateAvailableScenes(runtime?.scene_names);
 
   const fileName = runtime?.audio_file_name;
   const fileUrl = runtime?.audio_file_url;
@@ -105,6 +115,61 @@ function applyRuntime(runtime) {
 
   audioTrackStatusElement.textContent = `Track: ${String(fileName || "source file")}`;
   setupAudioPlayback(fileUrl);
+}
+
+function updateAvailableScenes(sceneValues) {
+  const names = normalizeSceneNames(sceneValues);
+  if (!names.length) {
+    return;
+  }
+  availableSceneNames = names;
+  renderSceneButtons();
+}
+
+function normalizeSceneNames(sceneValues) {
+  const seen = new Set();
+  const names = [];
+  const entries = Array.isArray(sceneValues) ? sceneValues : [];
+
+  for (const entry of entries) {
+    const rawName = typeof entry === "string" ? entry : entry?.name;
+    const name = String(rawName || "").trim();
+    if (!name || seen.has(name)) {
+      continue;
+    }
+    seen.add(name);
+    names.push(name);
+  }
+
+  return names;
+}
+
+function renderSceneButtons() {
+  if (!sceneSwitcherElement) {
+    return;
+  }
+
+  if (!availableSceneNames.length) {
+    sceneSwitcherElement.hidden = true;
+    sceneSwitcherElement.replaceChildren();
+    return;
+  }
+
+  sceneSwitcherElement.hidden = false;
+  const buttons = availableSceneNames.map((sceneName) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = sceneName;
+    button.classList.toggle("is-active", sceneName === currentSceneName);
+    button.onclick = () => {
+      if (sceneName === currentSceneName) {
+        return;
+      }
+      client.send("switch_scene", { scene: sceneName });
+    };
+    return button;
+  });
+  sceneSwitcherElement.replaceChildren(...buttons);
 }
 
 function setupAudioPlayback(audioUrl) {
