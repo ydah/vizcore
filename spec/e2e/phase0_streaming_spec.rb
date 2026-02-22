@@ -20,7 +20,8 @@ RSpec.describe "Phase 0 streaming", :e2e do
     script_response = Net::HTTP.get_response(server.http_url("/src/main.js"))
 
     expect(root_response).to be_a(Net::HTTPSuccess)
-    expect(root_response.body).to include("Vizcore Phase 0")
+    expect(root_response.body).to include("Vizcore")
+    expect(root_response.body).to include('id="vizcore-canvas"')
 
     expect(script_response).to be_a(Net::HTTPSuccess)
     expect(script_response.body).to include("WebSocketClient")
