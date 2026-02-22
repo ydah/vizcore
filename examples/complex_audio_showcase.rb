@@ -6,37 +6,35 @@ Vizcore.define do
   scene :build do
     layer :rings do
       shader :spectrum_rings
-      opacity 0.96
+      opacity 0.88
       effect :feedback
-      effect_intensity 0.35
+      effect_intensity 0.08
       map frequency_band(:low) => :rotation_speed
-      map frequency_band(:mid) => :effect_intensity
     end
 
     layer :grid do
       shader :neon_grid
-      opacity 0.45
+      opacity 0.28
       blend :add
       vj_effect :mirror
-      effect_intensity 0.35
+      effect_intensity 0.18
       map frequency_band(:high) => :effect_intensity
     end
 
     layer :particles do
       type :particle_field
-      count 5200
+      count 3800
       blend :add
-      size 2.8
-      effect :chromatic
-      effect_intensity 0.4
+      opacity 0.74
+      size 2.2
       map amplitude => :speed
       map frequency_band(:low) => :size
-      map frequency_band(:high) => :effect_intensity
     end
 
     layer :wireframe do
       type :wireframe_cube
       blend :add
+      opacity 0.9
       map fft_spectrum => :deform
       map frequency_band(:high) => :color_shift
       map frequency_band(:mid) => :rotation_speed
@@ -48,6 +46,56 @@ Vizcore.define do
       font_size 56
       color "#e8f8ff"
       glow_strength 0.12
+      map beat? => :glow_strength
+    end
+  end
+
+  scene :lift do
+    layer :background do
+      shader :bass_tunnel
+      opacity 0.94
+      effect :feedback
+      effect_intensity 0.16
+      map frequency_band(:low) => :rotation_speed
+      map frequency_band(:mid) => :effect_intensity
+    end
+
+    layer :grid do
+      shader :neon_grid
+      opacity 0.34
+      blend :add
+      vj_effect :color_shift
+      effect_intensity 0.22
+      map frequency_band(:high) => :effect_intensity
+    end
+
+    layer :particles do
+      type :particle_field
+      count 6800
+      blend :add
+      size 3.6
+      effect :chromatic
+      effect_intensity 0.18
+      map amplitude => :speed
+      map frequency_band(:low) => :size
+      map frequency_band(:high) => :effect_intensity
+    end
+
+    layer :wireframe do
+      type :wireframe_cube
+      blend :add
+      opacity 0.78
+      map fft_spectrum => :deform
+      map frequency_band(:high) => :color_shift
+      map frequency_band(:low) => :rotation_speed
+    end
+
+    layer :title do
+      type :text
+      content "LIFT"
+      font_size 72
+      color "#eefbff"
+      glow_strength 0.16
       map beat? => :glow_strength
     end
   end
@@ -100,8 +148,121 @@ Vizcore.define do
     end
   end
 
-  transition from: :build, to: :drop do
+  scene :afterglow do
+    layer :background do
+      shader :gradient_pulse
+      opacity 1.0
+      effect :bloom
+      effect_intensity 0.24
+      rotation_speed 0.45
+      map frequency_band(:low) => :effect_intensity
+    end
+
+    layer :rings do
+      shader :spectrum_rings
+      opacity 0.38
+      effect :chromatic
+      effect_intensity 0.1
+      map frequency_band(:mid) => :effect_intensity
+      map frequency_band(:low) => :rotation_speed
+    end
+
+    layer :dust do
+      type :particle_field
+      count 2600
+      blend :add
+      opacity 0.62
+      size 2.1
+      map amplitude => :speed
+      map frequency_band(:high) => :size
+    end
+
+    layer :wireframe do
+      type :wireframe_cube
+      opacity 0.36
+      map fft_spectrum => :deform
+      map frequency_band(:mid) => :color_shift
+      map amplitude => :rotation_speed
+    end
+
+    layer :title do
+      type :text
+      content "AFTERGLOW"
+      font_size 52
+      color "#edf5ff"
+      glow_strength 0.08
+      map beat? => :glow_strength
+    end
+  end
+
+  scene :breakdown do
+    layer :background do
+      shader :neon_grid
+      opacity 0.22
+      effect :bloom
+      effect_intensity 0.12
+      rotation_speed 0.18
+      map frequency_band(:mid) => :effect_intensity
+    end
+
+    layer :rings do
+      shader :spectrum_rings
+      opacity 0.26
+      effect :feedback
+      effect_intensity 0.06
+      map frequency_band(:low) => :rotation_speed
+    end
+
+    layer :dust do
+      type :particle_field
+      count 1800
+      blend :add
+      opacity 0.46
+      size 1.8
+      map amplitude => :speed
+      map frequency_band(:high) => :size
+    end
+
+    layer :wireframe do
+      type :wireframe_cube
+      opacity 0.22
+      map fft_spectrum => :deform
+      map frequency_band(:mid) => :color_shift
+      map amplitude => :rotation_speed
+    end
+
+    layer :title do
+      type :text
+      content "BREAKDOWN"
+      font_size 46
+      color "#e6f0ff"
+      glow_strength 0.06
+      map beat? => :glow_strength
+    end
+  end
+
+  transition from: :build, to: :lift do
     trigger { beat_count >= 24 || frame_count >= 900 }
+    effect :crossfade, duration: 0.9
+  end
+
+  transition from: :lift, to: :drop do
+    trigger { beat_count >= 16 || frame_count >= 540 }
     effect :crossfade, duration: 1.0
+  end
+
+  transition from: :drop, to: :afterglow do
+    trigger { beat_count >= 24 || frame_count >= 900 }
+    effect :crossfade, duration: 1.1
+  end
+
+  transition from: :afterglow, to: :breakdown do
+    trigger { beat_count >= 12 || frame_count >= 420 }
+    effect :crossfade, duration: 1.0
+  end
+
+  transition from: :breakdown, to: :build do
+    trigger { beat_count >= 16 || frame_count >= 720 }
+    effect :crossfade, duration: 1.2
   end
 end
