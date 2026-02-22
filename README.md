@@ -33,7 +33,7 @@ vizcore devices [audio|midi]
 
 ```bash
 # WAV
-vizcore start examples/basic.rb --audio-source file --audio-file spec/fixtures/audio/pulse16_mono.wav
+vizcore start examples/basic.rb --audio-source file --audio-file spec/fixtures/audio/kick_120bpm.wav
 
 # MP3/FLAC (decoded through ffmpeg)
 vizcore start examples/basic.rb --audio-source file --audio-file path/to/set.mp3
@@ -73,7 +73,7 @@ bundle exec rspec
 Try the same scenes locally:
 
 ```bash
-vizcore start examples/file_audio_demo.rb --audio-source file --audio-file spec/fixtures/audio/pulse16_mono.wav
+vizcore start examples/file_audio_demo.rb --audio-source file --audio-file spec/fixtures/audio/kick_120bpm.wav
 ```
 
 For non-file quick checks:
