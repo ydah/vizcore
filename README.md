@@ -54,9 +54,6 @@ When file source is active, the frontend receives runtime metadata from `/runtim
 - `examples/intro_drop.rb`
 - `examples/file_audio_demo.rb`
 - `examples/complex_audio_showcase.rb`
-- `examples/presets/edm.rb`
-- `examples/presets/lofi.rb`
-- `examples/presets/techno.rb`
 - `examples/midi_scene_switch.rb`
 - `examples/custom_shader.rb`
 
