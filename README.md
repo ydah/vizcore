@@ -54,6 +54,9 @@ When file source is active, the frontend receives runtime metadata from `/runtim
 - `examples/intro_drop.rb`
 - `examples/file_audio_demo.rb`
 - `examples/complex_audio_showcase.rb`
+- `examples/presets/edm.rb`
+- `examples/presets/lofi.rb`
+- `examples/presets/techno.rb`
 - `examples/midi_scene_switch.rb`
 - `examples/custom_shader.rb`
 
@@ -89,6 +92,24 @@ vizcore start examples/custom_shader.rb --audio-source dummy
 `intro_drop` automatically falls back to a time-based transition after about 6 seconds when beats are not detected (for example with `dummy` source). Use file input for beat-synced transitions.
 When running with `--audio-source file`, the HUD shows `Play Audio`/`Pause Audio` controls. If autoplay is blocked by the browser, click `Play Audio` once.
 `examples/complex_audio_showcase.rb` is tuned for the bundled `examples/assets/complex_demo_loop.wav` loop and demonstrates synced playback + richer multi-layer reactions.
+HUD also shows `BPM` and `Beat` / `Beat Count` to make sync quality easier to see while you pause/seek.
+
+### External Track Presets
+
+Swap in your own tracks (WAV/MP3/FLAC) and choose a preset scene based on genre:
+
+```bash
+# EDM / big-room / festival
+vizcore start examples/presets/edm.rb --audio-source file --audio-file path/to/edm_track.wav
+
+# Lo-fi / chill beats
+vizcore start examples/presets/lofi.rb --audio-source file --audio-file path/to/lofi_track.wav
+
+# Techno / hard groove
+vizcore start examples/presets/techno.rb --audio-source file --audio-file path/to/techno_track.wav
+```
+
+Tip: MP3/FLAC input works too (decoded by `ffmpeg`), but WAV gives the fastest startup for iteration.
 
 Re-generate demo assets with:
 

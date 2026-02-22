@@ -95,6 +95,18 @@ vizcore start examples/intro_drop.rb --audio-source file --audio-file spec/fixtu
 File source mode exposes `Play Audio` / `Pause Audio` in the HUD and streams the same file to the browser (`/audio-file`). If autoplay is blocked, click `Play Audio` once.
 `examples/complex_audio_showcase.rb` uses the bundled `examples/assets/complex_demo_loop.wav` loop for a denser audio-reactive demo.
 
+### External track presets (genre-specific)
+
+Use your own music file with one of the preset scenes:
+
+```bash
+vizcore start examples/presets/edm.rb --audio-source file --audio-file path/to/edm_track.wav
+vizcore start examples/presets/lofi.rb --audio-source file --audio-file path/to/lofi_track.wav
+vizcore start examples/presets/techno.rb --audio-source file --audio-file path/to/techno_track.wav
+```
+
+The HUD displays `BPM`, `Beat`, and `Beat Count`, which helps confirm synchronization while pausing or seeking playback.
+
 ## 6. Troubleshooting
 
 - `Audio file not found`: check `--audio-file` path.
