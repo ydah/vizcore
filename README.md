@@ -70,55 +70,6 @@ bundle exec rspec
 
 - YARD generation and stats commands are documented in `docs/YARD.md`.
 
-## Demo
-
-![Vizcore demo](docs/assets/demo.gif)
-
-The README demo GIF is an illustrative generated asset (not a direct capture of the runtime scenes).
-
-Try real runtime scenes locally:
-
-```bash
-vizcore start examples/complex_audio_showcase.rb --audio-source file --audio-file examples/assets/complex_demo_loop.wav
-vizcore start examples/file_audio_demo.rb --audio-source file --audio-file spec/fixtures/audio/kick_120bpm.wav
-```
-
-For non-file quick checks:
-
-```bash
-vizcore start examples/intro_drop.rb --audio-source dummy
-vizcore start examples/midi_scene_switch.rb --audio-source dummy
-vizcore start examples/custom_shader.rb --audio-source dummy
-```
-
-`intro_drop` automatically falls back to a time-based transition after about 6 seconds when beats are not detected (for example with `dummy` source). Use file input for beat-synced transitions.
-When running with `--audio-source file`, the HUD shows `Play Audio`/`Pause Audio` controls. If autoplay is blocked by the browser, click `Play Audio` once.
-`examples/complex_audio_showcase.rb` is tuned for the bundled `examples/assets/complex_demo_loop.wav` loop and demonstrates synced playback + richer multi-layer reactions.
-HUD also shows `BPM` and `Beat` / `Beat Count` to make sync quality easier to see while you pause/seek.
-
-### External Track Presets
-
-Swap in your own tracks (WAV/MP3/FLAC) and choose a preset scene based on genre:
-
-```bash
-# EDM / big-room / festival
-vizcore start examples/presets/edm.rb --audio-source file --audio-file path/to/edm_track.wav
-
-# Lo-fi / chill beats
-vizcore start examples/presets/lofi.rb --audio-source file --audio-file path/to/lofi_track.wav
-
-# Techno / hard groove
-vizcore start examples/presets/techno.rb --audio-source file --audio-file path/to/techno_track.wav
-```
-
-Tip: MP3/FLAC input works too (decoded by `ffmpeg`), but WAV gives the fastest startup for iteration.
-
-Re-generate demo assets with:
-
-```bash
-scripts/generate_demo_assets.sh
-```
-
 ## Error Handling Notes
 
 - Runtime components emit contextual error logs (for example scene reload and MIDI runtime failures).
@@ -131,7 +82,6 @@ scripts/generate_demo_assets.sh
 ## Release Process
 
 - Release checklist: `docs/RELEASE.md`
-- Demo capture checklist (README embed asset prep): `docs/DEMO_CAPTURE.md`
 - Changelog: `CHANGELOG.md`
 - Tag-driven release workflow: `.github/workflows/release.yml`
 
