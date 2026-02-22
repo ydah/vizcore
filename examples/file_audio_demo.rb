@@ -3,8 +3,16 @@
 Vizcore.define do
   scene :groove do
     layer :background do
-      shader :spectrum_rings
-      opacity 0.92
+      shader :neon_grid
+      opacity 1.0
+    end
+
+    layer :wireframe do
+      type :wireframe_cube
+      blend :add
+      map fft_spectrum => :deform
+      map frequency_band(:high) => :color_shift
+      map amplitude => :rotation_speed
     end
 
     layer :particles do
@@ -25,11 +33,9 @@ Vizcore.define do
   end
 
   scene :drop do
-    layer :flash do
-      shader :glitch_flash
-      map amplitude => :param_intensity
-      map frequency_band(:high) => :param_flash
-      opacity 0.9
+    layer :background do
+      shader :kaleidoscope
+      opacity 0.95
     end
 
     layer :wireframe do
@@ -39,15 +45,17 @@ Vizcore.define do
       map frequency_band(:high) => :color_shift
       map amplitude => :rotation_speed
     end
+    layer :title do
+      type :text
+      content "DROP"
+      font_size 92
+      color "#eaffff"
+      glow_strength 0.32
+    end
   end
 
   transition from: :groove, to: :drop do
-    trigger { beat_count >= 48 || frame_count >= 420 }
-    effect :crossfade, duration: 1.0
-  end
-
-  transition from: :drop, to: :groove do
-    trigger { beat_count >= 96 || frame_count >= 960 }
+    trigger { beat_count >= 32 || frame_count >= 720 }
     effect :crossfade, duration: 1.0
   end
 end

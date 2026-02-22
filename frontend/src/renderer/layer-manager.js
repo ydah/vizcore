@@ -40,6 +40,7 @@ const FULLSCREEN_VERTICES = new Float32Array([
   -1.0, 1.0,
   1.0, 1.0
 ]);
+const MAX_LAYER_TARGET_PIXELS = 4_194_304;
 
 export class LayerManager {
   constructor(gl, shaderManager) {
@@ -71,6 +72,7 @@ export class LayerManager {
     this.layerDepthRenderbuffer = null;
     this.layerTargetWidth = 0;
     this.layerTargetHeight = 0;
+    this.layerTargetAvailable = true;
 
     this.particleSystem = new ParticleSystem(this.gl, this.shaderManager);
     this.textRenderer = new TextRenderer(this.gl, this.shaderManager);
@@ -85,13 +87,23 @@ export class LayerManager {
     const height = Math.max(1, Math.floor(Number(resolution?.[1] || 1)));
     this.ensureLayerTarget(width, height);
 
+    if (!this.layerTargetAvailable || !this.layerFramebuffer || !this.layerTexture) {
+      for (const layer of layerList) {
+        const blend = String(layer?.params?.blend || "alpha").toLowerCase();
+        this.setBlendMode(blend);
+        this.renderLayer(layer, audio, time, rotation, [width, height]);
+      }
+      this.setBlendMode("alpha");
+      return;
+    }
+
     for (const layer of layerList) {
       this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.layerFramebuffer);
-      this.gl.viewport(0, 0, width, height);
+      this.gl.viewport(0, 0, this.layerTargetWidth, this.layerTargetHeight);
       this.gl.clearColor(0.0, 0.0, 0.0, 0.0);
       this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
-      this.renderLayer(layer, audio, time, rotation, [width, height]);
+      this.renderLayer(layer, audio, time, rotation, [this.layerTargetWidth, this.layerTargetHeight]);
 
       this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
       this.gl.viewport(0, 0, width, height);
@@ -258,11 +270,16 @@ export class LayerManager {
   }
 
   ensureLayerTarget(width, height) {
-    if (this.layerFramebuffer && this.layerTargetWidth === width && this.layerTargetHeight === height) {
+    if (!this.layerTargetAvailable) {
       return;
     }
-    this.layerTargetWidth = width;
-    this.layerTargetHeight = height;
+
+    const [targetWidth, targetHeight] = this.resolveLayerTargetSize(width, height);
+    if (this.layerFramebuffer && this.layerTargetWidth === targetWidth && this.layerTargetHeight === targetHeight) {
+      return;
+    }
+    this.layerTargetWidth = targetWidth;
+    this.layerTargetHeight = targetHeight;
 
     this.disposeLayerTarget();
 
@@ -272,7 +289,7 @@ export class LayerManager {
     this.layerDepthRenderbuffer = gl.createRenderbuffer();
 
     gl.bindTexture(gl.TEXTURE_2D, this.layerTexture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, targetWidth, targetHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -282,8 +299,18 @@ export class LayerManager {
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.layerTexture, 0);
 
     gl.bindRenderbuffer(gl.RENDERBUFFER, this.layerDepthRenderbuffer);
-    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, targetWidth, targetHeight);
     gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.layerDepthRenderbuffer);
+
+    const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+    if (status !== gl.FRAMEBUFFER_COMPLETE) {
+      console.warn("Layer framebuffer unavailable; falling back to direct rendering", status);
+      this.layerTargetAvailable = false;
+      this.disposeLayerTarget();
+      gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      return;
+    }
 
     gl.bindRenderbuffer(gl.RENDERBUFFER, null);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -302,6 +329,22 @@ export class LayerManager {
       this.gl.deleteFramebuffer(this.layerFramebuffer);
       this.layerFramebuffer = null;
     }
+  }
+
+  resolveLayerTargetSize(width, height) {
+    const gl = this.gl;
+    const maxTextureSize = Number(gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096);
+    let targetWidth = clamp(Math.floor(width), 1, maxTextureSize);
+    let targetHeight = clamp(Math.floor(height), 1, maxTextureSize);
+
+    const pixels = targetWidth * targetHeight;
+    if (pixels > MAX_LAYER_TARGET_PIXELS) {
+      const scale = Math.sqrt(MAX_LAYER_TARGET_PIXELS / pixels);
+      targetWidth = Math.max(1, Math.floor(targetWidth * scale));
+      targetHeight = Math.max(1, Math.floor(targetHeight * scale));
+    }
+
+    return [targetWidth, targetHeight];
   }
 
   setBlendMode(mode) {
