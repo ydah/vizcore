@@ -97,12 +97,14 @@ export class Engine {
 }
 
 const resolveRotationSpeed = (layers, amplitude) => {
-  const firstLayer = layers[0];
-  const fromLayer = Number(firstLayer?.params?.rotation_speed);
+  const layerWithSpeed = Array.isArray(layers)
+    ? layers.find((layer) => Number.isFinite(Number(layer?.params?.rotation_speed)))
+    : null;
+  const fromLayer = Number(layerWithSpeed?.params?.rotation_speed);
   if (Number.isFinite(fromLayer)) {
-    return clamp(fromLayer, 0.05, 6.0);
+    return clamp(fromLayer, 0.1, 8.0);
   }
-  return 0.35 + amplitude * 1.8;
+  return 0.7 + amplitude * 2.4;
 };
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
