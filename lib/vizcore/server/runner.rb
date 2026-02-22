@@ -31,7 +31,11 @@ module Vizcore
         definition = load_definition!
         scene = first_scene(definition) || fallback_scene
 
-        app = RackApp.new(frontend_root: Vizcore.frontend_root)
+        app = RackApp.new(
+          frontend_root: Vizcore.frontend_root,
+          audio_source: @config.audio_source,
+          audio_file: @config.audio_file
+        )
         server = Puma::Server.new(app, nil, min_threads: 0, max_threads: 4)
         server.add_tcp_listener(@config.host, @config.port)
         server.run
@@ -56,6 +60,7 @@ module Vizcore
 
         @output.puts("Vizcore server listening at http://#{@config.host}:#{@config.port}")
         @output.puts("Scene: #{scene[:name]}")
+        @output.puts("Audio playback: http://#{@config.host}:#{@config.port}/audio-file") if @config.audio_source == :file
         @output.puts("Press Ctrl+C to stop.")
 
         wait_for_interrupt

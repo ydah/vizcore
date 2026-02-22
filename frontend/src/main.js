@@ -6,12 +6,17 @@ const wsStatusElement = document.querySelector("#ws-status");
 const sceneStatusElement = document.querySelector("#scene-status");
 const transitionStatusElement = document.querySelector("#transition-status");
 const frameStatusElement = document.querySelector("#frame-status");
+const audioSourceStatusElement = document.querySelector("#audio-source-status");
+const audioTrackStatusElement = document.querySelector("#audio-track-status");
+const audioPlaybackStatusElement = document.querySelector("#audio-playback-status");
+const audioToggleButton = document.querySelector("#audio-toggle");
 
 const engine = new Engine(canvas);
 engine.init();
 engine.start();
 
 let currentSceneName = "unknown";
+let audioElement = null;
 
 const websocketUrl = buildWebSocketUrl();
 const client = new WebSocketClient(websocketUrl, {
@@ -43,6 +48,106 @@ const client = new WebSocketClient(websocketUrl, {
 });
 
 client.connect();
+void initializeRuntime();
+
+async function initializeRuntime() {
+  const runtime = await fetchRuntime();
+  applyRuntime(runtime);
+}
+
+async function fetchRuntime() {
+  try {
+    const response = await fetch("/runtime", { cache: "no-store" });
+    if (!response.ok) {
+      return null;
+    }
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+function applyRuntime(runtime) {
+  const source = String(runtime?.audio_source || "unknown");
+  audioSourceStatusElement.textContent = `Audio Source: ${source}`;
+
+  const fileName = runtime?.audio_file_name;
+  const fileUrl = runtime?.audio_file_url;
+  if (!fileUrl) {
+    audioTrackStatusElement.textContent = "Track: none";
+    audioPlaybackStatusElement.textContent = "Playback: unavailable";
+    audioToggleButton.hidden = true;
+    return;
+  }
+
+  audioTrackStatusElement.textContent = `Track: ${String(fileName || "source file")}`;
+  setupAudioPlayback(fileUrl);
+}
+
+function setupAudioPlayback(audioUrl) {
+  if (audioElement) {
+    audioElement.pause();
+  }
+
+  audioElement = new Audio(audioUrl);
+  audioElement.preload = "auto";
+  audioElement.loop = true;
+
+  audioToggleButton.hidden = false;
+  audioToggleButton.disabled = false;
+
+  const updatePlaybackState = () => {
+    if (!audioElement) {
+      return;
+    }
+    const state = audioElement.paused ? "paused" : "playing";
+    const current = formatSeconds(audioElement.currentTime);
+    const duration = Number.isFinite(audioElement.duration) ? formatSeconds(audioElement.duration) : "--:--";
+    audioPlaybackStatusElement.textContent = `Playback: ${state} ${current} / ${duration}`;
+    audioToggleButton.textContent = audioElement.paused ? "Play Audio" : "Pause Audio";
+  };
+
+  const playAudio = async () => {
+    if (!audioElement) {
+      return;
+    }
+    try {
+      await audioElement.play();
+      updatePlaybackState();
+    } catch (error) {
+      const message = String(error?.message || "autoplay blocked");
+      audioPlaybackStatusElement.textContent = `Playback: blocked (${message})`;
+      audioToggleButton.textContent = "Play Audio";
+    }
+  };
+
+  audioElement.addEventListener("play", updatePlaybackState);
+  audioElement.addEventListener("pause", updatePlaybackState);
+  audioElement.addEventListener("timeupdate", updatePlaybackState);
+  audioElement.addEventListener("loadedmetadata", updatePlaybackState);
+
+  audioToggleButton.onclick = async () => {
+    if (!audioElement) {
+      return;
+    }
+    if (audioElement.paused) {
+      await playAudio();
+      return;
+    }
+    audioElement.pause();
+    updatePlaybackState();
+  };
+
+  updatePlaybackState();
+  void playAudio();
+}
+
+function formatSeconds(value) {
+  const seconds = Math.max(0, Math.floor(Number(value) || 0));
+  const minutes = Math.floor(seconds / 60);
+  const remain = seconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remain).padStart(2, "0")}`;
+}
 
 function buildWebSocketUrl() {
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";

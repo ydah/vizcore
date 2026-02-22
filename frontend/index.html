@@ -66,17 +66,42 @@
       font-size: 0.85rem;
       color: var(--muted);
     }
+
+    .hud button {
+      margin-top: 0.35rem;
+      width: 100%;
+      border: 1px solid rgba(153, 195, 255, 0.35);
+      border-radius: 0.5rem;
+      padding: 0.45rem 0.6rem;
+      background: rgba(30, 64, 110, 0.55);
+      color: var(--fg);
+      font-size: 0.84rem;
+      cursor: pointer;
+    }
+
+    .hud button:hover:not([disabled]) {
+      background: rgba(58, 98, 151, 0.65);
+    }
+
+    .hud button[disabled] {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
   <div id="app">
     <canvas id="vizcore-canvas"></canvas>
     <section class="hud" aria-live="polite">
-      <h1>Vizcore Phase 0</h1>
+      <h1>Vizcore Live</h1>
       <p id="ws-status">WebSocket: connecting...</p>
       <p id="scene-status">Scene: unknown</p>
       <p id="transition-status">Transition: none</p>
       <p id="frame-status">Amplitude: 0.0000</p>
+      <p id="audio-source-status">Audio Source: unknown</p>
+      <p id="audio-track-status">Track: none</p>
+      <p id="audio-playback-status">Playback: unavailable</p>
+      <button id="audio-toggle" type="button" hidden>Play Audio</button>
     </section>
   </div>
 
