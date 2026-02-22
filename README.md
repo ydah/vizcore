@@ -164,8 +164,6 @@ When using file source, the HUD exposes **Play Audio** / **Pause Audio** control
 bundle exec rspec
 ```
 
-API documentation commands: `docs/YARD.md`
-Release checklist: `docs/RELEASE.md`
 
 ## License
 
