@@ -92,6 +92,19 @@ module Vizcore
         current_scene
       end
 
+      # Synchronize external playback transport (e.g. browser audio element) with the input source.
+      #
+      # @param playing [Boolean]
+      # @param position_seconds [Numeric]
+      # @return [void]
+      def sync_transport(playing:, position_seconds:)
+        return unless @input_manager.respond_to?(:sync_transport)
+
+        @input_manager.sync_transport(playing: playing, position_seconds: position_seconds)
+      rescue StandardError => e
+        report_error(e, context: "audio transport sync failed")
+      end
+
       # Run one frame tick and broadcast it.
       #
       # @param elapsed_seconds [Float]
@@ -155,8 +168,19 @@ module Vizcore
       private
 
       def capture_samples
-        samples = @input_manager.capture_frame
-        samples.empty? ? Array.new(@input_manager.frame_size, 0.0) : samples
+        ingest_count =
+          if @input_manager.respond_to?(:realtime_capture_size)
+            @input_manager.realtime_capture_size(FRAME_RATE)
+          else
+            @input_manager.frame_size
+          end
+
+        @input_manager.capture_frame(ingest_count)
+        samples = Array(@input_manager.latest_samples(@input_manager.frame_size))
+        return samples if samples.length == @input_manager.frame_size
+        return Array.new(@input_manager.frame_size, 0.0) if samples.empty?
+
+        Array.new(@input_manager.frame_size - samples.length, 0.0) + samples
       rescue StandardError => e
         report_error(e, context: "audio capture failed")
         fallback_frame_size = @input_manager.respond_to?(:frame_size) ? Integer(@input_manager.frame_size) : 1024

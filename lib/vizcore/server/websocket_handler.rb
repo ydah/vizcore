@@ -55,6 +55,21 @@ module Vizcore
           mutex.synchronize { @last_error }
         end
 
+        # Register one inbound message handler for client -> server control messages.
+        #
+        # @yieldparam message [Hash]
+        # @return [void]
+        def on_message(&block)
+          mutex.synchronize { @message_handler = block }
+        end
+
+        # Clear inbound message handler.
+        #
+        # @return [void]
+        def clear_message_handler
+          mutex.synchronize { @message_handler = nil }
+        end
+
         private
 
         def faye_websocket_class
@@ -91,7 +106,9 @@ module Vizcore
         end
 
         def handle_message(_socket, raw_message)
-          JSON.parse(raw_message)
+          message = JSON.parse(raw_message)
+          dispatch_message(message)
+          message
         rescue JSON::ParserError => e
           set_last_error(e)
           nil
@@ -120,6 +137,17 @@ module Vizcore
 
         def set_last_error(error)
           mutex.synchronize { @last_error = error }
+        end
+
+        def dispatch_message(message)
+          handler = mutex.synchronize { @message_handler }
+          return unless handler
+          return unless message.is_a?(Hash)
+
+          handler.call(message)
+        rescue StandardError => e
+          set_last_error(e)
+          nil
         end
 
         def text_headers

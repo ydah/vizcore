@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "open3"
+require "thread"
 require_relative "../errors"
 require_relative "base_input"
 
@@ -11,6 +12,7 @@ module Vizcore
       # Supported file extensions.
       SUPPORTED_EXTENSIONS = %w[.wav .mp3 .flac].freeze
       attr_reader :last_error
+      attr_reader :stream_sample_rate
 
       # @param path [String, Pathname]
       # @param sample_rate [Integer]
@@ -23,6 +25,9 @@ module Vizcore
         @ffmpeg_checker = ffmpeg_checker || method(:ffmpeg_available?)
         @cursor = 0
         @last_error = nil
+        @stream_sample_rate = sample_rate
+        @state_mutex = Mutex.new
+        @transport_paused = false
         @samples = load_samples
       end
 
@@ -33,13 +38,33 @@ module Vizcore
         return Array.new(count, 0.0) unless running?
         return Array.new(count, 0.0) if @samples.empty?
 
-        output = Array.new(count) do
-          sample = @samples[@cursor]
-          @cursor = (@cursor + 1) % @samples.length
-          sample
-        end
+        @state_mutex.synchronize do
+          return Array.new(count, 0.0) if @transport_paused
 
-        output
+          Array.new(count) do
+            sample = @samples[@cursor]
+            @cursor = (@cursor + 1) % @samples.length
+            sample
+          end
+        end
+      end
+
+      # Synchronize file cursor with an external playback transport (browser audio element).
+      #
+      # @param playing [Boolean]
+      # @param position_seconds [Numeric]
+      # @return [Vizcore::Audio::FileInput]
+      def sync_transport(playing:, position_seconds:)
+        return self if @samples.empty?
+
+        seconds = Float(position_seconds)
+        @state_mutex.synchronize do
+          @transport_paused = !playing
+          @cursor = seconds_to_cursor(seconds)
+        end
+        self
+      rescue StandardError
+        self
       end
 
       private
@@ -62,13 +87,17 @@ module Vizcore
         require "wavefile"
 
         samples = []
-        WaveFile::Reader.new(@path).each_buffer(1024) do |buffer|
-          mono = if buffer.channels == 1
-                   buffer.samples
-                 else
-                   buffer.samples.map { |frame| frame.is_a?(Array) ? frame.sum / frame.length.to_f : frame }
-                 end
-          samples.concat(mono.map { |sample| Float(sample) })
+        WaveFile::Reader.new(@path) do |reader|
+          @stream_sample_rate = reader.native_format.sample_rate
+
+          reader.each_buffer(1024) do |buffer|
+            mono = if buffer.channels == 1
+                     buffer.samples
+                   else
+                     buffer.samples.map { |frame| frame.is_a?(Array) ? frame.sum / frame.length.to_f : frame }
+                   end
+            samples.concat(mono.map { |sample| Float(sample) })
+          end
         end
         @last_error = nil
         samples
@@ -119,6 +148,15 @@ module Vizcore
       def record_error(error)
         @last_error = error
         []
+      end
+
+      def seconds_to_cursor(seconds)
+        return 0 if @samples.empty?
+
+        rate = @stream_sample_rate.to_f.positive? ? @stream_sample_rate.to_f : sample_rate.to_f
+        index = (seconds * rate).floor
+        index %= @samples.length
+        index.negative? ? index + @samples.length : index
       end
     end
   end

@@ -30,6 +30,19 @@ RSpec.describe Vizcore::Audio::FileInput do
     expect(input.read(4)).to eq([0.0, 0.0, 0.0, 0.0])
   end
 
+  it "can synchronize playback position and pause state from external transport" do
+    input = described_class.new(path: fixture_path)
+    input.start
+
+    input.sync_transport(playing: true, position_seconds: 2.0 / 8000.0)
+    expect(input.read(3)).to eq([-12_000.0, 24_000.0, -24_000.0])
+
+    input.sync_transport(playing: false, position_seconds: 0.0)
+    expect(input.read(3)).to eq([0.0, 0.0, 0.0])
+  ensure
+    input&.stop
+  end
+
   it "decodes mp3 files via ffmpeg when available" do
     status = instance_double(Process::Status, success?: true)
     runner = double("runner")
@@ -82,5 +95,11 @@ RSpec.describe Vizcore::Audio::FileInput do
 
     expect(input.last_error).to be_a(Vizcore::AudioSourceError)
     expect(input.last_error.message).to include("Audio file not found")
+  end
+
+  it "exposes native WAV sample rate as stream_sample_rate" do
+    input = described_class.new(path: fixture_path, sample_rate: 44_100)
+
+    expect(input.stream_sample_rate).to eq(8000)
   end
 end
