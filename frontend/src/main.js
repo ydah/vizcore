@@ -25,13 +25,27 @@ let lastConnectedAt = null;
 let lastTransportSyncAt = 0;
 let beatFlashUntil = 0;
 let availableSceneNames = [];
+let pendingSceneName = null;
+let pendingSceneRequestedAt = 0;
 
 const websocketUrl = buildWebSocketUrl();
 const client = new WebSocketClient(websocketUrl, {
   onFrame: (frame) => {
     engine.setAudioFrame(frame);
     frameCount += 1;
-    const sceneName = String(frame?.scene?.name || currentSceneName);
+    let sceneName = String(frame?.scene?.name || currentSceneName);
+    const now = performance.now();
+    if (
+      pendingSceneName &&
+      sceneName !== pendingSceneName &&
+      now - pendingSceneRequestedAt < 350
+    ) {
+      sceneName = currentSceneName;
+    }
+    if (pendingSceneName && sceneName === pendingSceneName) {
+      pendingSceneName = null;
+      pendingSceneRequestedAt = 0;
+    }
     const sceneChanged = sceneName !== currentSceneName;
     currentSceneName = sceneName;
     const amplitude = Number(frame?.audio?.amplitude || 0).toFixed(4);
@@ -54,6 +68,8 @@ const client = new WebSocketClient(websocketUrl, {
   onSceneChange: (payload) => {
     const from = String(payload?.from || "unknown");
     const to = String(payload?.to || "unknown");
+    pendingSceneName = null;
+    pendingSceneRequestedAt = 0;
     currentSceneName = to;
     sceneStatusElement.textContent = `Scene: ${to}`;
     transitionStatusElement.textContent = `Transition: ${from} -> ${to}`;
@@ -165,6 +181,11 @@ function renderSceneButtons() {
       if (sceneName === currentSceneName) {
         return;
       }
+      pendingSceneName = sceneName;
+      pendingSceneRequestedAt = performance.now();
+      currentSceneName = sceneName;
+      sceneStatusElement.textContent = `Scene: ${sceneName}`;
+      renderSceneButtons();
       client.send("switch_scene", { scene: sceneName });
     };
     return button;
