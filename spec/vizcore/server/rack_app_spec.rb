@@ -33,6 +33,7 @@ RSpec.describe Vizcore::Server::RackApp do
     expect(response.status).to eq(200)
     expect(response.headers["content-type"]).to include("application/json")
     expect(response.body).to include("\"audio_source\":\"unknown\"")
+    expect(response.body).to include("\"scene_names\":[]")
   end
 
   it "returns 404 for audio endpoint when file source is disabled" do
@@ -52,12 +53,25 @@ RSpec.describe Vizcore::Server::RackApp do
     expect(runtime.status).to eq(200)
     expect(runtime.body).to include("\"audio_source\":\"file\"")
     expect(runtime.body).to include("\"audio_file_url\":\"/audio-file\"")
+    expect(runtime.body).to include("\"scene_names\":[]")
 
     audio = Rack::MockRequest.new(file_app).get("/audio-file")
     expect(audio.status).to eq(200)
     expect(audio.headers["content-type"]).to include("audio")
     expect(audio.headers["accept-ranges"]).to eq("bytes")
     expect(audio.body.bytesize).to be > 0
+  end
+
+  it "includes scene names in runtime metadata" do
+    runtime_app = described_class.new(
+      frontend_root: Vizcore.frontend_root,
+      scene_names: %i[build drop]
+    )
+
+    response = Rack::MockRequest.new(runtime_app).get("/runtime")
+
+    expect(response.status).to eq(200)
+    expect(response.body).to include("\"scene_names\":[\"build\",\"drop\"]")
   end
 
   it "supports byte range requests for audio file streaming" do
