@@ -79,6 +79,7 @@ vizcore devices midi
 ## 5. Useful Example Scenes
 
 ```bash
+vizcore start examples/complex_audio_showcase.rb --audio-source file --audio-file examples/assets/complex_demo_loop.wav
 vizcore start examples/file_audio_demo.rb --audio-source file --audio-file spec/fixtures/audio/kick_120bpm.wav
 vizcore start examples/intro_drop.rb --audio-source dummy
 vizcore start examples/midi_scene_switch.rb --audio-source dummy
@@ -92,6 +93,7 @@ vizcore start examples/intro_drop.rb --audio-source file --audio-file spec/fixtu
 ```
 
 File source mode exposes `Play Audio` / `Pause Audio` in the HUD and streams the same file to the browser (`/audio-file`). If autoplay is blocked, click `Play Audio` once.
+`examples/complex_audio_showcase.rb` uses the bundled `examples/assets/complex_demo_loop.wav` loop for a denser audio-reactive demo.
 
 ## 6. Troubleshooting
 

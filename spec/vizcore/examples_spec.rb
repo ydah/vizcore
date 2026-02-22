@@ -26,6 +26,7 @@ RSpec.describe "example scenes" do
     "examples/basic.rb" => { expected_scene: "basic" },
     "examples/intro_drop.rb" => { expected_scene: "intro" },
     "examples/file_audio_demo.rb" => { expected_scene: "groove" },
+    "examples/complex_audio_showcase.rb" => { expected_scene: "build" },
     "examples/midi_scene_switch.rb" => { expected_scene: "warmup" },
     "examples/custom_shader.rb" => { expected_scene: "shader_art", expect_glsl_source: true }
   }.each do |path, expectation|
