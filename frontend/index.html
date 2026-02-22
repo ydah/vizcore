@@ -67,6 +67,15 @@
       color: var(--muted);
     }
 
+    .hud p.is-accent {
+      color: #c9f7ff;
+    }
+
+    .hud p.is-beat {
+      color: #9cffc4;
+      text-shadow: 0 0 10px rgba(101, 255, 176, 0.35);
+    }
+
     .hud button {
       margin-top: 0.35rem;
       width: 100%;
@@ -98,6 +107,8 @@
       <p id="scene-status">Scene: unknown</p>
       <p id="transition-status">Transition: none</p>
       <p id="frame-status">Amplitude: 0.0000</p>
+      <p id="bpm-status" class="is-accent">BPM: --</p>
+      <p id="beat-status">Beat: off | Count: 0</p>
       <p id="audio-source-status">Audio Source: unknown</p>
       <p id="audio-track-status">Track: none</p>
       <p id="audio-playback-status">Playback: unavailable</p>
