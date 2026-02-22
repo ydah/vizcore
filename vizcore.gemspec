@@ -17,7 +17,7 @@ Gem::Specification.new do |spec|
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = spec.homepage
   spec.metadata["changelog_uri"] = "#{spec.homepage}/blob/main/CHANGELOG.md"
-  spec.metadata["documentation_uri"] = "#{spec.homepage}/blob/main/GETTING_STARTED.md"
+  spec.metadata["documentation_uri"] = "#{spec.homepage}/blob/main/docs/GETTING_STARTED.md"
   spec.metadata["rubygems_mfa_required"] = "true"
 
   # Package only runtime files that are needed after `gem install`:
@@ -25,7 +25,7 @@ Gem::Specification.new do |spec|
   # - CLI executable (`exe/`)
   # - Browser runtime assets (`frontend/index.html`, `frontend/src/`)
   # - Example scenes and shader files (`examples/`)
-  # - RBS signatures and user docs (`sig/`, README/GETTING_STARTED/LICENSE)
+  # - RBS signatures and user docs (`sig/`, `docs/`, README/LICENSE)
   packaged_prefixes = %w[
     exe/
     lib/
@@ -33,8 +33,8 @@ Gem::Specification.new do |spec|
     frontend/src/
     examples/
     sig/
+    docs/
     README.md
-    GETTING_STARTED.md
     LICENSE.txt
   ].freeze
   excluded_prefixes = %w[

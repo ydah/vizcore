@@ -36,7 +36,7 @@ vizcore start examples/basic.rb
 
 Then open `http://127.0.0.1:4567`.
 
-For full setup, device listing, and troubleshooting, see [GETTING_STARTED.md](GETTING_STARTED.md).
+For full setup, device listing, and troubleshooting, see [GETTING_STARTED.md](docs/GETTING_STARTED.md).
 
 ## Scene DSL
 
