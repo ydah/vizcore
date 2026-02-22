@@ -152,8 +152,8 @@ Vizcore.define do
     layer :bars do
       shader :audio_bars
       opacity 1.0
-      effect :bloom
-      effect_intensity 0.18
+      effect :feedback
+      effect_intensity 0.05
       bar_count 28
       floor_glow 0.12
       map frequency_band(:low) => :effect_intensity
@@ -191,9 +191,9 @@ Vizcore.define do
   scene :breakdown do
     layer :background do
       shader :neon_grid
-      opacity 0.22
-      effect :bloom
-      effect_intensity 0.12
+      opacity 0.3
+      effect :feedback
+      effect_intensity 0.05
       rotation_speed 0.18
       map frequency_band(:mid) => :effect_intensity
     end

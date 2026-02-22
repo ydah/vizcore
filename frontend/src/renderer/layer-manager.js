@@ -73,6 +73,7 @@ export class LayerManager {
     this.layerTargetWidth = 0;
     this.layerTargetHeight = 0;
     this.layerTargetAvailable = true;
+    this.layerErrorKeys = new Set();
 
     this.particleSystem = new ParticleSystem(this.gl, this.shaderManager);
     this.textRenderer = new TextRenderer(this.gl, this.shaderManager);
@@ -89,25 +90,35 @@ export class LayerManager {
 
     if (!this.layerTargetAvailable || !this.layerFramebuffer || !this.layerTexture) {
       for (const layer of layerList) {
-        const blend = String(layer?.params?.blend || "alpha").toLowerCase();
-        this.setBlendMode(blend);
-        this.renderLayer(layer, audio, time, rotation, [width, height]);
+        try {
+          const blend = String(layer?.params?.blend || "alpha").toLowerCase();
+          this.setBlendMode(blend);
+          this.renderLayer(layer, audio, time, rotation, [width, height]);
+        } catch (error) {
+          this.reportLayerError(layer, error, "direct-render");
+        }
       }
       this.setBlendMode("alpha");
       return;
     }
 
     for (const layer of layerList) {
-      this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.layerFramebuffer);
-      this.gl.viewport(0, 0, this.layerTargetWidth, this.layerTargetHeight);
-      this.gl.clearColor(0.0, 0.0, 0.0, 0.0);
-      this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+      try {
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.layerFramebuffer);
+        this.gl.viewport(0, 0, this.layerTargetWidth, this.layerTargetHeight);
+        this.gl.clearColor(0.0, 0.0, 0.0, 0.0);
+        this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
-      this.renderLayer(layer, audio, time, rotation, [this.layerTargetWidth, this.layerTargetHeight]);
+        this.renderLayer(layer, audio, time, rotation, [this.layerTargetWidth, this.layerTargetHeight]);
 
-      this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
-      this.gl.viewport(0, 0, width, height);
-      this.compositeLayer(layer, { audio, time, resolution: [width, height] });
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+        this.gl.viewport(0, 0, width, height);
+        this.compositeLayer(layer, { audio, time, resolution: [width, height] });
+      } catch (error) {
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+        this.gl.viewport(0, 0, width, height);
+        this.reportLayerError(layer, error, "layer-pass");
+      }
     }
     this.setBlendMode("alpha");
   }
@@ -139,15 +150,28 @@ export class LayerManager {
     try {
       program = this.shaderManager.getProgram(cacheKey, FULLSCREEN_VERTEX_SHADER, fragmentShader);
     } catch (error) {
-      if (!customSource) {
-        throw error;
+      if (customSource) {
+        console.warn("Failed to compile custom GLSL, falling back to builtin shader", error);
+        try {
+          program = this.shaderManager.getProgram(
+            `builtin:${shaderName}`,
+            FULLSCREEN_VERTEX_SHADER,
+            getBuiltinShader(shaderName)
+          );
+        } catch (builtinError) {
+          this.reportLayerError(layer, builtinError, "builtin-shader-fallback");
+        }
+      } else {
+        this.reportLayerError(layer, error, "builtin-shader");
       }
-      console.warn("Failed to compile custom GLSL, falling back to builtin shader", error);
-      program = this.shaderManager.getProgram(
-        `builtin:${shaderName}`,
-        FULLSCREEN_VERTEX_SHADER,
-        getBuiltinShader(shaderName)
-      );
+
+      if (!program) {
+        program = this.shaderManager.getProgram(
+          "builtin:default",
+          FULLSCREEN_VERTEX_SHADER,
+          getBuiltinShader("default")
+        );
+      }
     }
     const gl = this.gl;
 
@@ -242,13 +266,19 @@ export class LayerManager {
     const vjShader = getVJEffectShader(vjEffectName);
     const selectedShader = vjShader || effectShader;
     const selectedEffectName = vjShader ? `vj:${vjEffectName}` : `post:${effectName}`;
-    const program = selectedShader
-      ? this.shaderManager.getProgram(
-        selectedEffectName,
-        FULLSCREEN_VERTEX_SHADER,
-        selectedShader
-      )
-      : this.compositeProgram;
+    let program = this.compositeProgram;
+    if (selectedShader) {
+      try {
+        program = this.shaderManager.getProgram(
+          selectedEffectName,
+          FULLSCREEN_VERTEX_SHADER,
+          selectedShader
+        );
+      } catch (error) {
+        this.reportLayerError(layer, error, selectedEffectName);
+        program = this.compositeProgram;
+      }
+    }
 
     this.setBlendMode(blend);
 
@@ -377,6 +407,17 @@ export class LayerManager {
       return;
     }
     this.gl.uniform1i(location, Number(value || 0));
+  }
+
+  reportLayerError(layer, error, phase) {
+    const name = String(layer?.name || "unnamed");
+    const shader = String(layer?.shader || layer?.type || "unknown");
+    const key = `${phase}:${name}:${shader}`;
+    if (this.layerErrorKeys.has(key)) {
+      return;
+    }
+    this.layerErrorKeys.add(key);
+    console.warn(`Layer render failed (${phase}) [${name}]`, error);
   }
 }
 
