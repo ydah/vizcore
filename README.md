@@ -74,7 +74,9 @@ bundle exec rspec
 
 ![Vizcore demo](docs/assets/demo.gif)
 
-Try the same scenes locally:
+The README demo GIF is an illustrative generated asset (not a direct capture of the runtime scenes).
+
+Try real runtime scenes locally:
 
 ```bash
 vizcore start examples/complex_audio_showcase.rb --audio-source file --audio-file examples/assets/complex_demo_loop.wav

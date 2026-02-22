@@ -7,11 +7,11 @@ This document covers demo asset refresh for Phase 5 (`5-11`).
 - `docs/assets/demo.gif` (README embedded animation)
 - `docs/assets/demo-poster.png` (static poster)
 
-## Scenario Coverage
+## Notes
 
-- `examples/intro_drop.rb` (scene transition flow)
-- `examples/midi_scene_switch.rb` (MIDI switch flow)
-- `examples/custom_shader.rb` (custom shader flow)
+- `docs/assets/demo.gif` is a generated illustrative asset (see `scripts/generate_demo_assets.sh`)
+- It is not a direct frame capture of specific runtime scenes
+- Use the example scenes in `README.md` for actual local runtime demos
 
 ## Local Refresh
 
