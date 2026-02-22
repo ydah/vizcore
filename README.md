@@ -53,6 +53,7 @@ When file source is active, the frontend receives runtime metadata from `/runtim
 - `examples/basic.rb`
 - `examples/intro_drop.rb`
 - `examples/file_audio_demo.rb`
+- `examples/complex_audio_showcase.rb`
 - `examples/midi_scene_switch.rb`
 - `examples/custom_shader.rb`
 
@@ -73,6 +74,7 @@ bundle exec rspec
 Try the same scenes locally:
 
 ```bash
+vizcore start examples/complex_audio_showcase.rb --audio-source file --audio-file examples/assets/complex_demo_loop.wav
 vizcore start examples/file_audio_demo.rb --audio-source file --audio-file spec/fixtures/audio/kick_120bpm.wav
 ```
 
@@ -86,6 +88,7 @@ vizcore start examples/custom_shader.rb --audio-source dummy
 
 `intro_drop` automatically falls back to a time-based transition after about 6 seconds when beats are not detected (for example with `dummy` source). Use file input for beat-synced transitions.
 When running with `--audio-source file`, the HUD shows `Play Audio`/`Pause Audio` controls. If autoplay is blocked by the browser, click `Play Audio` once.
+`examples/complex_audio_showcase.rb` is tuned for the bundled `examples/assets/complex_demo_loop.wav` loop and demonstrates synced playback + richer multi-layer reactions.
 
 Re-generate demo assets with:
 
