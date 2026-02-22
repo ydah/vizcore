@@ -8,7 +8,7 @@ module Release
   class GemContentsVerifier
     REQUIRED_FILES = %w[
       README.md
-      GETTING_STARTED.md
+      docs/index.html
       LICENSE.txt
       exe/vizcore
       lib/vizcore.rb
