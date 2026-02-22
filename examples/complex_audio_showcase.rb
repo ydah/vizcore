@@ -149,37 +149,30 @@ Vizcore.define do
   end
 
   scene :afterglow do
-    layer :background do
-      shader :gradient_pulse
+    layer :bars do
+      shader :audio_bars
       opacity 1.0
       effect :bloom
-      effect_intensity 0.24
-      rotation_speed 0.45
+      effect_intensity 0.18
+      bar_count 28
+      floor_glow 0.12
       map frequency_band(:low) => :effect_intensity
-    end
-
-    layer :rings do
-      shader :spectrum_rings
-      opacity 0.38
-      effect :chromatic
-      effect_intensity 0.1
-      map frequency_band(:mid) => :effect_intensity
-      map frequency_band(:low) => :rotation_speed
     end
 
     layer :dust do
       type :particle_field
-      count 2600
+      count 2200
       blend :add
-      opacity 0.62
-      size 2.1
+      opacity 0.38
+      size 1.9
       map amplitude => :speed
       map frequency_band(:high) => :size
     end
 
     layer :wireframe do
       type :wireframe_cube
-      opacity 0.36
+      blend :add
+      opacity 0.24
       map fft_spectrum => :deform
       map frequency_band(:mid) => :color_shift
       map amplitude => :rotation_speed
