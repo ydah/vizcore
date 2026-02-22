@@ -18,7 +18,7 @@ module Vizcore
       # Default ring buffer capacity in samples.
       DEFAULT_RING_BUFFER_SIZE = 4096
 
-      attr_reader :frame_size, :sample_rate, :ring_buffer
+      attr_reader :frame_size, :sample_rate, :ring_buffer, :source_name
 
       # @param source [Symbol, String] input source (`:mic`, `:file`, `:dummy`)
       # @param sample_rate [Integer] sample rate in Hz
@@ -31,6 +31,7 @@ module Vizcore
         @frame_size = Integer(frame_size)
         @ring_buffer = RingBuffer.new(ring_buffer_size)
         @input = build_input(file_path)
+        @sample_rate = resolve_input_sample_rate(@input, fallback: @sample_rate)
       end
 
       # @return [Vizcore::Audio::InputManager]
@@ -53,8 +54,9 @@ module Vizcore
       # Capture one frame from the underlying input and append to ring buffer.
       #
       # @return [Array<Float>]
-      def capture_frame
-        samples = @input.read(frame_size)
+      def capture_frame(read_size = frame_size)
+        count = Integer(read_size)
+        samples = @input.read(count)
         ring_buffer.write(samples)
         samples
       end
@@ -63,6 +65,26 @@ module Vizcore
       # @return [Array<Float>] recent samples from the ring buffer
       def latest_samples(count = frame_size)
         ring_buffer.latest(count)
+      end
+
+      # @param frame_rate [Numeric]
+      # @return [Integer] approximate real-time sample count to ingest per render tick
+      def realtime_capture_size(frame_rate)
+        rate = Float(frame_rate)
+        return frame_size unless rate.positive?
+
+        [(@sample_rate.to_f / rate).round, 1].max
+      rescue StandardError
+        frame_size
+      end
+
+      # @param playing [Boolean]
+      # @param position_seconds [Numeric]
+      # @return [void]
+      def sync_transport(playing:, position_seconds:)
+        return unless @input.respond_to?(:sync_transport)
+
+        @input.sync_transport(playing: playing, position_seconds: position_seconds)
       end
 
       # @return [Array<Hash>] detected audio devices or fallback dummy descriptor
@@ -96,6 +118,15 @@ module Vizcore
         else
           raise ArgumentError, "unsupported audio source: #{@source_name}"
         end
+      end
+
+      def resolve_input_sample_rate(input, fallback:)
+        return fallback unless input.respond_to?(:stream_sample_rate)
+
+        rate = input.stream_sample_rate
+        Integer(rate)
+      rescue StandardError
+        fallback
       end
     end
   end

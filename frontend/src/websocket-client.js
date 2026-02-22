@@ -115,4 +115,17 @@ export class WebSocketClient {
   isActiveSocket(socket, serial) {
     return this.socket === socket && this.connectionSerial === serial;
   }
+
+  send(type, payload = {}) {
+    if (!this.socket || this.socket.readyState !== READY_STATE_OPEN) {
+      return false;
+    }
+
+    try {
+      this.socket.send(JSON.stringify({ type, payload }));
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }

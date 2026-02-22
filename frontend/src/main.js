@@ -19,6 +19,7 @@ let currentSceneName = "unknown";
 let audioElement = null;
 let frameCount = 0;
 let lastConnectedAt = null;
+let lastTransportSyncAt = 0;
 
 const websocketUrl = buildWebSocketUrl();
 const client = new WebSocketClient(websocketUrl, {
@@ -48,6 +49,7 @@ const client = new WebSocketClient(websocketUrl, {
   onStatus: (status) => {
     if (status === "connected") {
       lastConnectedAt = new Date();
+      syncAudioTransportToServer({ force: true });
     }
     const connectedAt = lastConnectedAt ? ` | Last connected: ${formatClock(lastConnectedAt)}` : "";
     wsStatusElement.textContent = `WebSocket: ${status}${connectedAt}`;
@@ -81,6 +83,7 @@ function applyRuntime(runtime) {
   const fileName = runtime?.audio_file_name;
   const fileUrl = runtime?.audio_file_url;
   if (!fileUrl) {
+    engine.setMediaElement(null);
     audioTrackStatusElement.textContent = "Track: none";
     audioPlaybackStatusElement.textContent = "Playback: unavailable";
     audioToggleButton.hidden = true;
@@ -99,6 +102,7 @@ function setupAudioPlayback(audioUrl) {
   audioElement = new Audio(audioUrl);
   audioElement.preload = "auto";
   audioElement.loop = true;
+  engine.setMediaElement(audioElement);
 
   audioToggleButton.hidden = false;
   audioToggleButton.disabled = false;
@@ -132,6 +136,12 @@ function setupAudioPlayback(audioUrl) {
   audioElement.addEventListener("pause", updatePlaybackState);
   audioElement.addEventListener("timeupdate", updatePlaybackState);
   audioElement.addEventListener("loadedmetadata", updatePlaybackState);
+  audioElement.addEventListener("play", () => syncAudioTransportToServer({ force: true }));
+  audioElement.addEventListener("pause", () => syncAudioTransportToServer({ force: true }));
+  audioElement.addEventListener("seeking", () => syncAudioTransportToServer({ force: true }));
+  audioElement.addEventListener("seeked", () => syncAudioTransportToServer({ force: true }));
+  audioElement.addEventListener("loadedmetadata", () => syncAudioTransportToServer({ force: true }));
+  audioElement.addEventListener("timeupdate", () => syncAudioTransportToServer());
 
   audioToggleButton.onclick = async () => {
     if (!audioElement) {
@@ -146,6 +156,7 @@ function setupAudioPlayback(audioUrl) {
   };
 
   updatePlaybackState();
+  syncAudioTransportToServer({ force: true });
   void playAudio();
 }
 
@@ -161,6 +172,25 @@ function formatClock(date) {
   const minutes = String(date.getMinutes()).padStart(2, "0");
   const seconds = String(date.getSeconds()).padStart(2, "0");
   return `${hours}:${minutes}:${seconds}`;
+}
+
+function syncAudioTransportToServer({ force = false } = {}) {
+  if (!audioElement) {
+    return;
+  }
+
+  const now = performance.now();
+  if (!force && now - lastTransportSyncAt < 80) {
+    return;
+  }
+
+  const sent = client.send("transport_sync", {
+    playing: !audioElement.paused,
+    position_seconds: Number(audioElement.currentTime || 0)
+  });
+  if (sent) {
+    lastTransportSyncAt = now;
+  }
 }
 
 function buildWebSocketUrl() {

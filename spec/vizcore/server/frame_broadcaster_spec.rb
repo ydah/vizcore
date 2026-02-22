@@ -10,6 +10,8 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
         frame_size: 1024,
         sample_rate: 44_100,
         capture_frame: Array.new(1024, 0.0),
+        latest_samples: Array.new(1024, 0.0),
+        realtime_capture_size: 735,
         start: nil,
         stop: nil
       )
@@ -44,6 +46,8 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
         frame_size: 1024,
         sample_rate: 44_100,
         capture_frame: Array.new(1024, 0.0),
+        latest_samples: Array.new(1024, 0.0),
+        realtime_capture_size: 735,
         start: nil,
         stop: nil
       )
@@ -93,6 +97,8 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
         frame_size: 1024,
         sample_rate: 44_100,
         capture_frame: Array.new(1024, 0.0),
+        latest_samples: Array.new(1024, 0.0),
+        realtime_capture_size: 735,
         start: nil,
         stop: nil
       )
@@ -128,6 +134,8 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
         Vizcore::Audio::InputManager,
         frame_size: 1024,
         sample_rate: 44_100,
+        latest_samples: Array.new(1024, 0.0),
+        realtime_capture_size: 735,
         start: nil,
         stop: nil
       )
@@ -155,6 +163,8 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
         frame_size: 1024,
         sample_rate: 44_100,
         capture_frame: Array.new(1024, 0.0),
+        latest_samples: Array.new(1024, 0.0),
+        realtime_capture_size: 735,
         start: nil,
         stop: nil
       )
@@ -202,6 +212,41 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
         }
       )
       expect(next_frame.dig(:scene, :name)).to eq("drop")
+    end
+
+    it "captures approximately real-time sample count before analyzing latest frame window" do
+      input_manager = instance_double(
+        Vizcore::Audio::InputManager,
+        frame_size: 1024,
+        sample_rate: 44_100,
+        start: nil,
+        stop: nil
+      )
+      allow(input_manager).to receive(:realtime_capture_size).with(60.0).and_return(735)
+      allow(input_manager).to receive(:capture_frame).with(735).and_return(Array.new(735, 0.1))
+      allow(input_manager).to receive(:latest_samples).with(1024).and_return(Array.new(1024, 0.2))
+
+      pipeline = instance_double(
+        Vizcore::Analysis::Pipeline,
+        call: {
+          amplitude: 0.2,
+          bands: { sub: 0.0, low: 0.1, mid: 0.2, high: 0.3 },
+          fft: Array.new(32, 0.01),
+          beat: false,
+          beat_count: 0,
+          bpm: 120.0
+        }
+      )
+
+      frame = described_class.new(
+        scene_name: "groove",
+        input_manager: input_manager,
+        analysis_pipeline: pipeline
+      ).build_frame(0.1)
+
+      expect(input_manager).to have_received(:capture_frame).with(735)
+      expect(input_manager).to have_received(:latest_samples).with(1024)
+      expect(frame.dig(:audio, :amplitude)).to eq(0.2)
     end
   end
 end

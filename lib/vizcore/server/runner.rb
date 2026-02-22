@@ -53,6 +53,7 @@ module Vizcore
           error_reporter: ->(message) { @output.puts(message) }
         )
         broadcaster.start
+        register_client_message_handler(broadcaster)
         midi_runtime = start_midi_runtime(definition, broadcaster)
         watcher = start_scene_watcher(broadcaster) do |updated_definition|
           midi_runtime = refresh_midi_runtime(midi_runtime, updated_definition, broadcaster)
@@ -65,6 +66,7 @@ module Vizcore
 
         wait_for_interrupt
       ensure
+        Vizcore::Server::WebSocketHandler.clear_message_handler
         stop_midi_runtime(midi_runtime)
         watcher&.stop
         broadcaster&.stop
@@ -207,6 +209,28 @@ module Vizcore
         end
       rescue StandardError => e
         @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "MIDI action failed"))
+      end
+
+      def register_client_message_handler(broadcaster)
+        return unless @config.audio_source == :file
+
+        Vizcore::Server::WebSocketHandler.on_message do |message|
+          handle_client_message(message, broadcaster)
+        end
+      end
+
+      def handle_client_message(message, broadcaster)
+        type = message["type"] || message[:type]
+        return unless type.to_s == "transport_sync"
+
+        payload = message["payload"] || message[:payload]
+        values = Hash(payload)
+        broadcaster.sync_transport(
+          playing: values.fetch("playing", values.fetch(:playing, false)),
+          position_seconds: values.fetch("position_seconds", values.fetch(:position_seconds, 0.0))
+        )
+      rescue StandardError => e
+        @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "Client transport message failed"))
       end
 
       def apply_midi_action(action, executor, broadcaster)

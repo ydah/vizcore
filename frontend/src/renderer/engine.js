@@ -10,6 +10,8 @@ export class Engine {
     this.lastTime = performance.now();
     this.rotation = 0;
     this.currentRotationSpeed = 0.5;
+    this.mediaElement = null;
+    this.lastMediaTime = null;
     this.frame = {
       audio: {
         amplitude: 0,
@@ -49,6 +51,11 @@ export class Engine {
     this.frame = frame;
   }
 
+  setMediaElement(mediaElement) {
+    this.mediaElement = mediaElement || null;
+    this.lastMediaTime = null;
+  }
+
   start() {
     this.lastTime = performance.now();
     requestAnimationFrame((time) => this.render(time));
@@ -66,8 +73,26 @@ export class Engine {
   }
 
   render(time) {
-    const deltaSeconds = (time - this.lastTime) / 1000;
+    let deltaSeconds = (time - this.lastTime) / 1000;
     this.lastTime = time;
+    let visualTimeSeconds = time / 1000;
+
+    if (this.mediaElement) {
+      const currentMediaTime = Number(this.mediaElement.currentTime || 0);
+      visualTimeSeconds = currentMediaTime;
+
+      if (this.mediaElement.paused) {
+        deltaSeconds = 0;
+      } else if (this.lastMediaTime === null) {
+        deltaSeconds = 0;
+      } else {
+        deltaSeconds = Math.max(0, currentMediaTime - this.lastMediaTime);
+      }
+
+      this.lastMediaTime = currentMediaTime;
+    } else {
+      this.lastMediaTime = null;
+    }
 
     const audio = this.frame?.audio || {};
     const layers = Array.isArray(this.frame?.scene?.layers) ? this.frame.scene.layers : [];
@@ -87,7 +112,7 @@ export class Engine {
     this.layerManager.renderScene({
       layers,
       audio,
-      time: time / 1000,
+      time: visualTimeSeconds,
       rotation: this.rotation,
       resolution: [this.canvas.width, this.canvas.height]
     });

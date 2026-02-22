@@ -38,6 +38,24 @@ RSpec.describe Vizcore::Audio::InputManager do
     end
   end
 
+  describe "#realtime_capture_size" do
+    it "returns a real-time ingestion count based on current sample rate and frame rate" do
+      manager = described_class.new(source: :dummy, sample_rate: 44_100, frame_size: 1024)
+
+      expect(manager.realtime_capture_size(60.0)).to eq(735)
+      expect(manager.realtime_capture_size(30.0)).to eq(1470)
+    end
+
+    it "uses WAV native sample rate for file source pacing" do
+      manager = described_class.new(source: :file, file_path: fixture_path, frame_size: 1024, sample_rate: 44_100)
+
+      expect(manager.sample_rate).to eq(8000)
+      expect(manager.realtime_capture_size(60.0)).to eq(133)
+    ensure
+      manager&.stop
+    end
+  end
+
   describe ".available_audio_devices" do
     it "returns at least one device entry" do
       devices = described_class.available_audio_devices
