@@ -4,7 +4,4 @@
 -
 README.md
 GETTING_STARTED.md
-docs/CROSS_PLATFORM_TESTING.md
-docs/RELEASE.md
-docs/DEMO_CAPTURE.md
 lib/**/*.rb
