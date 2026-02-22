@@ -56,6 +56,36 @@ RSpec.describe Vizcore::Server::RackApp do
     audio = Rack::MockRequest.new(file_app).get("/audio-file")
     expect(audio.status).to eq(200)
     expect(audio.headers["content-type"]).to include("audio")
+    expect(audio.headers["accept-ranges"]).to eq("bytes")
     expect(audio.body.bytesize).to be > 0
+  end
+
+  it "supports byte range requests for audio file streaming" do
+    fixture = Vizcore.root.join("spec", "fixtures", "audio", "kick_120bpm.wav")
+    file_app = described_class.new(
+      frontend_root: Vizcore.frontend_root,
+      audio_source: :file,
+      audio_file: fixture
+    )
+
+    response = Rack::MockRequest.new(file_app).get("/audio-file", "HTTP_RANGE" => "bytes=0-99")
+
+    expect(response.status).to eq(206)
+    expect(response.headers["content-range"]).to start_with("bytes 0-99/")
+    expect(response.body.bytesize).to eq(100)
+  end
+
+  it "returns 416 for invalid byte ranges" do
+    fixture = Vizcore.root.join("spec", "fixtures", "audio", "kick_120bpm.wav")
+    file_app = described_class.new(
+      frontend_root: Vizcore.frontend_root,
+      audio_source: :file,
+      audio_file: fixture
+    )
+
+    response = Rack::MockRequest.new(file_app).get("/audio-file", "HTTP_RANGE" => "bytes=9999999-")
+
+    expect(response.status).to eq(416)
+    expect(response.headers["content-range"]).to match(%r{\Abytes \*/\d+\z})
   end
 end
