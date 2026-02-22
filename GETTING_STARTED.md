@@ -79,6 +79,7 @@ vizcore devices midi
 ## 5. Useful Example Scenes
 
 ```bash
+vizcore start examples/file_audio_demo.rb --audio-source file --audio-file spec/fixtures/audio/pulse16_mono.wav
 vizcore start examples/intro_drop.rb --audio-source dummy
 vizcore start examples/midi_scene_switch.rb --audio-source dummy
 vizcore start examples/custom_shader.rb --audio-source dummy
@@ -89,6 +90,8 @@ vizcore start examples/custom_shader.rb --audio-source dummy
 ```bash
 vizcore start examples/intro_drop.rb --audio-source file --audio-file spec/fixtures/audio/pulse16_mono.wav
 ```
+
+File source mode exposes `Play Audio` / `Pause Audio` in the HUD and streams the same file to the browser (`/audio-file`). If autoplay is blocked, click `Play Audio` once.
 
 ## 6. Troubleshooting
 

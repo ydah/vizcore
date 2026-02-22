@@ -40,6 +40,7 @@ vizcore start examples/basic.rb --audio-source file --audio-file path/to/set.mp3
 ```
 
 When `--audio-source file` is selected, `--audio-file` is required.
+When file source is active, the frontend receives runtime metadata from `/runtime` and can play the same track via `/audio-file`.
 
 ## Requirements
 
@@ -51,6 +52,7 @@ When `--audio-source file` is selected, `--audio-file` is required.
 
 - `examples/basic.rb`
 - `examples/intro_drop.rb`
+- `examples/file_audio_demo.rb`
 - `examples/midi_scene_switch.rb`
 - `examples/custom_shader.rb`
 
@@ -71,12 +73,19 @@ bundle exec rspec
 Try the same scenes locally:
 
 ```bash
+vizcore start examples/file_audio_demo.rb --audio-source file --audio-file spec/fixtures/audio/pulse16_mono.wav
+```
+
+For non-file quick checks:
+
+```bash
 vizcore start examples/intro_drop.rb --audio-source dummy
 vizcore start examples/midi_scene_switch.rb --audio-source dummy
 vizcore start examples/custom_shader.rb --audio-source dummy
 ```
 
 `intro_drop` automatically falls back to a time-based transition after about 6 seconds when beats are not detected (for example with `dummy` source). Use file input for beat-synced transitions.
+When running with `--audio-source file`, the HUD shows `Play Audio`/`Pause Audio` controls. If autoplay is blocked by the browser, click `Play Audio` once.
 
 Re-generate demo assets with:
 

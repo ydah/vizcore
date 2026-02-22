@@ -37,6 +37,11 @@ RSpec.describe Vizcore::Server::Runner do
 
       runner.run
 
+      expect(Vizcore::Server::RackApp).to have_received(:new).with(
+        frontend_root: Vizcore.frontend_root,
+        audio_source: :mic,
+        audio_file: nil
+      )
       expect(Puma::Server).to have_received(:new).with(rack_app, nil, min_threads: 0, max_threads: 4)
       expect(Vizcore::Audio::InputManager).to have_received(:new).with(source: :mic, file_path: nil)
       expect(Vizcore::Server::FrameBroadcaster).to have_received(:new).with(
@@ -57,6 +62,33 @@ RSpec.describe Vizcore::Server::Runner do
       expect(puma_server).to have_received(:stop).with(true)
       expect(broadcaster).to have_received(:start)
       expect(broadcaster).to have_received(:stop)
+    end
+
+    it "passes file source metadata to RackApp when file input is enabled" do
+      fixture = Vizcore.root.join("spec", "fixtures", "audio", "pulse16_mono.wav")
+      file_config = Vizcore::Config.new(
+        scene_file: scene_file.to_s,
+        host: "127.0.0.1",
+        port: 4567,
+        audio_source: :file,
+        audio_file: fixture.to_s
+      )
+      allow(Vizcore::Server::RackApp).to receive(:new).and_return(rack_app)
+      allow(Puma::Server).to receive(:new).and_return(puma_server)
+      allow(Vizcore::Audio::InputManager).to receive(:new).and_return(input_manager)
+      allow(Vizcore::Server::FrameBroadcaster).to receive(:new).and_return(broadcaster)
+      allow(Vizcore::DSL::Engine).to receive(:watch_file).and_return(watcher)
+
+      runner = described_class.new(file_config, output: output)
+      allow(runner).to receive(:wait_for_interrupt)
+
+      runner.run
+
+      expect(Vizcore::Server::RackApp).to have_received(:new).with(
+        frontend_root: Vizcore.frontend_root,
+        audio_source: :file,
+        audio_file: file_config.audio_file
+      )
     end
 
     it "hot-reloads scene changes and broadcasts config updates" do
