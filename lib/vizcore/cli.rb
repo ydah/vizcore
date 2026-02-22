@@ -13,6 +13,13 @@ module Vizcore
   class CLI < Thor
     package_name "vizcore"
 
+    # Exit with non-zero status when a Thor command fails.
+    #
+    # @return [Boolean]
+    def self.exit_on_failure?
+      true
+    end
+
     default_command :help
 
     desc "start SCENE_FILE", "Start vizcore HTTP/WebSocket server"
