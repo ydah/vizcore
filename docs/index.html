@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Vizcore is a Ruby gem for audio-reactive VJ visuals, scene DSL, beat analysis, MIDI control, and browser rendering." />
+  <meta name="theme-color" content="#050006" />
+  <link rel="canonical" href="https://ydah.github.io/vizcore/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Vizcore - Ruby DSL for Audio-Reactive VJ Visuals" />
+  <meta property="og:description" content="Ruby DSL, audio analysis, MIDI control, and browser-rendered VJ visuals." />
+  <meta property="og:url" content="https://ydah.github.io/vizcore/" />
+  <meta property="og:image" content="https://ydah.github.io/vizcore/assets/vizcore-poster.png" />
+  <title>Vizcore - Ruby DSL for Audio-Reactive VJ Visuals</title>
+  <link rel="stylesheet" href="assets/site.css" />
+  <script src="assets/vj-tunnel.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header" aria-label="Site header">
+    <a class="brand" href="#top" aria-label="Vizcore home">Vizcore</a>
+    <nav class="site-nav" aria-label="Primary navigation">
+      <a href="#signal">Signal</a>
+      <a href="#dsl">DSL</a>
+      <a href="#examples">Examples</a>
+      <a href="#install">Install</a>
+    </nav>
+    <a class="nav-cta" href="https://github.com/ydah/vizcore">GitHub</a>
+  </header>
+
+  <section class="hero" id="top" aria-labelledby="hero-title">
+    <canvas id="vj-field" aria-hidden="true"></canvas>
+    <div class="hero-grid" aria-hidden="true"></div>
+    <div class="hero-copy">
+      <p class="kicker">Ruby DSL / Audio Analysis / Browser Renderer</p>
+      <h1 id="hero-title">Audio-reactive VJ visuals, written in Ruby.</h1>
+      <p class="hero-lede">
+        Vizcore connects scene definitions, FFT analysis, beat detection, MIDI control,
+        and WebSocket streaming into one Ruby-first workflow for live visuals.
+      </p>
+      <div class="hero-actions" aria-label="Primary actions">
+        <a class="button is-primary" href="#install">Start a scene</a>
+        <a class="button is-secondary" href="https://github.com/ydah/vizcore">View source</a>
+      </div>
+      <div class="terminal-strip" aria-label="Quick start commands">
+        <span class="terminal-line"><span class="prompt">$</span> gem install vizcore</span>
+        <span class="terminal-line"><span class="prompt">$</span> vizcore start examples/basic.rb</span>
+        <span class="terminal-line"><span class="prompt">&gt;</span> open http://127.0.0.1:4567</span>
+      </div>
+    </div>
+    <a class="scroll-cue" href="#signal">Signal chain</a>
+  </section>
+
+  <main id="main">
+    <section class="section" id="signal" aria-labelledby="signal-title">
+      <div class="section-inner signal-layout">
+        <div class="section-copy">
+          <p class="section-kicker">Signal Chain</p>
+          <h2 id="signal-title">Turn sound into frames, then frames into light.</h2>
+          <p>
+            Analyze microphones, WAV, MP3, FLAC, dummy sources, and MIDI events,
+            then stream amplitude, frequency bands, BPM, beats, and scene data into
+            the browser renderer.
+          </p>
+          <div class="signal-steps" aria-label="Vizcore signal flow">
+            <div class="signal-step">
+              <strong>Input</strong>
+              <span>mic / file / dummy / MIDI</span>
+            </div>
+            <div class="signal-step">
+              <strong>Analyze</strong>
+              <span>amplitude / FFT / bands / beat</span>
+            </div>
+            <div class="signal-step">
+              <strong>Render</strong>
+              <span>GLSL / particles / text / wireframe</span>
+            </div>
+          </div>
+        </div>
+        <figure class="poster">
+          <img src="assets/vizcore-poster.png" width="1200" height="630" alt="Neon tunnel poster for Vizcore audio-reactive visuals" />
+          <figcaption>kaleidoscope, neon grid, particles, wireframe, drop</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="section section-dark" id="dsl" aria-labelledby="dsl-title">
+      <div class="section-inner split-layout">
+        <div class="section-copy">
+          <p class="section-kicker">Scene DSL</p>
+          <h2 id="dsl-title">Write the show structure in Ruby.</h2>
+          <p>
+            Define layers, shaders, transitions, and audio mappings with a Ruby DSL.
+            Connect peaks, low-end pressure, high-frequency motion, and beat counts
+            directly to visual parameters.
+          </p>
+          <ul class="feature-list">
+            <li>Use scenes and transitions to script the flow of a live set.</li>
+            <li>Map frequency_band, amplitude, and beat? into visual parameters.</li>
+            <li>Switch scenes and tune intensity with MIDI notes and CC values.</li>
+          </ul>
+        </div>
+        <div class="code-stage" aria-label="Ruby scene DSL example">
+<pre><code>Vizcore.define do
+  scene :drop do
+    layer :bg do
+      shader :kaleidoscope
+      effect :glitch
+      map frequency_band(:low) =&gt; :rotation_speed
+      map frequency_band(:high) =&gt; :effect_intensity
+    end
+
+    layer :storm do
+      type :particle_field
+      count 9000
+      blend :add
+      map amplitude =&gt; :speed
+      map beat? =&gt; :flash
+    end
+  end
+end</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="examples" aria-labelledby="examples-title">
+      <div class="section-inner">
+        <div class="section-head">
+          <p class="section-kicker">Show Files</p>
+          <h2 id="examples-title">Scenes you can launch now.</h2>
+          <p>
+            Start with a wireframe cube, beat-synced drops, file playback, MIDI
+            switching, and custom GLSL scenes built for pre-show testing.
+          </p>
+        </div>
+        <div class="example-grid">
+          <article class="example-item">
+            <h3>basic.rb</h3>
+            <p>A wireframe cube that bends with amplitude and FFT data.</p>
+            <code>vizcore start examples/basic.rb</code>
+          </article>
+          <article class="example-item">
+            <h3>intro_drop.rb</h3>
+            <p>A beat-counted transition from intro into drop.</p>
+            <code>vizcore start examples/intro_drop.rb</code>
+          </article>
+          <article class="example-item">
+            <h3>complex_audio_showcase.rb</h3>
+            <p>Layered rings, grid, particles, wireframe, and glitch energy.</p>
+            <code>vizcore start examples/complex_audio_showcase.rb --audio-source file</code>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-dark" id="install" aria-labelledby="install-title">
+      <div class="section-inner install-panel">
+        <div class="section-copy">
+          <p class="section-kicker">Install</p>
+          <h2 id="install-title">Boot it with Ruby 3.2+.</h2>
+          <p>
+            Install PortAudio and ffmpeg on macOS, or libportaudio and ffmpeg on
+            Linux, then add the gem. fftw3 is optional and speeds up FFT analysis
+            when it is available.
+          </p>
+        </div>
+        <div class="install-commands" aria-label="Install commands">
+<pre><code>gem install vizcore
+vizcore start examples/basic.rb
+
+# macOS
+brew install portaudio ffmpeg
+brew install fftw
+
+# Ubuntu / Debian
+sudo apt install -y libportaudio2 libportaudio-dev ffmpeg
+sudo apt install -y libfftw3-dev</code></pre>
+        </div>
+        <div class="install-actions">
+          <a class="button is-primary" href="https://rubygems.org/gems/vizcore">RubyGems</a>
+          <a class="button is-secondary" href="https://github.com/ydah/vizcore/blob/main/docs/GETTING_STARTED.md">Getting started</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>Vizcore</span>
+    <a href="https://github.com/ydah/vizcore">github.com/ydah/vizcore</a>
+  </footer>
+</body>
+</html>
