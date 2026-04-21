@@ -33,6 +33,19 @@ Vizcore.define do
       map beat_pulse, to: :bass_explosion, gain: 1.2, range: 0.3..1.8
     end
 
+    layer :blob_outline do
+      type :radial_blob
+      blend :add
+      opacity 0.65
+      segments 192
+      radius 0.42
+      wobble 0.2
+
+      map fft_spectrum => :spectrum
+      map amplitude, to: :wobble, gain: 2.8, range: 0.08..0.75, curve: :sqrt
+      map frequency_band(:low), to: :radius, gain: 0.8, range: 0.36..0.72
+    end
+
     layer :title do
       type :text
       content "UNYO"
