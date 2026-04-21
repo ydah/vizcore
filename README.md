@@ -76,6 +76,22 @@ Vizcore.define do
 end
 ```
 
+Mapping options can exaggerate small analysis values, clamp them into useful visual ranges, and smooth changes over time:
+
+```ruby
+layer :liquid do
+  shader :liquid_wobble
+  wobble 0.25
+  warp 0.45
+
+  map amplitude, to: :wobble, gain: 3.5, range: 0.12..1.4, curve: :sqrt
+  map frequency_band(:low), to: :warp, gain: 2.2, range: 0.25..2.4
+  map beat_pulse, to: :effect_intensity, range: 0.08..0.35
+end
+```
+
+Available transform options are `gain`, `range`, `min`, `max`, `curve`, `attack`, and `release`. `curve` supports `:linear`, `:sqrt`, and `:square`. Existing mappings such as `map amplitude => :speed` continue to work.
+
 ### Custom GLSL Shaders
 
 ```ruby
@@ -87,6 +103,19 @@ layer :wave_shader do
   map beat? => :param_flash
 end
 ```
+
+Custom fragment shaders must be GLSL ES 3.00 and can use these audio uniforms:
+
+- `u_amplitude`
+- `u_bass` / `u_mid` / `u_high`
+- `u_beat`
+- `u_beat_pulse`
+- `u_bpm`
+- `u_fft[32]`
+- `u_fft_size`
+- `u_param_<name>`
+
+For backward compatibility, a DSL target like `:param_intensity` is also exposed as `u_param_intensity`.
 
 ### MIDI Scene Switching
 
@@ -140,6 +169,8 @@ vizcore start scene.rb --audio-source file --audio-file set.mp3
 
 When using file source, the HUD exposes **Play Audio** / **Pause Audio** controls and shows BPM, Beat, and Beat Count.
 
+The browser HUD also includes Visual Gain, Bass Boost, Smoothing, Beat Hold, and Wobble controls for adapting visual response to different tracks and input levels.
+
 ## Requirements
 
 - Ruby `>= 3.2`
@@ -157,6 +188,7 @@ When using file source, the HUD exposes **Play Audio** / **Pause Audio** control
 | `examples/complex_audio_showcase.rb` | Dense multi-layer showcase |
 | `examples/midi_scene_switch.rb` | MIDI-driven scene switching |
 | `examples/custom_shader.rb` | Custom GLSL shader with audio mapping |
+| `examples/unyo_liquid.rb` | Organic liquid wobble scene with FFT blob and particles |
 
 ## Development
 
