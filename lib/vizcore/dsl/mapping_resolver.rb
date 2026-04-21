@@ -111,8 +111,6 @@ module Vizcore
           Math.sqrt([value, 0.0].max)
         when :square
           value * value
-        else
-          value
         end
       end
 
