@@ -122,6 +122,31 @@
       opacity: 0.6;
       cursor: not-allowed;
     }
+
+    .reactivity-controls {
+      margin-top: 0.55rem;
+      padding-top: 0.55rem;
+      border-top: 1px solid rgba(153, 195, 255, 0.16);
+    }
+
+    .reactivity-controls label {
+      display: grid;
+      grid-template-columns: minmax(5.5rem, 0.8fr) minmax(8rem, 1.2fr);
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.3rem;
+      font-size: 0.78rem;
+      color: #c9d9ee;
+    }
+
+    .reactivity-controls input[type="range"] {
+      width: 100%;
+    }
+
+    .reactivity-controls p {
+      margin-top: 0.45rem;
+      line-height: 1.35;
+    }
   </style>
 </head>
 <body>
@@ -138,6 +163,14 @@
       <p id="audio-source-status">Audio Source: unknown</p>
       <p id="audio-track-status">Track: none</p>
       <p id="audio-playback-status">Playback: unavailable</p>
+      <div class="reactivity-controls" aria-label="Visual reactivity controls">
+        <label>Visual Gain <input id="visual-gain-control" type="range" min="1" max="8" step="0.1" value="2.5" /></label>
+        <label>Bass Boost <input id="bass-boost-control" type="range" min="0" max="4" step="0.1" value="1.4" /></label>
+        <label>Smoothing <input id="smoothing-control" type="range" min="0" max="0.9" step="0.05" value="0.25" /></label>
+        <label>Beat Hold <input id="beat-hold-control" type="range" min="50" max="400" step="10" value="180" /></label>
+        <label>Wobble <input id="wobble-control" type="range" min="0.25" max="3" step="0.05" value="1" /></label>
+        <p id="reactivity-status">Visual Gain: 2.5x | Bass: 1.4x | Smooth: 0.25 | Beat Hold: 180ms | Wobble: 1.00x</p>
+      </div>
       <div id="scene-switcher" class="scene-switcher" hidden aria-label="Scene switcher"></div>
       <button id="audio-toggle" type="button" hidden>Play Audio</button>
     </section>

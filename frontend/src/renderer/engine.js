@@ -12,6 +12,15 @@ export class Engine {
     this.currentRotationSpeed = 0.5;
     this.mediaElement = null;
     this.lastMediaTime = null;
+    this.visualSettings = {
+      visualGain: 1,
+      bassBoost: 1,
+      smoothing: 0,
+      beatHoldMs: 180,
+      wobbleAmount: 1,
+    };
+    this.visualAudioState = null;
+    this.beatHoldUntil = 0;
     this.frame = {
       audio: {
         amplitude: 0,
@@ -57,6 +66,13 @@ export class Engine {
     this.lastMediaTime = null;
   }
 
+  setVisualSettings(settings = {}) {
+    this.visualSettings = {
+      ...this.visualSettings,
+      ...settings,
+    };
+  }
+
   start() {
     this.lastTime = performance.now();
     requestAnimationFrame((time) => this.render(time));
@@ -95,7 +111,13 @@ export class Engine {
       this.lastMediaTime = null;
     }
 
-    const audio = this.frame?.audio || {};
+    const rawAudio = this.frame?.audio || {};
+    const audio = applyVisualSettings({
+      audio: rawAudio,
+      settings: this.visualSettings,
+      previous: this.visualAudioState,
+    });
+    this.visualAudioState = audio;
     const layers = Array.isArray(this.frame?.scene?.layers) ? this.frame.scene.layers : [];
     const amplitude = clamp(Number(audio.amplitude || 0), 0, 1);
     const rotationSpeed = resolveRotationSpeed(layers, amplitude);
@@ -115,7 +137,8 @@ export class Engine {
       audio,
       time: visualTimeSeconds,
       rotation: this.rotation,
-      resolution: [this.canvas.width, this.canvas.height]
+      resolution: [this.canvas.width, this.canvas.height],
+      visualSettings: this.visualSettings
     });
 
     requestAnimationFrame((nextTime) => this.render(nextTime));
@@ -131,6 +154,47 @@ const resolveRotationSpeed = (layers, amplitude) => {
     return clamp(fromLayer, 0.1, 8.0);
   }
   return 0.7 + amplitude * 2.4;
+};
+
+export const applyVisualSettings = ({ audio, settings, previous }) => {
+  const visualGain = clamp(Number(settings?.visualGain ?? 1), 0.1, 16);
+  const bassBoost = clamp(Number(settings?.bassBoost ?? 1), 0, 8);
+  const smoothing = clamp(Number(settings?.smoothing ?? 0), 0, 0.95);
+  const wobbleAmount = clamp(Number(settings?.wobbleAmount ?? 1), 0, 8);
+
+  const rawBands = audio?.bands || {};
+  const next = {
+    ...audio,
+    amplitude: clamp(Number(audio?.amplitude || 0) * visualGain, 0, 1),
+    bands: {
+      ...rawBands,
+      sub: clamp(Number(rawBands.sub || 0) * bassBoost, 0, 1),
+      low: clamp(Number(rawBands.low || 0) * bassBoost, 0, 1),
+      mid: clamp(Number(rawBands.mid || 0) * visualGain, 0, 1),
+      high: clamp(Number(rawBands.high || 0) * visualGain, 0, 1),
+    },
+    visual_gain: visualGain,
+    bass_boost: bassBoost,
+    wobble_amount: wobbleAmount,
+  };
+
+  if (!previous || smoothing <= 0) {
+    return next;
+  }
+
+  const previousBands = previous.bands || {};
+  const alpha = 1 - smoothing;
+  return {
+    ...next,
+    amplitude: previous.amplitude + (next.amplitude - previous.amplitude) * alpha,
+    bands: {
+      ...next.bands,
+      sub: Number(previousBands.sub || 0) + (next.bands.sub - Number(previousBands.sub || 0)) * alpha,
+      low: Number(previousBands.low || 0) + (next.bands.low - Number(previousBands.low || 0)) * alpha,
+      mid: Number(previousBands.mid || 0) + (next.bands.mid - Number(previousBands.mid || 0)) * alpha,
+      high: Number(previousBands.high || 0) + (next.bands.high - Number(previousBands.high || 0)) * alpha,
+    },
+  };
 };
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
