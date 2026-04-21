@@ -15,6 +15,15 @@ test("getBuiltinShader resolves known shader keys", () => {
   assert.match(shader, /outColor/);
 });
 
+test("getBuiltinShader resolves liquid_wobble shader", () => {
+  const shader = getBuiltinShader("liquid_wobble");
+
+  assert.equal(shader, BUILTIN_FRAGMENT_SHADERS.liquid_wobble);
+  assert.match(shader, /u_beat_pulse/);
+  assert.match(shader, /u_fft\[32\]/);
+  assert.match(shader, /outColor/);
+});
+
 test("getPostEffectShader resolves known effects and returns null for unknown", () => {
   assert.equal(getPostEffectShader("bloom"), POST_EFFECT_SHADERS.bloom);
   assert.equal(getPostEffectShader("chromatic"), POST_EFFECT_SHADERS.chromatic);

@@ -17,6 +17,7 @@ RSpec.describe "example scenes" do
       bands: { sub: 0.2, low: 0.6, mid: 0.4, high: 0.3 },
       fft: Array.new(32, 0.05),
       beat: true,
+      beat_pulse: 0.7,
       beat_count: 42,
       bpm: 124.0
     }
@@ -28,7 +29,8 @@ RSpec.describe "example scenes" do
     "examples/file_audio_demo.rb" => { expected_scene: "groove" },
     "examples/complex_audio_showcase.rb" => { expected_scene: "build" },
     "examples/midi_scene_switch.rb" => { expected_scene: "warmup" },
-    "examples/custom_shader.rb" => { expected_scene: "shader_art", expect_glsl_source: true }
+    "examples/custom_shader.rb" => { expected_scene: "shader_art", expect_glsl_source: true },
+    "examples/unyo_liquid.rb" => { expected_scene: "unyo" }
   }.each do |path, expectation|
     it "loads and serializes #{path}" do
       definition = Vizcore::DSL::Engine.load_file(path)

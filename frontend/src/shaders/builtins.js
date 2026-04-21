@@ -146,6 +146,72 @@ void main() {
   outColor = vec4(color, 1.0);
 }
 `,
+  liquid_wobble: `#version 300 es
+precision mediump float;
+
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform float u_amplitude;
+uniform float u_bass;
+uniform float u_mid;
+uniform float u_high;
+uniform float u_beat;
+uniform float u_beat_pulse;
+uniform float u_bpm;
+uniform float u_fft[32];
+uniform float u_fft_size;
+uniform float u_param_wobble;
+uniform float u_param_warp;
+uniform float u_param_distortion;
+uniform float u_visual_gain;
+uniform float u_wobble_amount;
+
+out vec4 outColor;
+
+float blob(vec2 p, float r) {
+  return smoothstep(r, r - 0.035, length(p));
+}
+
+float fftSample(float t) {
+  float index = clamp(floor(t * 31.0), 0.0, 31.0);
+  int i = int(index);
+  return u_fft[i];
+}
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / max(u_resolution.xy, vec2(1.0));
+  vec2 p = uv * 2.0 - 1.0;
+  p.x *= u_resolution.x / max(u_resolution.y, 1.0);
+
+  float visualGain = max(u_visual_gain, 1.0);
+  float globalWobble = max(u_wobble_amount, 1.0);
+  float amp = clamp(u_amplitude * visualGain * 2.4, 0.0, 2.0);
+  float bass = clamp(u_bass * 2.2, 0.0, 2.0);
+  float pulse = max(u_beat_pulse, u_beat);
+
+  float angle = atan(p.y, p.x) / 6.28318530718 + 0.5;
+  float spectrum = fftSample(angle);
+
+  float wobble = (0.10 + u_param_wobble + amp * 0.25 + bass * 0.18 + spectrum * 0.18) * globalWobble;
+  float warp = 1.0 + u_param_warp + u_mid * 2.4;
+  float distortion = 0.7 + u_param_distortion + u_high * 2.0;
+
+  p.x += sin(p.y * 5.0 * warp + u_time * (1.1 + u_high * 5.0) + spectrum * 2.5) * wobble;
+  p.y += cos(p.x * 4.0 * warp - u_time * (0.9 + u_bass * 4.0) + spectrum * 3.0) * wobble;
+
+  float r = 0.42 + bass * 0.16 + pulse * 0.12 + spectrum * 0.08;
+  float shape = blob(p, r);
+  float rings = sin(length(p) * (16.0 + distortion * 5.0) - u_time * (2.0 + u_high * 8.0));
+  float glow = smoothstep(0.25, 1.0, shape + rings * 0.12);
+
+  vec3 color = vec3(0.012, 0.018, 0.035);
+  color += vec3(0.12, 0.72, 1.0) * glow * (0.45 + amp);
+  color += vec3(0.95, 0.24, 0.82) * shape * (0.20 + bass);
+  color += vec3(1.0, 0.95, 0.8) * pulse * 0.16;
+
+  outColor = vec4(color, 1.0);
+}
+`,
   audio_bars: `#version 300 es
 precision mediump float;
 uniform vec2 u_resolution;
