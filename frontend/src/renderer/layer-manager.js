@@ -295,6 +295,10 @@ export class LayerManager {
       count: Number(params.count || 2400),
       speed: Number(params.speed || audio?.amplitude || 0),
       size: Number(params.size || 2.0),
+      forceField: String(params.force_field || "drift"),
+      turbulence: Number(params.turbulence || 0),
+      bassExplosion: Number(params.bass_explosion || 0),
+      sparkle: Number(params.sparkle || 0),
       audio,
       time
     });

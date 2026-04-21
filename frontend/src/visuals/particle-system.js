@@ -20,6 +20,40 @@ void main() {
 }
 `;
 
+export const resolveParticleForces = ({ x, y, index, time, forceField, turbulence, bassExplosion, audio }) => {
+  const bass = clampNumber(audio?.bands?.low, 0, 1);
+  const mid = clampNumber(audio?.bands?.mid, 0, 1);
+  const high = clampNumber(audio?.bands?.high, 0, 1);
+  const pulse = clampNumber(audio?.beat_pulse || (audio?.beat ? 1 : 0), 0, 1);
+  const field = String(forceField || "drift").toLowerCase();
+
+  let fx = 0;
+  let fy = 0;
+
+  const radius = Math.max(0.001, Math.hypot(x, y));
+  const nx = x / radius;
+  const ny = y / radius;
+
+  if (field === "vortex") {
+    const strength = 0.00018 + mid * 0.00065;
+    fx += -ny * strength;
+    fy += nx * strength;
+  } else if (field === "pulse") {
+    const strength = (bass * 0.0007 + pulse * 0.0012) * (1 + clampNumber(bassExplosion, 0, 3));
+    fx += nx * strength;
+    fy += ny * strength;
+  }
+
+  const turb = clampNumber(turbulence, 0, 3);
+  if (turb > 0) {
+    const noise = Math.sin(time * (1.7 + high * 3.0) + index * 12.9898);
+    fx += Math.cos(noise * 6.28318530718) * turb * 0.00018;
+    fy += Math.sin(noise * 6.28318530718) * turb * 0.00018;
+  }
+
+  return [fx, fy];
+};
+
 export class ParticleSystem {
   constructor(gl, shaderManager) {
     this.gl = gl;
@@ -39,11 +73,11 @@ export class ParticleSystem {
     this.velocities = new Float32Array(0);
   }
 
-  render({ count, speed, size, audio, time }) {
+  render({ count, speed, size, forceField, turbulence, bassExplosion, sparkle, audio, time }) {
     const particleCount = clampInt(count, 200, 20_000);
     this.ensureParticles(particleCount);
-    this.updateParticles(speed, audio, time);
-    this.draw(size, audio);
+    this.updateParticles({ speed, forceField, turbulence, bassExplosion, audio, time });
+    this.draw({ size, sparkle, audio });
   }
 
   ensureParticles(nextCount) {
@@ -67,9 +101,9 @@ export class ParticleSystem {
     }
   }
 
-  updateParticles(speed, audio, time) {
+  updateParticles({ speed, forceField, turbulence, bassExplosion, audio, time }) {
     const motion = 0.4 + clampNumber(speed, 0, 4);
-    const beatBoost = audio?.beat ? 1.4 : 1.0;
+    const beatBoost = audio?.beat || audio?.beat_pulse ? 1.4 : 1.0;
     const drift = 0.0008 + clampNumber(audio?.amplitude, 0, 1) * 0.0018;
 
     for (let index = 0; index < this.count; index += 1) {
@@ -82,6 +116,12 @@ export class ParticleSystem {
       const swirl = Math.sin(time * 0.8 + index * 0.013) * drift;
       vx += swirl * 0.01;
       vy -= swirl * 0.01;
+
+      const [fx, fy] = resolveParticleForces({ x, y, index, time, forceField, turbulence, bassExplosion, audio });
+      vx += fx;
+      vy += fy;
+      vx = clampNumber(vx * 0.997, -0.035, 0.035);
+      vy = clampNumber(vy * 0.997, -0.035, 0.035);
 
       x += vx * motion * beatBoost;
       y += vy * motion * beatBoost;
@@ -102,12 +142,13 @@ export class ParticleSystem {
     }
   }
 
-  draw(size, audio) {
+  draw({ size, sparkle, audio }) {
     const gl = this.gl;
-    const pointSize = 1.5 + clampNumber(size, 0, 32);
     const amplitude = clampNumber(audio?.amplitude, 0, 1);
     const bass = clampNumber(audio?.bands?.low, 0, 1);
     const high = clampNumber(audio?.bands?.high, 0, 1);
+    const sparkleAmount = clampNumber(sparkle, 0, 3) * high;
+    const pointSize = 1.5 + clampNumber(size, 0, 32) + sparkleAmount * 1.5;
 
     gl.useProgram(this.program);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
@@ -119,8 +160,8 @@ export class ParticleSystem {
     gl.uniform3f(
       this.colorLocation,
       0.35 + bass * 0.45,
-      0.55 + high * 0.35,
-      0.95 + amplitude * 0.05
+      0.55 + high * 0.35 + sparkleAmount * 0.08,
+      0.95 + amplitude * 0.05 + sparkleAmount * 0.05
     );
     gl.drawArrays(gl.POINTS, 0, this.count);
   }

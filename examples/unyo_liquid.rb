@@ -27,6 +27,7 @@ Vizcore.define do
       force_field :vortex
       turbulence 0.55
       bass_explosion 0.9
+      sparkle 0.35
 
       map amplitude, to: :speed, gain: 4.0, range: 0.4..4.0, curve: :sqrt
       map frequency_band(:low), to: :size, gain: 6.0, range: 2.0..8.0, curve: :sqrt
