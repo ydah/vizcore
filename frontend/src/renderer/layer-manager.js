@@ -130,7 +130,7 @@ export class LayerManager {
     this.gl.bufferData(this.gl.ARRAY_BUFFER, FULLSCREEN_VERTICES, this.gl.STATIC_DRAW);
   }
 
-  renderScene({ layers, audio, time, rotation, resolution }) {
+  renderScene({ layers, audio, time, rotation, resolution, visualSettings }) {
     const layerList = Array.isArray(layers) && layers.length > 0 ? layers : [defaultLayer(audio)];
     const width = Math.max(1, Math.floor(Number(resolution?.[0] || 1)));
     const height = Math.max(1, Math.floor(Number(resolution?.[1] || 1)));
@@ -141,7 +141,7 @@ export class LayerManager {
         try {
           const blend = String(layer?.params?.blend || "alpha").toLowerCase();
           this.setBlendMode(blend);
-          this.renderLayer(layer, audio, time, rotation, [width, height]);
+          this.renderLayer(layer, audio, time, rotation, [width, height], visualSettings);
         } catch (error) {
           this.reportLayerError(layer, error, "direct-render");
         }
@@ -157,7 +157,7 @@ export class LayerManager {
         this.gl.clearColor(0.0, 0.0, 0.0, 0.0);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
-        this.renderLayer(layer, audio, time, rotation, [this.layerTargetWidth, this.layerTargetHeight]);
+        this.renderLayer(layer, audio, time, rotation, [this.layerTargetWidth, this.layerTargetHeight], visualSettings);
 
         this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
         this.gl.viewport(0, 0, width, height);
@@ -171,7 +171,7 @@ export class LayerManager {
     this.setBlendMode("alpha");
   }
 
-  renderLayer(layer, audio, time, rotation, resolution) {
+  renderLayer(layer, audio, time, rotation, resolution, visualSettings) {
     if (isParticleLayer(layer)) {
       this.renderParticleLayer(layer, audio, time);
       return;
@@ -181,13 +181,13 @@ export class LayerManager {
       return;
     }
     if (isShaderLayer(layer)) {
-      this.renderShaderLayer(layer, audio, time, resolution);
+      this.renderShaderLayer(layer, audio, time, resolution, visualSettings);
       return;
     }
     this.renderGeometryLayer(layer, audio, rotation, time);
   }
 
-  renderShaderLayer(layer, audio, time, resolution) {
+  renderShaderLayer(layer, audio, time, resolution, visualSettings) {
     const shaderName = String(layer?.shader || "gradient_pulse");
     const customSource = typeof layer?.glsl_source === "string" ? layer.glsl_source : null;
     const fragmentShader = customSource || getBuiltinShader(shaderName);
@@ -243,6 +243,9 @@ export class LayerManager {
     const spectrum = normalizeSpectrum(audio?.fft, 32);
     this.setUniform1fv(program, "u_fft[0]", spectrum);
     this.setUniform1f(program, "u_fft_size", spectrum.length);
+    this.setUniform1f(program, "u_visual_gain", audio?.visual_gain || visualSettings?.visualGain || 1);
+    this.setUniform1f(program, "u_bass_boost", audio?.bass_boost || visualSettings?.bassBoost || 1);
+    this.setUniform1f(program, "u_wobble_amount", audio?.wobble_amount || visualSettings?.wobbleAmount || 1);
 
     const params = layer?.params || {};
     for (const [key, value] of Object.entries(params)) {

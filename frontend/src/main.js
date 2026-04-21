@@ -13,9 +13,29 @@ const audioTrackStatusElement = document.querySelector("#audio-track-status");
 const audioPlaybackStatusElement = document.querySelector("#audio-playback-status");
 const sceneSwitcherElement = document.querySelector("#scene-switcher");
 const audioToggleButton = document.querySelector("#audio-toggle");
+const visualGainControl = document.querySelector("#visual-gain-control");
+const bassBoostControl = document.querySelector("#bass-boost-control");
+const smoothingControl = document.querySelector("#smoothing-control");
+const beatHoldControl = document.querySelector("#beat-hold-control");
+const wobbleControl = document.querySelector("#wobble-control");
+const reactivityStatusElement = document.querySelector("#reactivity-status");
 
+const visualSettings = {
+  visualGain: 2.5,
+  bassBoost: 1.4,
+  smoothing: 0.25,
+  beatHoldMs: 180,
+  wobbleAmount: 1.0,
+};
 const engine = new Engine(canvas);
 engine.init();
+engine.setVisualSettings(visualSettings);
+bindVisualControl(visualGainControl, "visualGain");
+bindVisualControl(bassBoostControl, "bassBoost");
+bindVisualControl(smoothingControl, "smoothing");
+bindVisualControl(beatHoldControl, "beatHoldMs");
+bindVisualControl(wobbleControl, "wobbleAmount");
+renderReactivityStatus();
 engine.start();
 
 let currentSceneName = "unknown";
@@ -53,7 +73,7 @@ const client = new WebSocketClient(websocketUrl, {
     const beat = !!frame?.audio?.beat;
     const beatCount = Math.max(0, Number(frame?.audio?.beat_count || 0) || 0);
     if (beat) {
-      beatFlashUntil = performance.now() + 180;
+      beatFlashUntil = performance.now() + visualSettings.beatHoldMs;
     }
     const beatVisible = performance.now() < beatFlashUntil;
     sceneStatusElement.textContent = `Scene: ${sceneName}`;
@@ -296,6 +316,29 @@ function syncAudioTransportToServer({ force = false } = {}) {
   if (sent) {
     lastTransportSyncAt = now;
   }
+}
+
+function bindVisualControl(control, key, parser = Number) {
+  if (!control) return;
+  control.addEventListener("input", () => {
+    visualSettings[key] = parser(control.value);
+    engine.setVisualSettings(visualSettings);
+    renderReactivityStatus();
+  });
+}
+
+function renderReactivityStatus() {
+  if (!reactivityStatusElement) {
+    return;
+  }
+
+  reactivityStatusElement.textContent = [
+    `Visual Gain: ${visualSettings.visualGain.toFixed(1)}x`,
+    `Bass: ${visualSettings.bassBoost.toFixed(1)}x`,
+    `Smooth: ${visualSettings.smoothing.toFixed(2)}`,
+    `Beat Hold: ${Math.round(visualSettings.beatHoldMs)}ms`,
+    `Wobble: ${visualSettings.wobbleAmount.toFixed(2)}x`,
+  ].join(" | ");
 }
 
 function buildWebSocketUrl() {
