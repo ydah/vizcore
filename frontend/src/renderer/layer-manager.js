@@ -1,6 +1,6 @@
 import { getBuiltinShader } from "../shaders/builtins.js";
 import { getPostEffectShader } from "../shaders/post-effects.js";
-import { buildWireframeLines, estimateDeformFromSpectrum } from "../visuals/geometry.js";
+import { buildRadialBlobLines, buildWireframeLines, estimateDeformFromSpectrum } from "../visuals/geometry.js";
 import { ParticleSystem } from "../visuals/particle-system.js";
 import { TextRenderer } from "../visuals/text-renderer.js";
 import { getVJEffectShader } from "../visuals/vj-effects.js";
@@ -184,7 +184,7 @@ export class LayerManager {
       this.renderShaderLayer(layer, audio, time, resolution);
       return;
     }
-    this.renderGeometryLayer(layer, audio, rotation);
+    this.renderGeometryLayer(layer, audio, rotation, time);
   }
 
   renderShaderLayer(layer, audio, time, resolution) {
@@ -258,16 +258,19 @@ export class LayerManager {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
-  renderGeometryLayer(layer, audio, rotation) {
+  renderGeometryLayer(layer, audio, rotation, time) {
     const gl = this.gl;
     const params = layer?.params || {};
     const colorShift = clamp(Number(params.color_shift || 0), 0, 1);
     const deform = estimateDeformFromSpectrum(params.deform ?? audio?.fft);
-    const points = buildWireframeLines({
-      rotationY: rotation,
-      rotationX: rotation * 0.8,
-      deform
-    });
+    const type = String(layer?.type || "").toLowerCase();
+    const points = type === "radial_blob"
+      ? buildRadialBlobLines({ time, params, audio })
+      : buildWireframeLines({
+          rotationY: rotation,
+          rotationX: rotation * 0.8,
+          deform
+        });
 
     gl.useProgram(this.geometryProgram);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.geometryBuffer);
@@ -276,9 +279,10 @@ export class LayerManager {
     gl.vertexAttribPointer(this.geometryPositionLocation, 2, gl.FLOAT, false, 0, 0);
 
     const amplitude = clamp(Number(audio?.amplitude || 0), 0, 1);
+    const pulse = clamp(Number(audio?.beat_pulse || 0), 0, 1);
     gl.uniform3f(
       this.geometryColorLocation,
-      0.45 + amplitude * 0.45,
+      0.45 + amplitude * 0.45 + pulse * 0.15,
       0.75 + colorShift * 0.2,
       0.96
     );
