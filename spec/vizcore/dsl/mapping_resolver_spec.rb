@@ -16,6 +16,7 @@ RSpec.describe Vizcore::DSL::MappingResolver do
             { source: { kind: :amplitude }, target: :intensity },
             { source: { kind: :frequency_band, band: :low }, target: :bass },
             { source: { kind: :beat }, target: :flash },
+            { source: { kind: :beat_pulse }, target: :pulse },
             { source: { kind: :bpm }, target: :tempo }
           ]
         }
@@ -25,6 +26,7 @@ RSpec.describe Vizcore::DSL::MappingResolver do
         bands: { sub: 0.1, low: 0.88, mid: 0.4, high: 0.2 },
         fft: Array.new(8, 0.05),
         beat: true,
+        beat_pulse: 0.82,
         beat_count: 12,
         bpm: 128.5
       }
@@ -40,6 +42,7 @@ RSpec.describe Vizcore::DSL::MappingResolver do
         intensity: 0.72,
         bass: 0.88,
         flash: true,
+        pulse: 0.82,
         tempo: 128.5
       )
     end

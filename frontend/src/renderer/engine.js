@@ -18,6 +18,7 @@ export class Engine {
         bands: { sub: 0, low: 0, mid: 0, high: 0 },
         fft: [],
         beat: false,
+        beat_pulse: 0,
         beat_count: 0,
         bpm: 0
       },

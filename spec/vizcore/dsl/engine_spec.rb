@@ -16,6 +16,7 @@ RSpec.describe Vizcore::DSL::Engine do
             shader :gradient_pulse
             map frequency_band(:low) => :intensity
             map beat? => :flash
+            map beat_pulse => :wobble
           end
         end
       end
@@ -35,7 +36,8 @@ RSpec.describe Vizcore::DSL::Engine do
       expect(layer[:shader]).to eq(:gradient_pulse)
       expect(layer[:mappings]).to include(
         { source: { kind: :frequency_band, band: :low }, target: :intensity },
-        { source: { kind: :beat }, target: :flash }
+        { source: { kind: :beat }, target: :flash },
+        { source: { kind: :beat_pulse }, target: :wobble }
       )
     end
   end

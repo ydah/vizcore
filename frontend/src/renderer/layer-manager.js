@@ -226,6 +226,7 @@ export class LayerManager {
     this.setUniform1f(program, "u_mid", bands.mid || 0);
     this.setUniform1f(program, "u_high", bands.high || 0);
     this.setUniform1f(program, "u_beat", audio?.beat ? 1 : 0);
+    this.setUniform1f(program, "u_beat_pulse", audio?.beat_pulse || (audio?.beat ? 1 : 0));
     this.setUniform1f(program, "u_bpm", audio?.bpm || 0);
 
     const params = layer?.params || {};
