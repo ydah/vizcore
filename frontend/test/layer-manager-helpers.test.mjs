@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   coerceUniformNumber,
+  normalizeSpectrum,
   shaderParamUniformNames,
 } from "../src/renderer/layer-manager.js";
 
@@ -27,4 +28,16 @@ test("shaderParamUniformNames supports plain and legacy param_ targets", () => {
     "u_param_intensity",
   ]);
   assert.deepEqual(shaderParamUniformNames("bass-gain"), ["u_param_bass_gain"]);
+});
+
+test("normalizeSpectrum returns a clamped Float32Array with fixed length", () => {
+  const spectrum = normalizeSpectrum([0.2, 2, -1, Number.NaN], 6);
+
+  assert.equal(spectrum.length, 6);
+  assert.ok(Math.abs(spectrum[0] - 0.2) < 0.00001);
+  assert.equal(spectrum[1], 1);
+  assert.equal(spectrum[2], 0);
+  assert.equal(spectrum[3], 0);
+  assert.equal(spectrum[4], 0);
+  assert.equal(spectrum[5], 0);
 });

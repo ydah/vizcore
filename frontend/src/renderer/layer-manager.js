@@ -78,6 +78,18 @@ export const shaderParamUniformNames = (rawKey) => {
   return [...new Set(names)];
 };
 
+export const normalizeSpectrum = (value, size = 32) => {
+  const input = Array.isArray(value) || ArrayBuffer.isView(value) ? Array.from(value) : [];
+  const output = new Float32Array(size);
+
+  for (let index = 0; index < size; index += 1) {
+    const numeric = Number(input[index] || 0);
+    output[index] = Number.isFinite(numeric) ? Math.min(Math.max(numeric, 0), 1) : 0;
+  }
+
+  return output;
+};
+
 export class LayerManager {
   constructor(gl, shaderManager) {
     this.gl = gl;
@@ -228,6 +240,9 @@ export class LayerManager {
     this.setUniform1f(program, "u_beat", audio?.beat ? 1 : 0);
     this.setUniform1f(program, "u_beat_pulse", audio?.beat_pulse || (audio?.beat ? 1 : 0));
     this.setUniform1f(program, "u_bpm", audio?.bpm || 0);
+    const spectrum = normalizeSpectrum(audio?.fft, 32);
+    this.setUniform1fv(program, "u_fft[0]", spectrum);
+    this.setUniform1f(program, "u_fft_size", spectrum.length);
 
     const params = layer?.params || {};
     for (const [key, value] of Object.entries(params)) {
@@ -430,6 +445,14 @@ export class LayerManager {
       return;
     }
     this.gl.uniform1f(location, Number(value || 0));
+  }
+
+  setUniform1fv(program, uniformName, values) {
+    const location = this.gl.getUniformLocation(program, uniformName);
+    if (location === null) {
+      return;
+    }
+    this.gl.uniform1fv(location, values);
   }
 
   setUniform2f(program, uniformName, x, y) {
