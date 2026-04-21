@@ -79,5 +79,94 @@ RSpec.describe Vizcore::DSL::MappingResolver do
       resolved = resolver.resolve_layers(scene_layers: scene_layers, audio: { bands: {} })
       expect(resolved[0][:params]).to eq({})
     end
+
+    it "applies mapping gain range and curve" do
+      resolver = described_class.new
+      scene_layers = [
+        {
+          name: :liquid,
+          params: {},
+          mappings: [
+            {
+              source: { kind: :amplitude },
+              target: :wobble,
+              transform: { gain: 4.0, min: 0.1, max: 1.0, curve: :sqrt }
+            }
+          ]
+        }
+      ]
+
+      resolved = resolver.resolve_layers(scene_layers: scene_layers, audio: { amplitude: 0.0625, bands: {} })
+
+      expect(resolved[0][:params][:wobble]).to eq(0.5)
+    end
+
+    it "converts boolean sources when applying transforms" do
+      resolver = described_class.new
+      scene_layers = [
+        {
+          name: :flash,
+          params: {},
+          mappings: [
+            {
+              source: { kind: :beat },
+              target: :intensity,
+              transform: { gain: 0.5, min: 0.0, max: 1.0 }
+            }
+          ]
+        }
+      ]
+
+      resolved = resolver.resolve_layers(scene_layers: scene_layers, audio: { beat: true, bands: {} })
+
+      expect(resolved[0][:params][:intensity]).to eq(0.5)
+    end
+
+    it "applies attack and release smoothing across calls" do
+      resolver = described_class.new
+      scene_layers = [
+        {
+          name: :smooth,
+          params: {},
+          mappings: [
+            {
+              source: { kind: :amplitude },
+              target: :wobble,
+              transform: { attack: 1.0, release: 0.5 }
+            }
+          ]
+        }
+      ]
+
+      first = resolver.resolve_layers(scene_layers: scene_layers, audio: { amplitude: 1.0, bands: {} })
+      second = resolver.resolve_layers(scene_layers: scene_layers, audio: { amplitude: 0.0, bands: {} })
+
+      expect(first[0][:params][:wobble]).to eq(1.0)
+      expect(second[0][:params][:wobble]).to eq(0.5)
+    end
+
+    it "applies transform options to array values without smoothing" do
+      resolver = described_class.new
+      scene_layers = [
+        {
+          name: :blob,
+          params: {},
+          mappings: [
+            {
+              source: { kind: :fft_spectrum },
+              target: :spectrum,
+              transform: { gain: 2.0, min: 0.0, max: 1.0 }
+            }
+          ]
+        }
+      ]
+
+      resolved = resolver.resolve_layers(
+        scene_layers: scene_layers,
+        audio: { fft: [0.3, 0.8, "bad", -0.2], bands: {} }
+      )
+
+      expect(resolved[0][:params][:spectrum]).to eq([0.6, 1.0, 0.0, 0.0])
+    end
   end
 end
