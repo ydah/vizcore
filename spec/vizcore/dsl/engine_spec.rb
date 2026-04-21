@@ -40,6 +40,39 @@ RSpec.describe Vizcore::DSL::Engine do
         { source: { kind: :beat_pulse }, target: :wobble }
       )
     end
+
+    it "builds mapping transforms from keyword and target hash syntax" do
+      definition = described_class.define do
+        scene :reactive do
+          layer :liquid do
+            shader :gradient_pulse
+            map amplitude, to: :wobble, gain: 3.0, range: 0.1..1.2, curve: :sqrt
+            map frequency_band(:low) => { to: :warp, gain: 2.0, min: 0.2, max: 2.5 }
+            map beat_pulse => { to: :flash, range: [0.0, 1.0], attack: 1.0, release: 0.2 }
+          end
+        end
+      end
+
+      layer = definition[:scenes].first[:layers].first
+
+      expect(layer[:mappings]).to include(
+        {
+          source: { kind: :amplitude },
+          target: :wobble,
+          transform: { gain: 3.0, min: 0.1, max: 1.2, curve: :sqrt }
+        },
+        {
+          source: { kind: :frequency_band, band: :low },
+          target: :warp,
+          transform: { gain: 2.0, min: 0.2, max: 2.5 }
+        },
+        {
+          source: { kind: :beat_pulse },
+          target: :flash,
+          transform: { min: 0.0, max: 1.0, attack: 1.0, release: 0.2 }
+        }
+      )
+    end
   end
 
   describe ".load_file" do

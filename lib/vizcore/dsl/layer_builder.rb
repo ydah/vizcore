@@ -63,18 +63,27 @@ module Vizcore
 
       # Map analysis source(s) to layer parameter target(s).
       #
-      # @param definition [Hash] mapping pairs (`source` => `target`)
+      # @param definition [Hash, Symbol, String] mapping pairs or a single source
       # @raise [ArgumentError] when the mapping is empty or invalid
       # @return [void]
-      def map(definition)
-        mapping = Hash(definition)
+      def map(definition = nil, **options)
+        if options.key?(:to)
+          transform_options = options.dup
+          to = transform_options.delete(:to)
+          @mappings << build_mapping(
+            source: normalize_source(definition),
+            target: to,
+            transform: normalize_transform(**transform_options)
+          )
+          return
+        end
+
+        mapping = definition.nil? ? options : Hash(definition)
         raise ArgumentError, "map requires at least one mapping pair" if mapping.empty?
 
         mapping.each do |source, target|
-          @mappings << {
-            source: normalize_source(source),
-            target: target.to_sym
-          }
+          target_name, transform = normalize_target(target)
+          @mappings << build_mapping(source: normalize_source(source), target: target_name, transform: transform)
         end
       end
 
@@ -174,6 +183,68 @@ module Vizcore
 
           options[symbol_key] = value.respond_to?(:to_sym) ? value.to_sym : value
         end
+      end
+
+      def normalize_target(target)
+        return [target.to_sym, {}] unless target.is_a?(Hash)
+
+        values = target.each_with_object({}) { |(key, value), output| output[key.to_sym] = value }
+        to = values.delete(:to)
+        raise ArgumentError, "mapping target hash must contain :to" unless to
+
+        [to.to_sym, normalize_transform(**values)]
+      end
+
+      def build_mapping(source:, target:, transform: {})
+        output = { source: source, target: target.to_sym }
+        output[:transform] = transform unless transform.empty?
+        output
+      end
+
+      def normalize_transform(gain: nil, range: nil, min: nil, max: nil, curve: nil, attack: nil, release: nil)
+        range_min, range_max = normalize_range(range)
+        min = range_min if min.nil?
+        max = range_max if max.nil?
+
+        output = {}
+        output[:gain] = normalize_float(gain, :gain) unless gain.nil?
+        output[:min] = normalize_float(min, :min) unless min.nil?
+        output[:max] = normalize_float(max, :max) unless max.nil?
+        output[:curve] = normalize_curve(curve) unless curve.nil?
+        output[:attack] = clamp(normalize_float(attack, :attack), 0.0, 1.0) unless attack.nil?
+        output[:release] = clamp(normalize_float(release, :release), 0.0, 1.0) unless release.nil?
+        output
+      end
+
+      def normalize_range(value)
+        return [nil, nil] if value.nil?
+
+        if value.is_a?(Range)
+          return [value.begin, value.end]
+        end
+
+        if value.is_a?(Array) && value.length == 2
+          return value
+        end
+
+        raise ArgumentError, "mapping range must be a Range or two-element Array"
+      end
+
+      def normalize_float(value, name)
+        Float(value)
+      rescue ArgumentError, TypeError
+        raise ArgumentError, "mapping #{name} must be numeric"
+      end
+
+      def normalize_curve(value)
+        curve = value.to_sym
+        return curve if %i[linear sqrt square].include?(curve)
+
+        raise ArgumentError, "unsupported mapping curve: #{value.inspect}"
+      end
+
+      def clamp(value, min, max)
+        [[value, min].max, max].min
       end
 
       def source(kind, **options)
