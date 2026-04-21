@@ -42,6 +42,42 @@ const FULLSCREEN_VERTICES = new Float32Array([
 ]);
 const MAX_LAYER_TARGET_PIXELS = 4_194_304;
 
+export const coerceUniformNumber = (value) => {
+  if (typeof value === "boolean") {
+    return value ? 1 : 0;
+  }
+
+  if (typeof value !== "number" && typeof value !== "string") {
+    return null;
+  }
+
+  if (typeof value === "string" && value.trim() === "") {
+    return null;
+  }
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+
+  return numeric;
+};
+
+export const shaderParamUniformNames = (rawKey) => {
+  const safeKey = String(rawKey || "").replace(/[^a-zA-Z0-9_]/g, "_");
+  if (!safeKey) {
+    return [];
+  }
+
+  const names = [`u_param_${safeKey}`];
+
+  if (safeKey.startsWith("param_")) {
+    names.push(`u_${safeKey}`);
+  }
+
+  return [...new Set(names)];
+};
+
 export class LayerManager {
   constructor(gl, shaderManager) {
     this.gl = gl;
@@ -194,11 +230,13 @@ export class LayerManager {
 
     const params = layer?.params || {};
     for (const [key, value] of Object.entries(params)) {
-      if (typeof value !== "number") {
+      const numeric = coerceUniformNumber(value);
+      if (numeric === null) {
         continue;
       }
-      const safeKey = key.replace(/[^a-zA-Z0-9_]/g, "_");
-      this.setUniform1f(program, `u_param_${safeKey}`, value);
+      for (const uniformName of shaderParamUniformNames(key)) {
+        this.setUniform1f(program, uniformName, numeric);
+      }
     }
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
