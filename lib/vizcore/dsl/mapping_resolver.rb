@@ -51,6 +51,8 @@ module Vizcore
           audio[:fft]
         when :beat
           audio[:beat]
+        when :beat_pulse
+          audio[:beat_pulse]
         when :beat_count
           audio[:beat_count]
         when :bpm

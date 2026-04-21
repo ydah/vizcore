@@ -99,6 +99,11 @@ module Vizcore
         source(:beat)
       end
 
+      # @return [Hash] source descriptor for beat pulse decay value
+      def beat_pulse
+        source(:beat_pulse)
+      end
+
       # @return [Hash] source descriptor for beat counter
       def beat_count
         source(:beat_count)

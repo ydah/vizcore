@@ -13,6 +13,7 @@ RSpec.describe Vizcore::Renderer::SceneSerializer do
           bands: { low: 0.987654, high: 0.333333 },
           fft: [0.123456, 0.987654],
           beat: true,
+          beat_pulse: 0.765432,
           beat_count: 7,
           bpm: 126.7
         },
@@ -35,6 +36,7 @@ RSpec.describe Vizcore::Renderer::SceneSerializer do
         bands: { low: 0.9877, high: 0.3333 },
         fft: [0.1235, 0.9877],
         beat: true,
+        beat_pulse: 0.7654,
         beat_count: 7,
         bpm: 126.7
       )

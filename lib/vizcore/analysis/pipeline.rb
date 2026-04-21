@@ -4,6 +4,9 @@ module Vizcore
   module Analysis
     # End-to-end analysis pipeline from PCM samples to renderer-ready features.
     class Pipeline
+      BEAT_PULSE_DECAY = 0.86
+      BEAT_PULSE_FLOOR = 0.001
+
       attr_reader :fft_processor, :band_splitter, :beat_detector, :bpm_estimator, :smoother
 
       # @param sample_rate [Integer]
@@ -19,6 +22,7 @@ module Vizcore
         frame_rate = sample_rate.to_f / fft_size.to_f
         @bpm_estimator = bpm_estimator || BPMEstimator.new(frame_rate: frame_rate)
         @smoother = smoother || Smoother.new(alpha: 0.35)
+        @beat_pulse = 0.0
       end
 
       # @param samples [Array<Numeric>] audio frame samples
@@ -27,6 +31,8 @@ module Vizcore
         fft = @fft_processor.call(samples)
         bands = @band_splitter.call(fft[:magnitudes])
         beat = @beat_detector.call(samples)
+        @beat_pulse = beat[:beat] ? 1.0 : @beat_pulse * BEAT_PULSE_DECAY
+        @beat_pulse = 0.0 if @beat_pulse < BEAT_PULSE_FLOOR
         bpm = @bpm_estimator.call(beat: beat[:beat])
         amplitude = rms(samples)
         spectrum_preview = preview_spectrum(fft[:magnitudes])
@@ -36,6 +42,7 @@ module Vizcore
           bands: @smoother.smooth_hash(bands, namespace: :bands),
           fft: @smoother.smooth_array(spectrum_preview, namespace: :fft),
           beat: beat[:beat],
+          beat_pulse: @beat_pulse,
           beat_count: beat[:beat_count],
           bpm: @smoother.smooth(:bpm, bpm, alpha: 0.2),
           peak_frequency: fft[:peak_frequency]

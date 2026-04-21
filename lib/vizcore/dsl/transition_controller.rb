@@ -134,6 +134,11 @@ module Vizcore
           !!@audio[:beat]
         end
 
+        # @return [Float]
+        def beat_pulse
+          @audio[:beat_pulse].to_f
+        end
+
         # @return [Integer]
         def beat_count
           Integer(@audio[:beat_count] || 0)
