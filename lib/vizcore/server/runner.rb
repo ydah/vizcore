@@ -45,7 +45,8 @@ module Vizcore
 
         input_manager = Vizcore::Audio::InputManager.new(
           source: @config.audio_source,
-          file_path: @config.audio_file&.to_s
+          file_path: @config.audio_file&.to_s,
+          audio_device: @config.audio_device
         )
         broadcaster = FrameBroadcaster.new(
           scene_name: scene[:name].to_s,
@@ -53,6 +54,7 @@ module Vizcore
           scene_catalog: definition[:scenes],
           transitions: definition[:transitions],
           input_manager: input_manager,
+          noise_gate: @config.noise_gate,
           error_reporter: ->(message) { @output.puts(message) }
         )
         replace_scene_catalog(definition[:scenes])

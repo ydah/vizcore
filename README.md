@@ -142,7 +142,7 @@ end
 ## CLI
 
 ```bash
-vizcore start SCENE_FILE [--host 127.0.0.1] [--port 4567] [--audio-source mic|file|dummy] [--audio-file PATH]
+vizcore start SCENE_FILE [--host 127.0.0.1] [--port 4567] [--audio-source mic|file|dummy] [--audio-file PATH] [--audio-device INDEX_OR_NAME] [--noise-gate RMS]
 vizcore new PROJECT_NAME
 vizcore devices [audio|midi]
 ```
@@ -158,6 +158,13 @@ vizcore devices [audio|midi]
 ```bash
 # Microphone
 vizcore start scene.rb --audio-source mic
+
+# Specific microphone device
+vizcore devices audio
+vizcore start scene.rb --audio-source mic --audio-device 5
+
+# Raise this if a quiet room still moves the visual
+vizcore start scene.rb --audio-source mic --audio-device 5 --noise-gate 0.03
 
 # WAV file
 vizcore start scene.rb --audio-source file --audio-file track.wav
@@ -185,6 +192,7 @@ The browser HUD also includes Visual Gain, Bass Boost, Smoothing, Beat Hold, and
 | `examples/intro_drop.rb` | Beat-triggered scene transition |
 | `examples/file_audio_demo.rb` | File audio source walkthrough |
 | `examples/complex_audio_showcase.rb` | Dense multi-layer showcase |
+| `examples/rhythm_geometry.rb` | Single large morphing geometric pattern scene with drum-reactive motion |
 | `examples/midi_scene_switch.rb` | MIDI-driven scene switching |
 | `examples/custom_shader.rb` | Custom GLSL shader with audio mapping |
 | `examples/unyo_liquid.rb` | Organic liquid wobble scene with FFT blob and particles |

@@ -1,13 +1,12 @@
 # frozen_string_literal: true
 
 require_relative "base_input"
-require_relative "dummy_sine_input"
 require_relative "../errors"
 require_relative "portaudio_ffi"
 
 module Vizcore
   module Audio
-    # Microphone input using PortAudio, with automatic fallback to dummy source.
+    # Microphone input using PortAudio, with automatic fallback to silence.
     class MicInput < BaseInput
       attr_reader :device, :last_error
 
@@ -22,7 +21,7 @@ module Vizcore
         @device = device
         @channels = Integer(channels)
         @frames_per_buffer = Integer(frames_per_buffer)
-        @fallback_input = fallback_input || DummySineInput.new(sample_rate: sample_rate)
+        @fallback_input = fallback_input || BaseInput.new(sample_rate: sample_rate)
         @portaudio_backend = portaudio_backend
         @stream = nil
         @using_fallback = false
@@ -75,11 +74,7 @@ module Vizcore
       private
 
       def open_stream
-        stream = @portaudio_backend.open_default_input_stream(
-          sample_rate: sample_rate,
-          channels: @channels,
-          frames_per_buffer: @frames_per_buffer
-        )
+        stream = open_requested_stream
         return nil unless stream
         return stream if stream.start
 
@@ -88,6 +83,27 @@ module Vizcore
       rescue StandardError => e
         @last_error = AudioSourceError.new("Microphone stream open failed: #{e.message}")
         nil
+      end
+
+      def open_requested_stream
+        if default_device?
+          return @portaudio_backend.open_default_input_stream(
+            sample_rate: sample_rate,
+            channels: @channels,
+            frames_per_buffer: @frames_per_buffer
+          )
+        end
+
+        @portaudio_backend.open_input_stream(
+          device: @device,
+          sample_rate: sample_rate,
+          channels: @channels,
+          frames_per_buffer: @frames_per_buffer
+        )
+      end
+
+      def default_device?
+        @device.nil? || @device.to_s.empty? || @device.to_s == "default"
       end
 
       def close_stream

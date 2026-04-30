@@ -27,6 +27,8 @@ module Vizcore
     option :port, type: :numeric, default: Config::DEFAULT_PORT, desc: "Bind port"
     option :audio_source, type: :string, default: Config::DEFAULT_AUDIO_SOURCE.to_s, desc: "Audio source: mic, file, dummy"
     option :audio_file, type: :string, desc: "Path to audio file used when --audio-source file (wav/mp3/flac)"
+    option :audio_device, type: :string, desc: "Audio input device index or name used when --audio-source mic"
+    option :noise_gate, type: :numeric, default: Config::DEFAULT_NOISE_GATE, desc: "RMS level below which audio is treated as silence"
     # Start the Vizcore server with the given scene file.
     #
     # @param scene_file [String] path to a Ruby scene DSL file
@@ -38,7 +40,9 @@ module Vizcore
         host: options.fetch(:host),
         port: options.fetch(:port),
         audio_source: options.fetch(:audio_source),
-        audio_file: options[:audio_file]
+        audio_file: options[:audio_file],
+        audio_device: options[:audio_device],
+        noise_gate: options.fetch(:noise_gate)
       )
       Server::Runner.new(config).run
     rescue ArgumentError => e

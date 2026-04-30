@@ -10,11 +10,13 @@ module Vizcore
       # @param sensitivity [Float] multiplier applied to moving average energy
       # @param refractory_frames [Integer] minimum frames between beat events
       # @param min_history [Integer] minimum history size before detecting beats
-      def initialize(history_size: 43, sensitivity: 1.35, refractory_frames: 4, min_history: 8)
+      # @param min_energy [Float] absolute energy floor required for beat detection
+      def initialize(history_size: 43, sensitivity: 1.35, refractory_frames: 4, min_history: 8, min_energy: 1e-6)
         @history_size = Integer(history_size)
         @sensitivity = Float(sensitivity)
         @refractory_frames = Integer(refractory_frames)
         @min_history = Integer(min_history)
+        @min_energy = Float(min_energy)
         @energy_history = []
         @frame_index = 0
         @last_beat_frame = -@refractory_frames
@@ -29,7 +31,7 @@ module Vizcore
         threshold = average_energy * @sensitivity
         enough_history = @energy_history.length >= @min_history
         refractory_ok = (@frame_index - @last_beat_frame) > @refractory_frames
-        beat = enough_history && refractory_ok && instant_energy > threshold && instant_energy.positive?
+        beat = enough_history && refractory_ok && instant_energy > threshold && instant_energy >= @min_energy
 
         if beat
           @beat_count += 1

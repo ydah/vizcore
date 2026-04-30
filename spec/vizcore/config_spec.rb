@@ -17,6 +17,18 @@ RSpec.describe Vizcore::Config do
     expect(config.audio_file.to_s).to end_with("spec/fixtures/audio/pulse16_mono.wav")
   end
 
+  it "parses optional audio device" do
+    config = described_class.new(scene_file: scene_file, audio_device: "5")
+
+    expect(config.audio_device).to eq("5")
+  end
+
+  it "parses optional noise gate" do
+    config = described_class.new(scene_file: scene_file, noise_gate: "0.03")
+
+    expect(config.noise_gate).to eq(0.03)
+  end
+
   it "raises for unsupported audio source" do
     expect do
       described_class.new(scene_file: scene_file, audio_source: "invalid")

@@ -38,6 +38,14 @@ RSpec.describe Vizcore::Audio::InputManager do
     end
   end
 
+  it "passes explicit audio device to microphone input" do
+    allow(Vizcore::Audio::MicInput).to receive(:new).and_call_original
+
+    described_class.new(source: :mic, audio_device: "5")
+
+    expect(Vizcore::Audio::MicInput).to have_received(:new).with(sample_rate: 44_100, device: "5")
+  end
+
   describe "#realtime_capture_size" do
     it "returns a real-time ingestion count based on current sample rate and frame rate" do
       manager = described_class.new(source: :dummy, sample_rate: 44_100, frame_size: 1024)

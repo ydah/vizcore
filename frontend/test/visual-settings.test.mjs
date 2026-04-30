@@ -29,3 +29,22 @@ test("applyVisualSettings smooths amplitude and bands", () => {
   assert.equal(result.amplitude, 0.5);
   assert.equal(result.bands.low, 0.5);
 });
+
+test("applyVisualSettings does not smooth silent frames", () => {
+  const previous = { amplitude: 0.8, bands: { sub: 0.7, low: 0.7, mid: 0.7, high: 0.7 }, beat_pulse: 0.5 };
+  const audio = {
+    amplitude: 0,
+    bands: { sub: 0, low: 0, mid: 0, high: 0 },
+    beat: false,
+    beat_pulse: 0,
+  };
+  const result = applyVisualSettings({
+    audio,
+    previous,
+    settings: { visualGain: 2.5, bassBoost: 1.4, smoothing: 0.5, wobbleAmount: 1 },
+  });
+
+  assert.equal(result.amplitude, 0);
+  assert.equal(result.bands.low, 0);
+  assert.equal(result.beat_pulse, 0);
+});

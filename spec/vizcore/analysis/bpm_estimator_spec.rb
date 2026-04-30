@@ -45,4 +45,17 @@ RSpec.describe Vizcore::Analysis::BPMEstimator do
 
     expect(estimator.call(beat: true)).to eq(0.0)
   end
+
+  it "can reset the accumulated tempo estimate" do
+    estimator = described_class.new(frame_rate: 30.0, history_seconds: 8.0, min_onsets: 4, smoothing: 1.0)
+
+    240.times do |frame_index|
+      estimator.call(beat: (frame_index % 15).zero?)
+    end
+    expect(estimator.call(beat: false)).to be > 0.0
+
+    estimator.reset
+
+    expect(estimator.call(beat: false)).to eq(0.0)
+  end
 end

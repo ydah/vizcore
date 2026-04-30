@@ -45,7 +45,7 @@ RSpec.describe Vizcore::CLI do
       end.to output(/MIDI devices:\n  - 2: Launchpad Mini MK3/).to_stdout
     end
 
-    it "passes --audio-source and --audio-file to config" do
+    it "passes audio options to config" do
       described_class.start(
         [
           "start",
@@ -53,13 +53,19 @@ RSpec.describe Vizcore::CLI do
           "--audio-source",
           "file",
           "--audio-file",
-          "spec/fixtures/audio/pulse16_mono.wav"
+          "spec/fixtures/audio/pulse16_mono.wav",
+          "--audio-device",
+          "5",
+          "--noise-gate",
+          "0.03"
         ]
       )
 
       expect(Vizcore::Server::Runner).to have_received(:new) do |config|
         expect(config.audio_source).to eq(:file)
         expect(config.audio_file.to_s).to end_with("spec/fixtures/audio/pulse16_mono.wav")
+        expect(config.audio_device).to eq("5")
+        expect(config.noise_gate).to eq(0.03)
       end
       expect(runner).to have_received(:run)
     end

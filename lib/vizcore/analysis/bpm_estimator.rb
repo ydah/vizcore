@@ -44,6 +44,14 @@ module Vizcore
         @current_bpm
       end
 
+      # Clear accumulated onset history and the current tempo estimate.
+      #
+      # @return [void]
+      def reset
+        @history.clear
+        @current_bpm = 0.0
+      end
+
       private
 
       def onset_count

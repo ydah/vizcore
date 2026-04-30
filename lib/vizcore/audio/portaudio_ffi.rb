@@ -109,6 +109,8 @@ module Vizcore
       PA_NO_ERROR = 0
       # PortAudio float sample format code.
       PA_FLOAT_32 = 0x0000_0001
+      # PortAudio stream flags.
+      PA_NO_FLAGS = 0
 
       # @return [Boolean] true when PortAudio native library can be loaded
       def available?
@@ -174,6 +176,50 @@ module Vizcore
         nil
       end
 
+      # @param device [String, Integer] PortAudio device index or case-insensitive name fragment
+      # @param sample_rate [Float]
+      # @param channels [Integer]
+      # @param frames_per_buffer [Integer]
+      # @return [Vizcore::Audio::PortAudioFFI::Stream, nil]
+      def open_input_stream(device:, sample_rate:, channels: DEFAULT_CHANNELS, frames_per_buffer: 1024)
+        mod = ffi_module
+        return nil unless mod
+        return nil unless ok?(mod.Pa_Initialize)
+
+        device_info = resolve_input_device(mod, device)
+        return terminate_with_nil(mod) unless device_info
+
+        device_index, info = device_info
+        actual_channels = [Integer(channels), info[:maxInputChannels]].min
+        input_params = mod::StreamParameters.new
+        input_params[:device] = device_index
+        input_params[:channelCount] = actual_channels
+        input_params[:sampleFormat] = PA_FLOAT_32
+        input_params[:suggestedLatency] = info[:defaultLowInputLatency].to_f
+        input_params[:hostApiSpecificStreamInfo] = nil
+
+        stream_ptr_ptr = ffi::MemoryPointer.new(:pointer)
+        result = mod.Pa_OpenStream(
+          stream_ptr_ptr,
+          input_params.to_ptr,
+          nil,
+          Float(sample_rate),
+          Integer(frames_per_buffer),
+          PA_NO_FLAGS,
+          nil,
+          nil
+        )
+        return terminate_with_nil(mod) unless ok?(result)
+
+        stream_pointer = stream_ptr_ptr.read_pointer
+        return terminate_with_nil(mod) if stream_pointer.null?
+
+        Stream.new(mod: mod, pointer: stream_pointer, channels: actual_channels)
+      rescue StandardError
+        mod&.Pa_Terminate
+        nil
+      end
+
       # @param stream [Vizcore::Audio::PortAudioFFI::Stream, nil]
       # @return [nil]
       def close_stream(stream)
@@ -188,6 +234,44 @@ module Vizcore
       def terminate_with_nil(mod)
         mod.Pa_Terminate
         nil
+      end
+
+      def resolve_input_device(mod, device)
+        if integer_string?(device)
+          index = Integer(device)
+          pointer = mod.Pa_GetDeviceInfo(index)
+          return nil if pointer.null?
+
+          info = mod::DeviceInfo.new(pointer)
+          return nil unless info[:maxInputChannels].positive?
+
+          return [index, info]
+        end
+
+        find_input_device_by_name(mod, device.to_s)
+      end
+
+      def find_input_device_by_name(mod, query)
+        normalized_query = query.downcase
+        count = mod.Pa_GetDeviceCount
+        return nil if count <= 0
+
+        count.times do |index|
+          pointer = mod.Pa_GetDeviceInfo(index)
+          next if pointer.null?
+
+          info = mod::DeviceInfo.new(pointer)
+          next unless info[:maxInputChannels].positive?
+
+          name = info[:name].read_string
+          return [index, info] if name.downcase.include?(normalized_query)
+        end
+
+        nil
+      end
+
+      def integer_string?(value)
+        value.to_s.match?(/\A\d+\z/)
       end
 
       def ffi
@@ -225,11 +309,20 @@ module Vizcore
                            :defaultSampleRate, :double
         mod.const_set(:DeviceInfo, device_info)
 
+        stream_parameters = Class.new(ffi::Struct)
+        stream_parameters.layout :device, :int,
+                                 :channelCount, :int,
+                                 :sampleFormat, :ulong,
+                                 :suggestedLatency, :double,
+                                 :hostApiSpecificStreamInfo, :pointer
+        mod.const_set(:StreamParameters, stream_parameters)
+
         mod.attach_function :Pa_Initialize, [], :int
         mod.attach_function :Pa_Terminate, [], :int
         mod.attach_function :Pa_GetDeviceCount, [], :int
         mod.attach_function :Pa_GetDeviceInfo, [:int], :pointer
         mod.attach_function :Pa_OpenDefaultStream, [:pointer, :int, :int, :ulong, :double, :ulong, :pointer, :pointer], :int
+        mod.attach_function :Pa_OpenStream, [:pointer, :pointer, :pointer, :double, :ulong, :ulong, :pointer, :pointer], :int
         mod.attach_function :Pa_StartStream, [:pointer], :int
         mod.attach_function :Pa_StopStream, [:pointer], :int
         mod.attach_function :Pa_CloseStream, [:pointer], :int

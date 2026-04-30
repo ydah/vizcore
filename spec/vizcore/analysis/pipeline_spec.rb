@@ -29,7 +29,70 @@ RSpec.describe Vizcore::Analysis::Pipeline do
     expect(result[:bands]).to eq(sub: 0.0, low: 0.0, mid: 0.0, high: 0.0)
     expect(result[:fft]).to eq(Array.new(32, 0.0))
     expect(result[:beat_pulse]).to eq(0.0)
-    expect(result[:bpm]).to be >= 0.0
+    expect(result[:bpm]).to eq(0.0)
+    expect(result[:peak_frequency]).to eq(0.0)
+  end
+
+  it "suppresses beats and bpm while input is below the silence floor" do
+    beat_detector = instance_double(
+      Vizcore::Analysis::BeatDetector,
+      call: { beat: true, beat_count: 4, instant_energy: 0.0, average_energy: 0.0, threshold: 0.0 }
+    )
+    bpm_estimator = instance_double(Vizcore::Analysis::BPMEstimator)
+    allow(bpm_estimator).to receive(:reset)
+    allow(bpm_estimator).to receive(:call)
+
+    pipeline = described_class.new(
+      sample_rate: 44_100,
+      fft_size: 1024,
+      beat_detector: beat_detector,
+      bpm_estimator: bpm_estimator
+    )
+    samples = Array.new(1024, 0.001)
+
+    result = pipeline.call(samples)
+
+    expect(result[:beat]).to eq(false)
+    expect(result[:beat_pulse]).to eq(0.0)
+    expect(result[:bpm]).to eq(0.0)
+    expect(bpm_estimator).to have_received(:reset)
+    expect(beat_detector).not_to have_received(:call)
+    expect(bpm_estimator).not_to have_received(:call)
+  end
+
+  it "keeps intentional microphone-level input above the noise gate active" do
+    pipeline = described_class.new(sample_rate: 44_100, fft_size: 1024)
+    samples = sine_samples(frequency_hz: 180.0, sample_rate: 44_100, count: 1024, amplitude: 0.03)
+
+    result = pipeline.call(samples)
+
+    expect(result[:amplitude]).to be > 0.0
+    expect(result[:bands].values.sum).to be > 0.0
+    expect(result[:fft].sum).to be > 0.0
+  end
+
+  it "can lower the noise gate for quiet inputs" do
+    pipeline = described_class.new(sample_rate: 44_100, fft_size: 1024, noise_gate: 0.0001)
+    samples = sine_samples(frequency_hz: 180.0, sample_rate: 44_100, count: 1024, amplitude: 0.0004)
+
+    result = pipeline.call(samples)
+
+    expect(result[:amplitude]).to be > 0.0
+  end
+
+  it "clears smoothed band and spectrum values during silence" do
+    pipeline = described_class.new(sample_rate: 44_100, fft_size: 1024)
+    active_samples = sine_samples(frequency_hz: 80.0, sample_rate: 44_100, count: 1024, amplitude: 0.8)
+    silent_samples = Array.new(1024, 0.0)
+
+    active = pipeline.call(active_samples)
+    silent = pipeline.call(silent_samples)
+
+    expect(active[:bands].values.sum).to be > 0.0
+    expect(active[:fft].sum).to be > 0.0
+    expect(silent[:amplitude]).to eq(0.0)
+    expect(silent[:bands]).to eq(sub: 0.0, low: 0.0, mid: 0.0, high: 0.0)
+    expect(silent[:fft]).to eq(Array.new(32, 0.0))
   end
 
   it "integrates bpm estimator and smoother in the output path" do

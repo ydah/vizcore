@@ -23,6 +23,7 @@ module Vizcore
       # @param scene_catalog [Array<Hash>, nil]
       # @param transitions [Array<Hash>, nil]
       # @param transition_controller [Vizcore::DSL::TransitionController, nil]
+      # @param noise_gate [Numeric]
       # @param error_reporter [#call, nil]
       def initialize(
         scene_name: "basic",
@@ -35,6 +36,7 @@ module Vizcore
         scene_catalog: nil,
         transitions: nil,
         transition_controller: nil,
+        noise_gate: Vizcore::Analysis::Pipeline::DEFAULT_NOISE_GATE,
         error_reporter: nil
       )
         @scene_name = scene_name
@@ -44,7 +46,8 @@ module Vizcore
         fft_size = supported_fft_size(@input_manager.frame_size)
         @analysis_pipeline = analysis_pipeline || Vizcore::Analysis::Pipeline.new(
           sample_rate: @input_manager.sample_rate,
-          fft_size: fft_size
+          fft_size: fft_size,
+          noise_gate: noise_gate
         )
         @mapping_resolver = mapping_resolver || Vizcore::DSL::MappingResolver.new
         @scene_serializer = scene_serializer || Vizcore::Renderer::SceneSerializer.new

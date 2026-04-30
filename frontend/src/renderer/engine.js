@@ -178,6 +178,10 @@ export const applyVisualSettings = ({ audio, settings, previous }) => {
     wobble_amount: wobbleAmount,
   };
 
+  if (isSilentAudio(next)) {
+    return next;
+  }
+
   if (!previous || smoothing <= 0) {
     return next;
   }
@@ -195,6 +199,17 @@ export const applyVisualSettings = ({ audio, settings, previous }) => {
       high: Number(previousBands.high || 0) + (next.bands.high - Number(previousBands.high || 0)) * alpha,
     },
   };
+};
+
+const isSilentAudio = (audio) => {
+  const bands = audio?.bands || {};
+  return Number(audio?.amplitude || 0) <= 0
+    && Number(audio?.beat_pulse || 0) <= 0
+    && !audio?.beat
+    && Number(bands.sub || 0) <= 0
+    && Number(bands.low || 0) <= 0
+    && Number(bands.mid || 0) <= 0
+    && Number(bands.high || 0) <= 0;
 };
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);

@@ -31,4 +31,14 @@ RSpec.describe Vizcore::Analysis::BeatDetector do
     expect(third[:beat]).to eq(false)
     expect(detector.beat_count).to eq(1)
   end
+
+  it "ignores tiny noise below the absolute energy floor" do
+    detector = described_class.new(history_size: 16, sensitivity: 1.1, refractory_frames: 1, min_history: 3, min_energy: 1e-6)
+
+    6.times { detector.call(frame(0.00001)) }
+    result = detector.call(frame(0.0002))
+
+    expect(result[:beat]).to eq(false)
+    expect(result[:beat_count]).to eq(0)
+  end
 end

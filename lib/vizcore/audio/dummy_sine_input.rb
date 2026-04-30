@@ -4,7 +4,7 @@ require_relative "base_input"
 
 module Vizcore
   module Audio
-    # Deterministic sine-wave generator used as fallback/dummy source.
+    # Deterministic sine-wave generator used for the explicit dummy source.
     class DummySineInput < BaseInput
       # Default oscillator amplitude.
       DEFAULT_AMPLITUDE = 0.45

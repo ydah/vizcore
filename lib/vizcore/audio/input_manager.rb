@@ -25,11 +25,13 @@ module Vizcore
       # @param frame_size [Integer] frame size used by capture loop
       # @param ring_buffer_size [Integer] stored sample capacity
       # @param file_path [String, nil] source file path for `:file`
-      def initialize(source: :mic, sample_rate: DEFAULT_SAMPLE_RATE, frame_size: DEFAULT_FRAME_SIZE, ring_buffer_size: DEFAULT_RING_BUFFER_SIZE, file_path: nil)
+      # @param audio_device [String, Integer, nil] input device index/name for `:mic`
+      def initialize(source: :mic, sample_rate: DEFAULT_SAMPLE_RATE, frame_size: DEFAULT_FRAME_SIZE, ring_buffer_size: DEFAULT_RING_BUFFER_SIZE, file_path: nil, audio_device: nil)
         @source_name = source.to_sym
         @sample_rate = Integer(sample_rate)
         @frame_size = Integer(frame_size)
         @ring_buffer = RingBuffer.new(ring_buffer_size)
+        @audio_device = audio_device
         @input = build_input(file_path)
         @sample_rate = resolve_input_sample_rate(@input, fallback: @sample_rate)
       end
@@ -110,7 +112,7 @@ module Vizcore
       def build_input(file_path)
         case @source_name
         when :mic
-          MicInput.new(sample_rate: sample_rate)
+          MicInput.new(sample_rate: sample_rate, device: @audio_device || :default)
         when :file
           FileInput.new(path: file_path, sample_rate: sample_rate)
         when :dummy

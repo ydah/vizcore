@@ -45,7 +45,7 @@ RSpec.describe Vizcore::Server::Runner do
         scene_names: ["basic"]
       )
       expect(Puma::Server).to have_received(:new).with(rack_app, nil, min_threads: 0, max_threads: 4)
-      expect(Vizcore::Audio::InputManager).to have_received(:new).with(source: :mic, file_path: nil)
+      expect(Vizcore::Audio::InputManager).to have_received(:new).with(source: :mic, file_path: nil, audio_device: nil)
       expect(Vizcore::Server::FrameBroadcaster).to have_received(:new).with(
         hash_including(
           scene_name: "basic",
@@ -53,6 +53,7 @@ RSpec.describe Vizcore::Server::Runner do
           scene_catalog: [hash_including(name: :basic)],
           transitions: [],
           input_manager: input_manager,
+          noise_gate: 0.01,
           error_reporter: an_instance_of(Proc)
         )
       )

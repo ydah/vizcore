@@ -24,6 +24,18 @@ test("getBuiltinShader resolves liquid_wobble shader", () => {
   assert.match(shader, /outColor/);
 });
 
+test("getBuiltinShader resolves unyo_geometry shader", () => {
+  const shader = getBuiltinShader("unyo_geometry");
+
+  assert.equal(shader, BUILTIN_FRAGMENT_SHADERS.unyo_geometry);
+  assert.match(shader, /u_param_seed/);
+  assert.match(shader, /u_param_kick/);
+  assert.match(shader, /u_beat_pulse/);
+  assert.match(shader, /smoothstep\(0\.006, 0\.035, soundEnergy\)/);
+  assert.match(shader, /motionTime/);
+  assert.match(shader, /sdRegularPolygon/);
+});
+
 test("getPostEffectShader resolves known effects and returns null for unknown", () => {
   assert.equal(getPostEffectShader("bloom"), POST_EFFECT_SHADERS.bloom);
   assert.equal(getPostEffectShader("chromatic"), POST_EFFECT_SHADERS.chromatic);

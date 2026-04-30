@@ -28,6 +28,7 @@ RSpec.describe "example scenes" do
     "examples/intro_drop.rb" => { expected_scene: "intro" },
     "examples/file_audio_demo.rb" => { expected_scene: "groove" },
     "examples/complex_audio_showcase.rb" => { expected_scene: "build" },
+    "examples/rhythm_geometry.rb" => { expected_scene: "rhythm_geometry" },
     "examples/midi_scene_switch.rb" => { expected_scene: "warmup" },
     "examples/custom_shader.rb" => { expected_scene: "shader_art", expect_glsl_source: true },
     "examples/unyo_liquid.rb" => { expected_scene: "unyo" }
