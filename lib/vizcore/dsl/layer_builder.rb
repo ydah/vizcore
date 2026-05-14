@@ -98,6 +98,36 @@ module Vizcore
         source(:frequency_band, band: name.to_sym)
       end
 
+      # @return [Hash] source descriptor for the sub-bass frequency band
+      def sub
+        frequency_band(:sub)
+      end
+
+      # @return [Hash] source descriptor for the low/bass frequency band
+      def low
+        frequency_band(:low)
+      end
+
+      # @return [Hash] source descriptor for the low/bass frequency band
+      def bass
+        frequency_band(:low)
+      end
+
+      # @return [Hash] source descriptor for the mid frequency band
+      def mid
+        frequency_band(:mid)
+      end
+
+      # @return [Hash] source descriptor for the high frequency band
+      def high
+        frequency_band(:high)
+      end
+
+      # @return [Hash] source descriptor for the high/treble frequency band
+      def treble
+        frequency_band(:high)
+      end
+
       # @return [Hash] source descriptor for FFT spectrum array
       def fft_spectrum
         source(:fft_spectrum)

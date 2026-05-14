@@ -124,6 +124,36 @@ module Vizcore
           @bands[name.to_sym].to_f
         end
 
+        # @return [Float]
+        def sub
+          frequency_band(:sub)
+        end
+
+        # @return [Float]
+        def low
+          frequency_band(:low)
+        end
+
+        # @return [Float]
+        def bass
+          frequency_band(:low)
+        end
+
+        # @return [Float]
+        def mid
+          frequency_band(:mid)
+        end
+
+        # @return [Float]
+        def high
+          frequency_band(:high)
+        end
+
+        # @return [Float]
+        def treble
+          frequency_band(:high)
+        end
+
         # @return [Array<Float>]
         def fft_spectrum
           Array(@audio[:fft])

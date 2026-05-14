@@ -90,5 +90,34 @@ RSpec.describe Vizcore::DSL::TransitionController do
         to: :drop
       )
     end
+
+    it "exposes musical frequency band aliases to transition triggers" do
+      controller = described_class.new(
+        scenes: [
+          { name: :intro, layers: [] },
+          { name: :drop, layers: [] }
+        ],
+        transitions: [
+          {
+            from: :intro,
+            to: :drop,
+            trigger: proc { bass > 0.7 && treble > 0.2 }
+          }
+        ]
+      )
+
+      expect(
+        controller.next_transition(
+          scene_name: :intro,
+          audio: { bands: { low: 0.8, high: 0.1 } }
+        )
+      ).to be_nil
+      expect(
+        controller.next_transition(
+          scene_name: :intro,
+          audio: { bands: { low: 0.8, high: 0.3 } }
+        )
+      ).to include(from: :intro, to: :drop)
+    end
   end
 end

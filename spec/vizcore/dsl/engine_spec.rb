@@ -73,6 +73,27 @@ RSpec.describe Vizcore::DSL::Engine do
         }
       )
     end
+
+    it "supports musical frequency band aliases in layer mappings" do
+      definition = described_class.define do
+        scene :aliases do
+          layer :reactive do
+            type :particle_field
+            map bass => :size
+            map treble, to: :sparkle
+            map sub => :rumble
+          end
+        end
+      end
+
+      mappings = definition[:scenes].first[:layers].first[:mappings]
+
+      expect(mappings).to include(
+        { source: { kind: :frequency_band, band: :low }, target: :size },
+        { source: { kind: :frequency_band, band: :high }, target: :sparkle },
+        { source: { kind: :frequency_band, band: :sub }, target: :rumble }
+      )
+    end
   end
 
   describe ".load_file" do
