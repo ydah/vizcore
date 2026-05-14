@@ -45,6 +45,21 @@ RSpec.describe Vizcore::CLI do
       end.to output(/MIDI devices:\n  - 2: Launchpad Mini MK3/).to_stdout
     end
 
+    it "prints doctor checks" do
+      check = Vizcore::CLISupport::Doctor::Check.new(
+        name: "Ruby",
+        status: :ok,
+        message: "3.2.0 satisfies >= 3.2.0"
+      )
+      report = Vizcore::CLISupport::Doctor::Report.new(checks: [check])
+      doctor = instance_double(Vizcore::CLISupport::Doctor, call: report)
+      allow(Vizcore::CLISupport::Doctor).to receive(:new).and_return(doctor)
+
+      expect do
+        described_class.start(["doctor"])
+      end.to output(/\[ok\] Ruby: 3\.2\.0 satisfies >= 3\.2\.0/).to_stdout
+    end
+
     it "passes audio options to config" do
       described_class.start(
         [

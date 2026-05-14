@@ -5,6 +5,7 @@ require "pathname"
 require "thor"
 require_relative "../vizcore"
 require_relative "audio"
+require_relative "cli/doctor"
 require_relative "config"
 require_relative "server"
 
@@ -90,7 +91,31 @@ module Vizcore
       end
     end
 
+    desc "doctor", "Check local dependencies and device availability"
+    # Print local environment checks for Vizcore runtime dependencies.
+    #
+    # @raise [Thor::Error] when a required check fails
+    # @return [void]
+    def doctor
+      report = Vizcore::CLISupport::Doctor.new.call
+      report.checks.each do |check|
+        say("#{status_label(check.status)} #{check.name}: #{check.message}")
+      end
+      raise Thor::Error, "vizcore doctor found required failures" if report.failure?
+    end
+
     private
+
+    def status_label(status)
+      case status
+      when :ok
+        "[ok]"
+      when :warn
+        "[warn]"
+      else
+        "[fail]"
+      end
+    end
 
     def write_template(template_name, destination, project_name:)
       template_path = Vizcore.templates_root.join(template_name)
