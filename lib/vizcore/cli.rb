@@ -51,6 +51,27 @@ module Vizcore
       raise Thor::Error, e.message
     end
 
+    desc "demo", "Start the bundled audio-reactive demo"
+    option :host, type: :string, default: Config::DEFAULT_HOST, desc: "Bind host"
+    option :port, type: :numeric, default: Config::DEFAULT_PORT, desc: "Bind port"
+    option :noise_gate, type: :numeric, default: Config::DEFAULT_NOISE_GATE, desc: "RMS level below which audio is treated as silence"
+    # Start a bundled scene with bundled audio for first-run verification.
+    #
+    # @return [void]
+    def demo
+      config = Config.new(
+        scene_file: Vizcore.root.join("examples", "rhythm_geometry.rb"),
+        host: options.fetch(:host),
+        port: options.fetch(:port),
+        audio_source: :file,
+        audio_file: Vizcore.root.join("examples", "assets", "complex_demo_loop.wav"),
+        noise_gate: options.fetch(:noise_gate)
+      )
+      Server::Runner.new(config).run
+    rescue ArgumentError => e
+      raise Thor::Error, e.message
+    end
+
     desc "new NAME", "Create a starter project scaffold"
     # Generate a new Vizcore project scaffold.
     #

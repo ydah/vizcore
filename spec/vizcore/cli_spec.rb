@@ -106,5 +106,18 @@ RSpec.describe Vizcore::CLI do
       end
       expect(runner).to have_received(:run)
     end
+
+    it "starts the bundled demo with bundled audio" do
+      described_class.start(["demo", "--port", "4568", "--noise-gate", "0.02"])
+
+      expect(Vizcore::Server::Runner).to have_received(:new) do |config|
+        expect(config.scene_file.to_s).to end_with("examples/rhythm_geometry.rb")
+        expect(config.audio_source).to eq(:file)
+        expect(config.audio_file.to_s).to end_with("examples/assets/complex_demo_loop.wav")
+        expect(config.port).to eq(4568)
+        expect(config.noise_gate).to eq(0.02)
+      end
+      expect(runner).to have_received(:run)
+    end
   end
 end
