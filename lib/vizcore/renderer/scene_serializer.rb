@@ -31,7 +31,8 @@ module Vizcore
           beat: !!audio[:beat],
           beat_pulse: round_float(audio[:beat_pulse]),
           beat_count: Integer(audio[:beat_count] || 0),
-          bpm: audio[:bpm]
+          bpm: audio[:bpm],
+          peak_frequency: round_float(audio[:peak_frequency])
         }
       end
 

@@ -1,3 +1,4 @@
+import { BAND_KEYS, DEFAULT_FFT_BINS, buildAudioInspectorState, formatMeterValue } from "./audio-inspector.js";
 import { Engine } from "./renderer/engine.js";
 import { WebSocketClient } from "./websocket-client.js";
 
@@ -8,6 +9,19 @@ const transitionStatusElement = document.querySelector("#transition-status");
 const frameStatusElement = document.querySelector("#frame-status");
 const bpmStatusElement = document.querySelector("#bpm-status");
 const beatStatusElement = document.querySelector("#beat-status");
+const inspectorPeakElement = document.querySelector("#inspector-peak");
+const inspectorAmplitudeFill = document.querySelector("#inspector-amplitude-fill");
+const inspectorAmplitudeValue = document.querySelector("#inspector-amplitude-value");
+const inspectorBandElements = Object.fromEntries(
+  BAND_KEYS.map((key) => [
+    key,
+    {
+      fill: document.querySelector(`#inspector-band-${key}-fill`),
+      value: document.querySelector(`#inspector-band-${key}-value`)
+    }
+  ])
+);
+const fftPreviewElement = document.querySelector("#fft-preview");
 const audioSourceStatusElement = document.querySelector("#audio-source-status");
 const audioTrackStatusElement = document.querySelector("#audio-track-status");
 const audioPlaybackStatusElement = document.querySelector("#audio-playback-status");
@@ -36,6 +50,7 @@ bindVisualControl(smoothingControl, "smoothing");
 bindVisualControl(beatHoldControl, "beatHoldMs");
 bindVisualControl(wobbleControl, "wobbleAmount");
 renderReactivityStatus();
+const fftBars = initializeFftPreview(fftPreviewElement);
 engine.start();
 
 let currentSceneName = "unknown";
@@ -84,6 +99,7 @@ const client = new WebSocketClient(websocketUrl, {
     bpmStatusElement.textContent = `BPM: ${bpm > 0 ? bpm.toFixed(1) : "--"}`;
     beatStatusElement.textContent = `Beat: ${beatVisible ? "ON" : "off"} | Count: ${beatCount}`;
     beatStatusElement.classList.toggle("is-beat", beatVisible);
+    renderAudioInspector(frame?.audio);
   },
   onSceneChange: (payload) => {
     const from = String(payload?.from || "unknown");
@@ -339,6 +355,54 @@ function renderReactivityStatus() {
     `Beat Hold: ${Math.round(visualSettings.beatHoldMs)}ms`,
     `Wobble: ${visualSettings.wobbleAmount.toFixed(2)}x`,
   ].join(" | ");
+}
+
+function initializeFftPreview(container) {
+  if (!container) {
+    return [];
+  }
+
+  const bars = Array.from({ length: DEFAULT_FFT_BINS }, () => {
+    const bar = document.createElement("span");
+    bar.className = "fft-bar";
+    bar.setAttribute("aria-hidden", "true");
+    return bar;
+  });
+  container.replaceChildren(...bars);
+  return bars;
+}
+
+function renderAudioInspector(audio) {
+  const state = buildAudioInspectorState(audio);
+  setMeter(inspectorAmplitudeFill, inspectorAmplitudeValue, state.amplitude, 3);
+
+  for (const key of BAND_KEYS) {
+    const elements = inspectorBandElements[key] || {};
+    setMeter(elements.fill, elements.value, state.bands[key], 2);
+  }
+
+  state.fft.forEach((value, index) => {
+    const bar = fftBars[index];
+    if (!bar) {
+      return;
+    }
+    bar.style.setProperty("--bin-value", value.toFixed(4));
+  });
+
+  if (inspectorPeakElement) {
+    inspectorPeakElement.textContent = state.peakFrequency > 0
+      ? `Peak: ${Math.round(state.peakFrequency)} Hz`
+      : "Peak: --";
+  }
+}
+
+function setMeter(fill, valueElement, value, digits) {
+  if (fill) {
+    fill.style.setProperty("--meter-value", value.toFixed(4));
+  }
+  if (valueElement) {
+    valueElement.textContent = formatMeterValue(value, digits);
+  }
 }
 
 function buildWebSocketUrl() {

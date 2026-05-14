@@ -15,7 +15,8 @@ RSpec.describe Vizcore::Renderer::SceneSerializer do
           beat: true,
           beat_pulse: 0.765432,
           beat_count: 7,
-          bpm: 126.7
+          bpm: 126.7,
+          peak_frequency: 440.12345
         },
         scene_name: :intro,
         scene_layers: [
@@ -38,7 +39,8 @@ RSpec.describe Vizcore::Renderer::SceneSerializer do
         beat: true,
         beat_pulse: 0.7654,
         beat_count: 7,
-        bpm: 126.7
+        bpm: 126.7,
+        peak_frequency: 440.1235
       )
       expect(frame[:scene]).to eq(
         name: "intro",

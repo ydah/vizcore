@@ -51,6 +51,8 @@
       background: var(--panel-bg);
       backdrop-filter: blur(6px);
       min-width: 18rem;
+      max-height: calc(100vh - 2rem);
+      overflow-y: auto;
     }
 
     .hud h1 {
@@ -129,6 +131,84 @@
       border-top: 1px solid rgba(153, 195, 255, 0.16);
     }
 
+    .audio-inspector {
+      margin-top: 0.55rem;
+      padding-top: 0.55rem;
+      border-top: 1px solid rgba(153, 195, 255, 0.16);
+    }
+
+    .audio-inspector__header,
+    .audio-meter {
+      display: grid;
+      grid-template-columns: 3.25rem minmax(7rem, 1fr) 3.25rem;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    .audio-inspector__header {
+      margin-bottom: 0.35rem;
+      color: #d9e8ff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .audio-inspector__header span:last-child {
+      grid-column: 2 / 4;
+      justify-self: end;
+      color: var(--muted);
+      font-weight: 500;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    .audio-meter {
+      margin-top: 0.24rem;
+      color: #aebfda;
+      font-size: 0.72rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .meter-track {
+      position: relative;
+      height: 0.34rem;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.16);
+    }
+
+    .meter-fill {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      transform: scaleX(var(--meter-value, 0));
+      transform-origin: left center;
+      transition: transform 90ms linear;
+      background: linear-gradient(90deg, #65ffb0, #38bdf8 58%, #f472b6);
+    }
+
+    .fft-preview {
+      display: grid;
+      grid-template-columns: repeat(16, minmax(0, 1fr));
+      align-items: end;
+      gap: 0.12rem;
+      height: 2.45rem;
+      margin-top: 0.48rem;
+      padding: 0.18rem 0;
+    }
+
+    .fft-bar {
+      height: 100%;
+      min-width: 2px;
+      border-radius: 2px 2px 0 0;
+      transform: scaleY(var(--bin-value, 0));
+      transform-origin: bottom center;
+      transition: transform 90ms linear;
+      background: linear-gradient(180deg, #f8fafc, #38bdf8 45%, #65ffb0);
+      opacity: 0.9;
+    }
+
     .reactivity-controls label {
       display: grid;
       grid-template-columns: minmax(5.5rem, 0.8fr) minmax(8rem, 1.2fr);
@@ -147,6 +227,18 @@
       margin-top: 0.45rem;
       line-height: 1.35;
     }
+
+    @media (max-width: 520px) {
+      .hud {
+        right: 1rem;
+        min-width: 0;
+      }
+
+      .audio-inspector__header,
+      .audio-meter {
+        grid-template-columns: 2.75rem minmax(5rem, 1fr) 2.9rem;
+      }
+    }
   </style>
 </head>
 <body>
@@ -160,6 +252,38 @@
       <p id="frame-status">Amplitude: 0.0000</p>
       <p id="bpm-status" class="is-accent">BPM: --</p>
       <p id="beat-status">Beat: off | Count: 0</p>
+      <div class="audio-inspector" aria-label="Audio inspector">
+        <div class="audio-inspector__header">
+          <span>Audio</span>
+          <span id="inspector-peak">Peak: --</span>
+        </div>
+        <div class="audio-meter">
+          <span>amp</span>
+          <span class="meter-track"><span id="inspector-amplitude-fill" class="meter-fill"></span></span>
+          <span id="inspector-amplitude-value">0.000</span>
+        </div>
+        <div class="audio-meter">
+          <span>sub</span>
+          <span class="meter-track"><span id="inspector-band-sub-fill" class="meter-fill"></span></span>
+          <span id="inspector-band-sub-value">0.00</span>
+        </div>
+        <div class="audio-meter">
+          <span>low</span>
+          <span class="meter-track"><span id="inspector-band-low-fill" class="meter-fill"></span></span>
+          <span id="inspector-band-low-value">0.00</span>
+        </div>
+        <div class="audio-meter">
+          <span>mid</span>
+          <span class="meter-track"><span id="inspector-band-mid-fill" class="meter-fill"></span></span>
+          <span id="inspector-band-mid-value">0.00</span>
+        </div>
+        <div class="audio-meter">
+          <span>high</span>
+          <span class="meter-track"><span id="inspector-band-high-fill" class="meter-fill"></span></span>
+          <span id="inspector-band-high-value">0.00</span>
+        </div>
+        <div id="fft-preview" class="fft-preview" aria-label="FFT preview"></div>
+      </div>
       <p id="audio-source-status">Audio Source: unknown</p>
       <p id="audio-track-status">Track: none</p>
       <p id="audio-playback-status">Playback: unavailable</p>
