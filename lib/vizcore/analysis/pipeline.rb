@@ -7,6 +7,7 @@ module Vizcore
       BEAT_PULSE_DECAY = 0.86
       BEAT_PULSE_FLOOR = 0.001
       DEFAULT_NOISE_GATE = 0.01
+      SILENCE_RESET_FRAMES = 90
 
       attr_reader :fft_processor, :band_splitter, :beat_detector, :bpm_estimator, :smoother
 
@@ -26,13 +27,20 @@ module Vizcore
         @smoother = smoother || Smoother.new(alpha: 0.35)
         @noise_gate = normalize_noise_gate(noise_gate)
         @beat_pulse = 0.0
+        @last_bpm = 0.0
+        @silent_frame_count = 0
       end
 
       # @param samples [Array<Numeric>] audio frame samples
       # @return [Hash] normalized analysis payload consumed by frame broadcaster
       def call(samples)
         amplitude = rms(samples)
-        return silent_frame if silence?(amplitude)
+        if silence?(amplitude)
+          track_silent_frame(samples)
+          return silent_frame(reset_tempo: sustained_silence?)
+        end
+
+        @silent_frame_count = 0
 
         fft = @fft_processor.call(samples)
         bands = @band_splitter.call(fft[:magnitudes])
@@ -67,9 +75,9 @@ module Vizcore
         DEFAULT_NOISE_GATE
       end
 
-      def silent_frame
+      def silent_frame(reset_tempo:)
         @beat_pulse = 0.0
-        @bpm_estimator.reset if @bpm_estimator.respond_to?(:reset)
+        reset_tempo_state if reset_tempo
         @smoother.reset if @smoother.respond_to?(:reset)
 
         {
@@ -79,9 +87,26 @@ module Vizcore
           beat: false,
           beat_pulse: 0.0,
           beat_count: current_beat_count,
-          bpm: 0.0,
+          bpm: @last_bpm,
           peak_frequency: 0.0
         }
+      end
+
+      def reset_tempo_state
+        @last_bpm = 0.0
+        @bpm_estimator.reset if @bpm_estimator.respond_to?(:reset)
+      end
+
+      def track_silent_frame(samples)
+        @silent_frame_count += 1
+        @beat_detector.call(samples) if @beat_detector.respond_to?(:call)
+        @last_bpm = @bpm_estimator.call(beat: false).to_f if @bpm_estimator.respond_to?(:call)
+      rescue StandardError
+        nil
+      end
+
+      def sustained_silence?
+        @silent_frame_count == SILENCE_RESET_FRAMES
       end
 
       def current_beat_count
@@ -94,7 +119,7 @@ module Vizcore
 
       def resolve_bpm(beat_detected)
         bpm = @bpm_estimator.call(beat: beat_detected)
-        @smoother.smooth(:bpm, bpm, alpha: 0.2)
+        @last_bpm = @smoother.smooth(:bpm, bpm, alpha: 0.2).to_f
       end
 
       def preview_spectrum(magnitudes, bins: 32)

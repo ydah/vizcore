@@ -55,9 +55,34 @@ RSpec.describe Vizcore::Analysis::Pipeline do
     expect(result[:beat]).to eq(false)
     expect(result[:beat_pulse]).to eq(0.0)
     expect(result[:bpm]).to eq(0.0)
+    expect(beat_detector).to have_received(:call)
+    expect(bpm_estimator).to have_received(:call).with(beat: false)
+
+    described_class::SILENCE_RESET_FRAMES.times { pipeline.call(samples) }
     expect(bpm_estimator).to have_received(:reset)
-    expect(beat_detector).not_to have_received(:call)
-    expect(bpm_estimator).not_to have_received(:call)
+  end
+
+  it "feeds gated silent frames to beat history for percussive onsets" do
+    beat_detector = Vizcore::Analysis::BeatDetector.new(
+      history_size: 8,
+      sensitivity: 1.25,
+      refractory_frames: 1,
+      min_history: 4
+    )
+    pipeline = described_class.new(
+      sample_rate: 44_100,
+      fft_size: 1024,
+      beat_detector: beat_detector,
+      noise_gate: 0.01
+    )
+    kick = Array.new(1024, 0.8)
+    silence = Array.new(1024, 0.0)
+
+    pipeline.call(kick)
+    4.times { pipeline.call(silence) }
+    result = pipeline.call(kick)
+
+    expect(result[:beat]).to eq(true)
   end
 
   it "keeps intentional microphone-level input above the noise gate active" do
