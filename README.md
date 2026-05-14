@@ -31,6 +31,7 @@ sudo apt install -y libfftw3-dev   # optional: faster FFT
 ## Quick Start
 
 ```bash
+vizcore doctor
 vizcore start examples/basic.rb
 ```
 
@@ -91,6 +92,14 @@ end
 
 Available transform options are `gain`, `range`, `min`, `max`, `curve`, `attack`, and `release`. `curve` supports `:linear`, `:sqrt`, and `:square`. Existing mappings such as `map amplitude => :speed` continue to work.
 
+Frequency bands can be written with musical aliases when that reads better in a scene:
+
+```ruby
+map bass, to: :size      # same as frequency_band(:low)
+map mid, to: :twist
+map treble, to: :sparkle # same as frequency_band(:high)
+```
+
 ### Custom GLSL Shaders
 
 ```ruby
@@ -143,6 +152,9 @@ end
 
 ```bash
 vizcore start SCENE_FILE [--host 127.0.0.1] [--port 4567] [--audio-source mic|file|dummy] [--audio-file PATH] [--audio-device INDEX_OR_NAME] [--noise-gate RMS]
+vizcore doctor
+vizcore validate SCENE_FILE
+vizcore inspect SCENE_FILE
 vizcore new PROJECT_NAME
 vizcore devices [audio|midi]
 ```
@@ -175,7 +187,7 @@ vizcore start scene.rb --audio-source file --audio-file set.mp3
 
 When using file source, the HUD exposes **Play Audio** / **Pause Audio** controls and shows BPM, Beat, and Beat Count.
 
-The browser HUD also includes Visual Gain, Bass Boost, Smoothing, Beat Hold, and Wobble controls for adapting visual response to different tracks and input levels.
+The browser HUD also includes an Audio Inspector with amplitude, sub/low/mid/high meters, FFT preview bars, and Visual Gain, Bass Boost, Smoothing, Beat Hold, and Wobble controls for adapting visual response to different tracks and input levels.
 
 ## Requirements
 
@@ -201,6 +213,7 @@ The browser HUD also includes Visual Gain, Bass Boost, Smoothing, Beat Hold, and
 
 ```bash
 bundle exec rspec
+npm --prefix frontend test
 ```
 
 
