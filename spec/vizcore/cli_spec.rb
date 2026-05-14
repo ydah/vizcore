@@ -60,6 +60,28 @@ RSpec.describe Vizcore::CLI do
       end.to output(/\[ok\] Ruby: 3\.2\.0 satisfies >= 3\.2\.0/).to_stdout
     end
 
+    it "validates a scene file" do
+      Dir.mktmpdir("vizcore-cli-validate") do |dir|
+        scene_path = File.join(dir, "scene.rb")
+        File.write(scene_path, "Vizcore.define { scene(:main) { layer(:cube) { type :wireframe_cube } } }")
+
+        expect do
+          described_class.start(["validate", scene_path])
+        end.to output(/Scene valid: #{Regexp.escape(scene_path)}/).to_stdout
+      end
+    end
+
+    it "inspects a scene file" do
+      Dir.mktmpdir("vizcore-cli-inspect") do |dir|
+        scene_path = File.join(dir, "scene.rb")
+        File.write(scene_path, "Vizcore.define { scene(:main) { layer(:cube) { type :wireframe_cube } } }")
+
+        expect do
+          described_class.start(["inspect", scene_path])
+        end.to output(/Scenes:\n  main\n    layer cube \(wireframe_cube\)/).to_stdout
+      end
+    end
+
     it "passes audio options to config" do
       described_class.start(
         [

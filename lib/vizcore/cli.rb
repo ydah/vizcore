@@ -6,6 +6,7 @@ require "thor"
 require_relative "../vizcore"
 require_relative "audio"
 require_relative "cli/doctor"
+require_relative "cli/scene_diagnostics"
 require_relative "config"
 require_relative "server"
 
@@ -104,6 +105,36 @@ module Vizcore
       raise Thor::Error, "vizcore doctor found required failures" if report.failure?
     end
 
+    map "inspect" => :inspect_scene
+    desc "inspect SCENE_FILE", "Print scenes, layers, mappings, and transitions"
+    # Load a scene DSL file and print its runtime structure.
+    #
+    # @param scene_file [String] path to a Ruby scene DSL file
+    # @raise [Thor::Error] when scene loading fails
+    # @return [void]
+    def inspect_scene(scene_file)
+      diagnostics = Vizcore::CLISupport::SceneDiagnostics.new(scene_file: scene_file)
+      result = diagnostics.validate
+      print_issues(result.issues)
+      raise Thor::Error, "scene inspection failed" unless result.definition
+
+      diagnostics.inspect_lines(result.definition).each { |line| say(line) }
+    end
+
+    desc "validate SCENE_FILE", "Validate a scene DSL file"
+    # Load and validate a scene DSL file without starting the server.
+    #
+    # @param scene_file [String] path to a Ruby scene DSL file
+    # @raise [Thor::Error] when validation fails
+    # @return [void]
+    def validate(scene_file)
+      result = Vizcore::CLISupport::SceneDiagnostics.new(scene_file: scene_file).validate
+      print_issues(result.issues)
+      raise Thor::Error, "scene validation failed" unless result.valid?
+
+      say("Scene valid: #{scene_file}")
+    end
+
     private
 
     def status_label(status)
@@ -114,6 +145,13 @@ module Vizcore
         "[warn]"
       else
         "[fail]"
+      end
+    end
+
+    def print_issues(issues)
+      issues.each do |issue|
+        label = issue.error? ? "[error]" : "[warn]"
+        say("#{label} #{issue.message}")
       end
     end
 
