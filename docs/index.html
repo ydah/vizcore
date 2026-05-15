@@ -74,7 +74,7 @@
             </div>
             <div class="signal-step">
               <strong>Render</strong>
-              <span>GLSL / video / particles / waveform</span>
+              <span>GLSL / video / particles / spectrogram</span>
             </div>
           </div>
         </div>
@@ -124,6 +124,12 @@
       source :audio
       style :ribbon
       map amplitude, to: :height
+    end
+
+    layer :waterfall do
+      type :spectrogram
+      scroll :vertical
+      map amplitude, to: :gain
     end
 
     layer :footage do

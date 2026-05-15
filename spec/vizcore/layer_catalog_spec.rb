@@ -22,10 +22,12 @@ RSpec.describe Vizcore::LayerCatalog do
       :video_layer,
       :footage,
       :waveform,
-      :waveform_layer
+      :waveform_layer,
+      :spectrogram,
+      :spectrogram_layer
     )
     expect(described_class).to be_supported_type(:particle)
-    expect(described_class).not_to be_supported_type(:spectrogram)
+    expect(described_class).not_to be_supported_type(:mesh)
   end
 
   it "returns params and mappable params for a layer family" do
@@ -37,5 +39,6 @@ RSpec.describe Vizcore::LayerCatalog do
     expect(described_class.mappable_params_for(:image)).to include(:scale, :rotation, :opacity)
     expect(described_class.mappable_params_for(:video)).to include(:playback_rate, :invert)
     expect(described_class.mappable_params_for(:waveform)).to include(:height, :opacity, :color_shift)
+    expect(described_class.mappable_params_for(:spectrogram)).to include(:gain, :opacity)
   end
 end

@@ -133,6 +133,18 @@ module Vizcore
         ),
         mappable_params: %i[height opacity color_shift],
         description: "Audio feature waveform rendered as line, mirror, or ribbon geometry."
+      ),
+      Capability.new(
+        type: :spectrogram,
+        aliases: %i[spectrogram_layer],
+        params: COMMON_PARAMS.merge(
+          scroll: "Symbol",
+          bins: "Integer",
+          history: "Integer",
+          gain: "Float"
+        ),
+        mappable_params: %i[gain opacity],
+        description: "Scrolling FFT heatmap rendered by the browser."
       )
     ].freeze
 

@@ -402,6 +402,29 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "stores spectrogram layer params" do
+      definition = described_class.define do
+        scene :analysis do
+          layer :spectrogram do
+            type :spectrogram
+            scroll :vertical
+            bins 96
+            history 128
+            map amplitude, to: :gain, range: 0.8..3.0
+          end
+        end
+      end
+
+      layer = definition[:scenes].first[:layers].first
+      expect(layer[:type]).to eq(:spectrogram)
+      expect(layer[:params]).to include(scroll: :vertical, bins: 96, history: 128)
+      expect(layer[:mappings]).to include(
+        source: { kind: :amplitude },
+        target: :gain,
+        transform: { min: 0.8, max: 3.0 }
+      )
+    end
+
     it "builds scenes from inherited layers" do
       definition = described_class.define do
         scene :base do

@@ -69,6 +69,12 @@ Vizcore.define do
       map amplitude, to: :height, range: 0.2..0.7
     end
 
+    layer :spectrogram do
+      type :spectrogram
+      scroll :vertical
+      map amplitude, to: :gain, range: 0.8..3.0
+    end
+
     layer :title do
       type :text
       content "DROP\nNOW"
@@ -274,6 +280,19 @@ layer :footage do
   file "assets/loop.mp4"
   fit :cover
   map beat?, to: :invert
+end
+```
+
+Spectrogram layers render a short scrolling FFT heatmap. Use `scroll :vertical`
+for a waterfall view or `scroll :horizontal` when time should move left to right:
+
+```ruby
+layer :waterfall do
+  type :spectrogram
+  scroll :vertical
+  bins 96
+  history 128
+  map amplitude, to: :gain, range: 0.8..3.0
 end
 ```
 

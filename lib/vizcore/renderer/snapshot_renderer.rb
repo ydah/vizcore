@@ -52,6 +52,8 @@ module Vizcore
           render_image_layer(canvas, layer, audio, color)
         when "waveform", "waveform_layer"
           render_waveform_layer(canvas, layer, audio, color)
+        when "spectrogram", "spectrogram_layer"
+          render_spectrogram_layer(canvas, layer, audio, color)
         else
           render_geometry_layer(canvas, audio, color, index)
         end
@@ -119,6 +121,30 @@ module Vizcore
         return unless %w[mirror ribbon].include?(style)
 
         canvas.draw_wave(y_base, amplitude: amplitude, color: color, alpha: alpha * 0.68, height_scale: -height_scale)
+      rescue ArgumentError, TypeError
+        nil
+      end
+
+      def render_spectrogram_layer(canvas, layer, audio, color)
+        params = Hash(layer[:params] || layer["params"] || {})
+        fft = Array(audio[:fft] || audio["fft"])
+        bins = [[Integer(params[:bins] || params["bins"] || 32), 8].max, 96].min
+        gain = Float(params[:gain] || params["gain"] || 1).clamp(0.1, 8.0)
+        band_width = width.to_f / bins
+        rows = 18
+        row_height = height * 0.5 / rows
+        top = height * 0.22
+
+        rows.times do |row|
+          age = row.to_f / [rows - 1, 1].max
+          bins.times do |bin|
+            value = clamp(Float(fft[bin % [fft.length, 1].max] || 0) * gain)
+            alpha = (0.08 + value * 0.52) * (1.0 - age * 0.62)
+            x = bin * band_width
+            y = top + row * row_height
+            canvas.fill_rect(x, y, band_width.ceil + 1, row_height.ceil + 1, color, alpha: alpha)
+          end
+        end
       rescue ArgumentError, TypeError
         nil
       end
@@ -246,6 +272,16 @@ module Vizcore
           draw_line(x + rect_width, y, x + rect_width, y + rect_height, color, alpha: alpha)
           draw_line(x + rect_width, y + rect_height, x, y + rect_height, color, alpha: alpha)
           draw_line(x, y + rect_height, x, y, color, alpha: alpha)
+        end
+
+        def fill_rect(x, y, rect_width, rect_height, color, alpha:)
+          start_x = x.round
+          end_x = (x + rect_width).round
+          start_y = y.round
+          end_y = (y + rect_height).round
+          start_y.upto(end_y) do |py|
+            start_x.upto(end_x) { |px| blend_pixel(px, py, color, alpha) }
+          end
         end
 
         def draw_line(x1, y1, x2, y2, color, alpha:)

@@ -9,6 +9,7 @@ import {
 } from "../visuals/geometry.js";
 import { ImageRenderer } from "../visuals/image-renderer.js";
 import { ParticleSystem } from "../visuals/particle-system.js";
+import { SpectrogramRenderer } from "../visuals/spectrogram-renderer.js";
 import { TextRenderer } from "../visuals/text-renderer.js";
 import { getVJEffectShader } from "../visuals/vj-effects.js";
 import { FULLSCREEN_VERTEX_SHADER } from "./shader-manager.js";
@@ -196,6 +197,7 @@ export class LayerManager {
     this.particleSystem = new ParticleSystem(this.gl, this.shaderManager);
     this.textRenderer = new TextRenderer(this.gl, this.shaderManager);
     this.imageRenderer = new ImageRenderer(this.gl, this.shaderManager);
+    this.spectrogramRenderer = new SpectrogramRenderer(this.gl, this.shaderManager);
 
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.fullscreenBuffer);
     this.gl.bufferData(this.gl.ARRAY_BUFFER, FULLSCREEN_VERTICES, this.gl.STATIC_DRAW);
@@ -257,6 +259,10 @@ export class LayerManager {
     }
     if (isWaveformLayer(layer)) {
       this.renderWaveformLayer(layer, audio, time, paletteIndex);
+      return;
+    }
+    if (isSpectrogramLayer(layer)) {
+      this.renderSpectrogramLayer(layer, audio);
       return;
     }
     if (isShaderLayer(layer)) {
@@ -468,6 +474,14 @@ export class LayerManager {
       playbackRate: params.playback_rate,
       invert: params.invert,
       audio
+    });
+  }
+
+  renderSpectrogramLayer(layer, audio) {
+    this.spectrogramRenderer.render({
+      key: layer?.name || "spectrogram",
+      audio,
+      params: layer?.params || {}
     });
   }
 
@@ -707,6 +721,11 @@ const isVideoLayer = (layer) => {
 const isWaveformLayer = (layer) => {
   const type = String(layer?.type || "").toLowerCase();
   return type === "waveform" || type === "waveform_layer";
+};
+
+const isSpectrogramLayer = (layer) => {
+  const type = String(layer?.type || "").toLowerCase();
+  return type === "spectrogram" || type === "spectrogram_layer";
 };
 
 const defaultLayer = (audio) => ({
