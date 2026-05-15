@@ -303,8 +303,10 @@ to print the generated uniform reference. Common uniforms include:
 - `u_fft[32]`
 - `u_fft_size`
 - `u_param_<name>`
+- `u_global_<name>`
 
 For backward compatibility, a DSL target like `:param_intensity` is also exposed as `u_param_intensity`.
+Runtime globals set with `set :global_intensity, 0.75` are exposed as `u_global_intensity`.
 Use `param :name, default:, range:, step:` to attach numeric metadata for shader
 params that can be surfaced by tooling.
 The browser HUD turns this metadata into per-layer shader parameter sliders, so
@@ -314,11 +316,13 @@ declared params can be adjusted during a live run without editing the scene file
 
 ```ruby
 Vizcore.define do
+  set :global_intensity, 0.65
+
   midi :controller, device: :default
 
   scene :warmup do
     layer :grid do
-      shader :neon_grid
+      shader :waveform_ribbon
       map frequency_band(:mid) => :intensity
     end
   end
@@ -414,6 +418,7 @@ Run `vizcore gallery` to open a browser gallery of bundled examples with scene c
 | `examples/shader_playground.rb` | Focused shader scene with declared params |
 | `examples/audio_inspector.rb` | Audio bars and blob for analysis visualization |
 | `examples/midi_scene_switch.rb` | MIDI-driven scene switching |
+| `examples/midi_controller_show.rb` | MIDI pads for scenes and knobs for global shader intensity/color |
 | `examples/custom_shader.rb` | Custom GLSL shader with audio mapping |
 | `examples/unyo_liquid.rb` | Organic liquid wobble scene with FFT blob and particles |
 

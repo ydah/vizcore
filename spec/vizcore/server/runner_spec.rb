@@ -48,6 +48,7 @@ RSpec.describe Vizcore::Server::Runner do
         audio_file: nil,
         scene_names: ["basic"],
         tap_tempo_key: nil,
+        globals: {},
         projector_mode: false
       )
       expect(Puma::Server).to have_received(:new).with(rack_app, nil, min_threads: 0, max_threads: 4)
@@ -117,6 +118,7 @@ RSpec.describe Vizcore::Server::Runner do
         audio_file: file_config.audio_file,
         scene_names: ["basic"],
         tap_tempo_key: nil,
+        globals: {},
         projector_mode: false
       )
       expect(broadcaster).to have_received(:sync_transport).with(playing: false, position_seconds: 0.0)

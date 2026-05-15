@@ -286,6 +286,8 @@ uniform float u_beat_pulse;
 uniform float u_bpm;
 uniform float u_param_facets;
 uniform float u_param_refraction;
+uniform float u_global_intensity;
+uniform float u_global_color;
 out vec4 outColor;
 
 const float PI = 3.14159265359;
@@ -313,6 +315,8 @@ void main() {
   vec2 uv = gl_FragCoord.xy / max(u_resolution.xy, vec2(1.0));
   vec2 p = uv * 2.0 - 1.0;
   p.x *= u_resolution.x / max(u_resolution.y, 1.0);
+  float globalIntensity = 1.0 + clamp(u_global_intensity, 0.0, 1.0) * 0.5;
+  float globalColor = clamp(u_global_color, 0.0, 1.0);
 
   float facets = clamp(max(u_param_facets, 6.0), 4.0, 12.0);
   float refraction = max(u_param_refraction, 0.35);
@@ -333,10 +337,11 @@ void main() {
   float glow = exp(-abs(sdDiamond(warped)) * 8.0) * (0.18 + u_bass * 0.35 + pulse * 0.45);
 
   vec3 bg = vec3(0.018, 0.006, 0.018) + vec3(0.05, 0.00, 0.045) * (1.0 - smoothstep(0.0, 1.35, radius));
+  vec3 accent = mix(vec3(1.0, 0.18, 0.32), vec3(0.12, 0.72, 1.0), globalColor);
   vec3 color = bg;
-  color += rubyPalette(light + refraction * u_amplitude * 0.28) * body;
-  color += vec3(1.0, 0.18, 0.32) * glow;
-  color += vec3(1.0, 0.82, 0.70) * sparkle * (0.4 + u_high);
+  color += rubyPalette(light + refraction * u_amplitude * 0.28) * body * globalIntensity;
+  color += accent * glow * globalIntensity;
+  color += mix(vec3(1.0, 0.82, 0.70), accent, 0.35) * sparkle * (0.4 + u_high) * globalIntensity;
   outColor = vec4(color, 1.0);
 }
 `,
@@ -349,6 +354,8 @@ uniform float u_bass;
 uniform float u_mid;
 uniform float u_high;
 uniform float u_beat;
+uniform float u_global_intensity;
+uniform float u_global_color;
 out vec4 outColor;
 
 float hash11(float p) {
@@ -366,6 +373,10 @@ void main() {
   vec2 uv = gl_FragCoord.xy / max(u_resolution.xy, vec2(1.0));
   vec2 p = uv * 2.0 - 1.0;
   p.x *= u_resolution.x / max(u_resolution.y, 1.0);
+  float globalIntensity = 1.0 + clamp(u_global_intensity, 0.0, 1.0) * 0.5;
+  float globalColor = clamp(u_global_color, 0.0, 1.0);
+  vec3 accentA = mix(vec3(0.20, 0.72, 1.0), vec3(1.0, 0.26, 0.58), globalColor);
+  vec3 accentB = mix(vec3(1.0, 0.26, 0.58), vec3(1.0, 0.78, 0.24), globalColor);
   vec3 color = vec3(0.004, 0.008, 0.018);
   color += vec3(0.015, 0.02, 0.05) * (1.0 - smoothstep(0.0, 1.4, length(p)));
 
@@ -377,8 +388,8 @@ void main() {
     vec2 pos = seed / max(depth, 0.08);
     float size = (1.0 - depth) * (0.004 + u_high * 0.011 + u_beat * 0.006);
     float trail = star(p - pos, size);
-    vec3 tint = mix(vec3(0.20, 0.72, 1.0), vec3(1.0, 0.26, 0.58), hash11(fi + 101.0));
-    color += tint * trail * (0.18 + (1.0 - depth) * 0.85 + u_beat * 0.5);
+    vec3 tint = mix(accentA, accentB, hash11(fi + 101.0));
+    color += tint * trail * (0.18 + (1.0 - depth) * 0.85 + u_beat * 0.5) * globalIntensity;
   }
 
   float warp = sin(length(p) * (12.0 + u_mid * 8.0) - u_time * (1.0 + u_high * 3.0));
@@ -397,6 +408,8 @@ uniform float u_high;
 uniform float u_beat;
 uniform float u_beat_pulse;
 uniform float u_fft[32];
+uniform float u_global_intensity;
+uniform float u_global_color;
 out vec4 outColor;
 
 float fftSample(float t) {
@@ -410,6 +423,8 @@ float line(float y, float center, float width) {
 
 void main() {
   vec2 uv = gl_FragCoord.xy / max(u_resolution.xy, vec2(1.0));
+  float globalIntensity = 1.0 + clamp(u_global_intensity, 0.0, 1.0) * 0.5;
+  float globalColor = clamp(u_global_color, 0.0, 1.0);
   float spectrum = fftSample(uv.x);
   float phase = uv.x * 18.8495559215 + u_time * (1.2 + u_mid * 3.5);
   float center = 0.5 + sin(phase) * (0.035 + u_bass * 0.08) + sin(phase * 0.43 - u_time) * 0.035;
@@ -421,12 +436,15 @@ void main() {
 
   vec3 bg = vec3(0.006, 0.012, 0.026);
   bg += vec3(0.02, 0.03, 0.055) * smoothstep(0.9, 0.0, abs(uv.y - 0.5));
-  vec3 ribbon = vec3(0.08, 0.92, 1.0) * primary;
-  ribbon += vec3(1.0, 0.18, 0.58) * echoA * (0.5 + u_high);
-  ribbon += vec3(0.95, 0.78, 0.28) * echoB * (0.35 + u_bass);
+  vec3 primaryColor = mix(vec3(0.08, 0.92, 1.0), vec3(1.0, 0.18, 0.58), globalColor);
+  vec3 echoColor = mix(vec3(1.0, 0.18, 0.58), vec3(0.95, 0.78, 0.28), globalColor);
+  vec3 bassColor = mix(vec3(0.95, 0.78, 0.28), vec3(0.22, 0.78, 1.0), globalColor);
+  vec3 ribbon = primaryColor * primary;
+  ribbon += echoColor * echoA * (0.5 + u_high);
+  ribbon += bassColor * echoB * (0.35 + u_bass);
   ribbon += vec3(0.7, 0.85, 1.0) * primary * u_beat * 0.35;
 
-  vec3 color = bg + ribbon * (0.65 + spectrum * 0.75 + u_amplitude * 0.5);
+  vec3 color = bg + ribbon * (0.65 + spectrum * 0.75 + u_amplitude * 0.5) * globalIntensity;
   color += vec3(0.18, 0.28, 0.44) * grid * (0.2 + spectrum);
   outColor = vec4(color, 1.0);
 }

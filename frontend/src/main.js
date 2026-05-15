@@ -111,6 +111,7 @@ let availableSceneNames = [];
 let pendingSceneName = null;
 let pendingSceneRequestedAt = 0;
 let tapTempoKey = null;
+let runtimeGlobalsReceived = false;
 let shaderParamOverrides = {};
 let shaderParamControlsSignature = "";
 
@@ -180,6 +181,10 @@ const client = new WebSocketClient(websocketUrl, {
     if (Object.prototype.hasOwnProperty.call(payload || {}, "tap_tempo_key")) {
       updateTapTempoKey(payload?.tap_tempo_key);
     }
+    if (Object.prototype.hasOwnProperty.call(payload || {}, "globals")) {
+      runtimeGlobalsReceived = true;
+      applyRuntimeGlobals(payload?.globals);
+    }
   },
   onLatencyProbe: (payload) => {
     updatePerformanceMonitor(recordLatencyProbe(performanceMonitor, payload, Date.now()));
@@ -236,6 +241,9 @@ function applyRuntime(runtime) {
   audioSourceStatusElement.textContent = `Audio Source: ${source}`;
   updateAvailableScenes(runtime?.scene_names);
   updateTapTempoKey(runtime?.tap_tempo_key);
+  if (!runtimeGlobalsReceived) {
+    applyRuntimeGlobals(runtime?.globals);
+  }
 
   const fileName = runtime?.audio_file_name;
   const fileUrl = runtime?.audio_file_url;
@@ -249,6 +257,10 @@ function applyRuntime(runtime) {
 
   audioTrackStatusElement.textContent = `Track: ${String(fileName || "source file")}`;
   setupAudioPlayback(fileUrl);
+}
+
+function applyRuntimeGlobals(globals) {
+  engine.setRuntimeGlobals(globals);
 }
 
 function updateAvailableScenes(sceneValues) {

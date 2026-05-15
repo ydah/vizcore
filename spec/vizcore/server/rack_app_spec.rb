@@ -99,7 +99,8 @@ RSpec.describe Vizcore::Server::RackApp do
     runtime_app = described_class.new(
       frontend_root: Vizcore.frontend_root,
       scene_names: %i[build drop],
-      tap_tempo_key: :t
+      tap_tempo_key: :t,
+      globals: { global_intensity: 0.75 }
     )
 
     response = Rack::MockRequest.new(runtime_app).get("/runtime")
@@ -107,6 +108,7 @@ RSpec.describe Vizcore::Server::RackApp do
     expect(response.status).to eq(200)
     expect(response.body).to include("\"scene_names\":[\"build\",\"drop\"]")
     expect(response.body).to include("\"tap_tempo_key\":\"t\"")
+    expect(response.body).to include("\"globals\":{\"global_intensity\":0.75}")
   end
 
   it "supports byte range requests for audio file streaming" do

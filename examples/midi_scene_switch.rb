@@ -1,11 +1,13 @@
 # frozen_string_literal: true
 
 Vizcore.define do
+  set :global_intensity, 0.65
+
   midi :controller, device: :default
 
   scene :warmup do
     layer :grid do
-      shader :neon_grid
+      shader :waveform_ribbon
       map frequency_band(:mid) => :intensity
     end
   end

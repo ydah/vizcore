@@ -29,7 +29,8 @@ module Vizcore
         Uniform.new(name: "u_visual_gain", type: "float", description: "Browser visual gain control value."),
         Uniform.new(name: "u_bass_boost", type: "float", description: "Browser bass boost control value."),
         Uniform.new(name: "u_wobble_amount", type: "float", description: "Browser wobble amount control value."),
-        Uniform.new(name: "u_param_<name>", type: "float", description: "Numeric layer param or mapped DSL target.")
+        Uniform.new(name: "u_param_<name>", type: "float", description: "Numeric layer param or mapped DSL target."),
+        Uniform.new(name: "u_global_<name>", type: "float", description: "Numeric runtime global from DSL or MIDI set.")
       ].freeze
 
       # @return [Array<String>]
@@ -44,7 +45,8 @@ module Vizcore
           *UNIFORMS.map { |uniform| "| `#{uniform.name}` | `#{uniform.type}` | #{uniform.description} |" },
           "",
           "Layer params are exposed as `u_param_<name>` after non-word characters are converted to underscores.",
-          "For compatibility, a mapped target like `:param_intensity` is also exposed as `u_param_intensity`."
+          "For compatibility, a mapped target like `:param_intensity` is also exposed as `u_param_intensity`.",
+          "Runtime globals are exposed as `u_global_<name>`; `:global_intensity` becomes `u_global_intensity`."
         ]
       end
     end

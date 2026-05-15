@@ -25,6 +25,7 @@ export class Engine {
       blackout: false,
       freeze: false,
     };
+    this.runtimeGlobals = {};
     this.shaderParamOverrides = {};
     this.beatHoldUntil = 0;
     this.frame = {
@@ -87,6 +88,10 @@ export class Engine {
       blackout: !!controls?.blackout,
       freeze: !!controls?.freeze,
     };
+  }
+
+  setRuntimeGlobals(globals = {}) {
+    this.runtimeGlobals = globals && typeof globals === "object" ? { ...globals } : {};
   }
 
   setShaderParamOverrides(overrides = {}) {
@@ -171,6 +176,7 @@ export class Engine {
       time: visualTimeSeconds,
       rotation: this.rotation,
       resolution: [this.canvas.width, this.canvas.height],
+      globals: this.runtimeGlobals,
       visualSettings: this.visualSettings
     });
 

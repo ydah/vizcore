@@ -24,6 +24,7 @@ module Vizcore
         "shader_playground.rb" => "Focused liquid shader scene with mapped params.",
         "audio_inspector.rb" => "Audio feature visualization scene with bars and blob.",
         "midi_scene_switch.rb" => "MIDI note and CC driven scene switching.",
+        "midi_controller_show.rb" => "MIDI pads switch scenes and knobs drive global shader uniforms.",
         "custom_shader.rb" => "Custom GLSL fragment shader example.",
         "unyo_liquid.rb" => "Organic liquid wobble scene with FFT blobs and particles."
       }.freeze

@@ -41,6 +41,7 @@ module Vizcore
           audio_file: @config.audio_file,
           scene_names: scene_names_for(definition),
           tap_tempo_key: @tap_tempo_key,
+          globals: globals_for(definition),
           projector_mode: @config.projector_mode
         )
         server = Puma::Server.new(app, nil, min_threads: 0, max_threads: 4)
@@ -157,7 +158,8 @@ module Vizcore
             payload: {
               scene: scene,
               scenes: scene_names_for(definition),
-              tap_tempo_key: @tap_tempo_key
+              tap_tempo_key: @tap_tempo_key,
+              globals: globals_for(definition)
             }
           )
           @output.puts("Scene reloaded: #{scene[:name]}")
@@ -327,9 +329,15 @@ module Vizcore
           enabled: !Array(definition[:midi_maps]).empty?,
           midi_maps: Array(definition[:midi_maps]),
           scenes: Array(definition[:scenes]),
-          globals: Hash(definition[:globals] || {}),
+          globals: globals_for(definition),
           device: midi_inputs.first&.dig(:options, :device)
         }
+      end
+
+      def globals_for(definition)
+        Hash(definition[:globals] || {})
+      rescue StandardError
+        {}
       end
 
       def resolve_shader_sources(definition)

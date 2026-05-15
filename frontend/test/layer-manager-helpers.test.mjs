@@ -5,6 +5,7 @@ import {
   coerceUniformNumber,
   normalizeBlendMode,
   normalizeSpectrum,
+  shaderGlobalUniformNames,
   shaderParamUniformNames,
 } from "../src/renderer/layer-manager.js";
 
@@ -29,6 +30,12 @@ test("shaderParamUniformNames supports plain and legacy param_ targets", () => {
     "u_param_intensity",
   ]);
   assert.deepEqual(shaderParamUniformNames("bass-gain"), ["u_param_bass_gain"]);
+});
+
+test("shaderGlobalUniformNames supports global_ keys and plain keys", () => {
+  assert.deepEqual(shaderGlobalUniformNames("global_intensity"), ["u_global_intensity"]);
+  assert.deepEqual(shaderGlobalUniformNames("color"), ["u_global_color"]);
+  assert.deepEqual(shaderGlobalUniformNames("midi-color"), ["u_global_midi_color"]);
 });
 
 test("normalizeSpectrum returns a clamped Float32Array with fixed length", () => {
