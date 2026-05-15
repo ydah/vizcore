@@ -73,6 +73,7 @@ module Vizcore
         @transitions = []
         @midi_mappings = []
         @global_params = {}
+        @section_tail = nil
       end
 
       # Evaluate DSL methods on this engine instance.
@@ -111,6 +112,23 @@ module Vizcore
         builder = SceneBuilder.new(name: name)
         builder.evaluate(&block)
         @scenes << builder.to_h
+      end
+
+      # Define a beat-counted song section as a scene and auto-transition to the
+      # following section.
+      #
+      # @param name [Symbol, String] scene/section identifier
+      # @param bars [Integer] section duration in bars
+      # @param beats_per_bar [Integer] meter used to convert bars into beats
+      # @yield Scene definition block
+      # @return [void]
+      def section(name, bars:, beats_per_bar: 4, &block)
+        section_name = name.to_sym
+        section_beats = positive_integer(bars, "section bars") * positive_integer(beats_per_bar, "beats_per_bar")
+
+        scene(section_name, &block)
+        add_section_transition(to: section_name) if @section_tail
+        @section_tail = { name: section_name, beats: section_beats }
       end
 
       # Define a transition between scenes.
@@ -177,6 +195,23 @@ module Vizcore
         hash.each_with_object({}) do |(key, value), output|
           output[key.to_sym] = value
         end
+      end
+
+      def positive_integer(value, name)
+        numeric = Integer(value)
+        raise ArgumentError, "#{name} must be positive" unless numeric.positive?
+
+        numeric
+      end
+
+      def add_section_transition(to:)
+        from = @section_tail.fetch(:name)
+        beats = @section_tail.fetch(:beats)
+        @transitions << {
+          from: from,
+          to: to,
+          trigger: proc { beat_count >= beats }
+        }
       end
 
       def deep_dup(value)

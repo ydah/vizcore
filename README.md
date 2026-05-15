@@ -91,7 +91,7 @@ layer :liquid do
 end
 ```
 
-Available transform options are `gain`, `range`, `min`, `max`, `curve`, `attack`, and `release`. `curve` supports `:linear`, `:sqrt`, and `:square`. Existing mappings such as `map amplitude => :speed` continue to work.
+Available transform options are `gain`, `range`, `min`, `max`, `curve`, `deadzone`, `attack`, and `release`. `curve` supports `:linear`, `:sqrt`, `:square`, and `:ease_out`. Existing mappings such as `map amplitude => :speed` continue to work.
 Use block syntax when shaping a mapping reads better:
 
 ```ruby
@@ -133,6 +133,23 @@ closer to the structure of a track:
 transition from: :build, to: :drop do
   on_bar 8
   effect :flash, duration: 0.35
+end
+```
+
+For simple song structure, `section` defines scenes in order and creates
+beat-counted transitions between adjacent sections:
+
+```ruby
+section :intro, bars: 8 do
+  layer :pulse do
+    map amplitude => :scale
+  end
+end
+
+section :drop, bars: 16 do
+  layer :sparks do
+    map beat? => :burst
+  end
 end
 ```
 

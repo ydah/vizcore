@@ -243,6 +243,34 @@ RSpec.describe Vizcore::DSL::Engine do
       expect(controller.next_transition(scene_name: :build, audio: { beat_count: 16 })).to include(to: :drop)
     end
 
+    it "builds section scenes with beat-counted transitions" do
+      definition = described_class.define do
+        section :intro, bars: 2 do
+          layer(:a) { type :geometry }
+        end
+
+        section :drop, bars: 1, beats_per_bar: 3 do
+          layer(:b) { type :geometry }
+        end
+
+        section :outro, bars: 1 do
+          layer(:c) { type :geometry }
+        end
+      end
+
+      expect(definition[:scenes].map { |scene| scene[:name] }).to eq(%i[intro drop outro])
+
+      controller = Vizcore::DSL::TransitionController.new(
+        scenes: definition[:scenes],
+        transitions: definition[:transitions]
+      )
+
+      expect(controller.next_transition(scene_name: :intro, audio: { beat_count: 7 })).to be_nil
+      expect(controller.next_transition(scene_name: :intro, audio: { beat_count: 8 })).to include(to: :drop)
+      expect(controller.next_transition(scene_name: :drop, audio: { beat_count: 2 })).to be_nil
+      expect(controller.next_transition(scene_name: :drop, audio: { beat_count: 3 })).to include(to: :outro)
+    end
+
     it "rejects react_to without a reaction body" do
       expect do
         described_class.define do
