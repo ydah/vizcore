@@ -13,6 +13,7 @@ module Vizcore
         append_inputs(output, "Audio", Array(@definition[:audio]))
         append_inputs(output, "MIDI", Array(@definition[:midi]))
         append_scenes(output, Array(@definition[:scenes]))
+        append_timelines(output, Array(@definition[:timelines]))
         append_transitions(output, Array(@definition[:transitions]))
         output
       end
@@ -60,6 +61,17 @@ module Vizcore
         end
       end
 
+      def append_timelines(output, timelines)
+        timelines.each_with_index do |timeline, index|
+          next if Array(timeline).empty?
+
+          output << "Timeline #{index + 1}:"
+          Array(timeline).each do |entry|
+            output << "  #{format_timeline_position(entry)} -> #{entry[:scene]}"
+          end
+        end
+      end
+
       def format_layer(layer)
         type = layer[:type] || :geometry
         return "#{type}, shader=#{layer[:shader]}" if layer[:shader]
@@ -91,6 +103,11 @@ module Vizcore
 
         formatted = values.map { |key, value| "#{key}=#{value.inspect}" }.join(", ")
         " (#{formatted})"
+      end
+
+      def format_timeline_position(entry)
+        unit = entry[:unit] == :seconds ? "s" : " beats"
+        "#{entry[:at]}#{unit}"
       end
     end
   end

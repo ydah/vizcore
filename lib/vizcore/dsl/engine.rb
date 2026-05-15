@@ -4,6 +4,7 @@ require "pathname"
 require_relative "file_watcher"
 require_relative "scene_builder"
 require_relative "style_builder"
+require_relative "timeline_builder"
 
 module Vizcore
   module DSL
@@ -76,6 +77,7 @@ module Vizcore
         @global_params = {}
         @analysis_settings = {}
         @section_tail = nil
+        @timelines = []
         @styles = {}
         @themes = {}
         @scene_registry = {}
@@ -198,6 +200,20 @@ module Vizcore
         @section_tail = { name: section_name, beats: section_beats }
       end
 
+      # Define ordered scene markers and derive transitions between them.
+      #
+      # @param beats_per_bar [Integer] meter used by timeline `bars(...)` markers
+      # @yield Timeline marker block
+      # @return [void]
+      def timeline(beats_per_bar: TimelineBuilder::DEFAULT_BEATS_PER_BAR, &block)
+        raise ArgumentError, "timeline requires a block" unless block
+
+        builder = TimelineBuilder.new(beats_per_bar: beats_per_bar).evaluate(&block)
+        entries = builder.to_h
+        @timelines << entries unless entries.empty?
+        @transitions.concat(builder.transitions)
+      end
+
       # Define a transition between scenes.
       #
       # @param from [Symbol, String] source scene name
@@ -246,7 +262,7 @@ module Vizcore
 
       # @return [Hash] deep-copied definition payload for renderer/runtime.
       def result
-        {
+        definition = {
           audio: @audio_inputs.map { |item| deep_dup(item) },
           midi: @midi_inputs.map { |item| deep_dup(item) },
           scenes: @scenes.map { |scene| deep_dup(scene) },
@@ -257,6 +273,8 @@ module Vizcore
           styles: @styles.map { |name, params| { name: name, params: deep_dup(params) } },
           themes: @themes.map { |name, params| { name: name, params: deep_dup(params) } }
         }
+        definition[:timelines] = @timelines.map { |timeline| deep_dup(timeline) } unless @timelines.empty?
+        definition
       end
 
       private

@@ -109,11 +109,25 @@ RSpec.describe Vizcore::CLI do
     it "inspects a scene file" do
       Dir.mktmpdir("vizcore-cli-inspect") do |dir|
         scene_path = File.join(dir, "scene.rb")
-        File.write(scene_path, "Vizcore.define { scene(:main) { layer(:cube) { type :wireframe_cube } } }")
+        File.write(
+          scene_path,
+          <<~RUBY
+            Vizcore.define do
+              scene(:main) { layer(:cube) { type :wireframe_cube } }
+              scene(:drop) { layer(:blob) { type :radial_blob } }
+              timeline do
+                at beats(0), scene: :main
+                at beats(8), scene: :drop
+              end
+            end
+          RUBY
+        )
 
         expect do
           described_class.start(["inspect", scene_path])
-        end.to output(/Scenes:\n  main\n    layer cube \(wireframe_cube\)/).to_stdout
+        end.to output(
+          /Scenes:\n  main\n    layer cube \(wireframe_cube\).*Timeline 1:\n  0\.0 beats -> main\n  8\.0 beats -> drop/m
+        ).to_stdout
       end
     end
 

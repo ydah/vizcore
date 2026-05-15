@@ -69,6 +69,28 @@ RSpec.describe Vizcore::DSL::TransitionController do
       )
     end
 
+    it "exposes scene-local seconds to transition trigger context" do
+      controller = described_class.new(
+        scenes: [
+          { name: :intro, layers: [] },
+          { name: :drop, layers: [] }
+        ],
+        transitions: [
+          {
+            from: :intro,
+            to: :drop,
+            trigger: proc { seconds >= 1.5 }
+          }
+        ]
+      )
+
+      expect(controller.next_transition(scene_name: :intro, audio: {}, frame_count: 89)).to be_nil
+      expect(controller.next_transition(scene_name: :intro, audio: {}, frame_count: 90)).to include(
+        from: :intro,
+        to: :drop
+      )
+    end
+
     it "exposes beat_pulse to transition trigger context" do
       controller = described_class.new(
         scenes: [

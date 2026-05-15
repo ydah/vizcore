@@ -188,6 +188,17 @@ section :drop, bars: 16 do
 end
 ```
 
+For file-backed shows or rehearsed sets, `timeline` can mark existing scenes at
+ordered beat or second positions and generate the transitions:
+
+```ruby
+timeline do
+  at beats(0), scene: :intro
+  at bars(8), scene: :build
+  at bars(16), scene: :drop
+end
+```
+
 Layers can choose their compositing mode with `blend`. Supported modes are `:alpha` / `:normal`, `:add`, `:multiply`, `:screen`, and `:difference`:
 
 ```ruby

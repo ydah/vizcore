@@ -424,6 +424,82 @@ RSpec.describe Vizcore::DSL::Engine do
       expect(controller.next_transition(scene_name: :drop, audio: { beat_count: 3 })).to include(to: :outro)
     end
 
+    it "builds timeline transitions from beat markers" do
+      definition = described_class.define do
+        scene(:intro) { layer(:a) { type :geometry } }
+        scene(:build) { layer(:b) { type :geometry } }
+        scene(:drop) { layer(:c) { type :geometry } }
+
+        timeline do
+          at beats(0), scene: :intro
+          at bars(2), scene: :build
+          at bars(3), scene: :drop
+        end
+      end
+
+      expect(definition[:timelines]).to eq(
+        [
+          [
+            { at: 0.0, unit: :beats, scene: :intro },
+            { at: 8.0, unit: :beats, scene: :build },
+            { at: 12.0, unit: :beats, scene: :drop }
+          ]
+        ]
+      )
+
+      controller = Vizcore::DSL::TransitionController.new(
+        scenes: definition[:scenes],
+        transitions: definition[:transitions]
+      )
+
+      expect(controller.next_transition(scene_name: :intro, audio: { beat_count: 7 })).to be_nil
+      expect(controller.next_transition(scene_name: :intro, audio: { beat_count: 8 })).to include(to: :build)
+      expect(controller.next_transition(scene_name: :build, audio: { beat_count: 3 })).to be_nil
+      expect(controller.next_transition(scene_name: :build, audio: { beat_count: 4 })).to include(to: :drop)
+    end
+
+    it "builds timeline transitions from second markers" do
+      definition = described_class.define do
+        scene(:intro) { layer(:a) { type :geometry } }
+        scene(:drop) { layer(:b) { type :geometry } }
+
+        timeline do
+          at 0, scene: :intro
+          at seconds(1.5), scene: :drop
+        end
+      end
+
+      controller = Vizcore::DSL::TransitionController.new(
+        scenes: definition[:scenes],
+        transitions: definition[:transitions]
+      )
+
+      expect(controller.next_transition(scene_name: :intro, audio: {}, frame_count: 89)).to be_nil
+      expect(controller.next_transition(scene_name: :intro, audio: {}, frame_count: 90)).to include(to: :drop)
+    end
+
+    it "rejects mixed timeline units" do
+      expect do
+        described_class.define do
+          timeline do
+            at seconds(0), scene: :intro
+            at beats(4), scene: :drop
+          end
+        end
+      end.to raise_error(ArgumentError, /same unit/)
+    end
+
+    it "rejects non-increasing timeline positions" do
+      expect do
+        described_class.define do
+          timeline do
+            at beats(4), scene: :intro
+            at beats(4), scene: :drop
+          end
+        end
+      end.to raise_error(ArgumentError, /positions must increase/)
+    end
+
     it "rejects react_to without a reaction body" do
       expect do
         described_class.define do

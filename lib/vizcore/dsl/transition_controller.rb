@@ -4,6 +4,8 @@ module Vizcore
   module DSL
     # Evaluates transition rules and returns scene-change payloads.
     class TransitionController
+      DEFAULT_FRAME_RATE = 60.0
+
       # @param scenes [Array<Hash>]
       # @param transitions [Array<Hash>]
       def initialize(scenes:, transitions:)
@@ -219,6 +221,11 @@ module Vizcore
         # @return [Integer]
         def frame_count
           @frame_count
+        end
+
+        # @return [Float] scene-local elapsed seconds at the default runtime frame rate
+        def seconds
+          @frame_count / DEFAULT_FRAME_RATE
         end
 
         private
