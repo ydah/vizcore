@@ -6,6 +6,7 @@ require "thor"
 require_relative "../vizcore"
 require_relative "audio"
 require_relative "cli/doctor"
+require_relative "cli/dsl_reference"
 require_relative "cli/layer_docs"
 require_relative "cli/scene_diagnostics"
 require_relative "cli/shader_template"
@@ -263,6 +264,15 @@ module Vizcore
     # @return [void]
     def layers
       Vizcore::CLISupport::LayerDocs.new.lines.each { |line| say(line) }
+    end
+
+    map "dsl-docs" => :dsl_docs
+    desc "dsl-docs", "Print generated Ruby DSL reference"
+    # Print generated documentation for the Ruby scene DSL.
+    #
+    # @return [void]
+    def dsl_docs
+      Vizcore::CLISupport::DslReference.new.lines.each { |line| say(line) }
     end
 
     map "shader-docs" => :shader_docs

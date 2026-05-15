@@ -360,6 +360,7 @@ vizcore snapshot SCENE_FILE [--audio-source dummy|file|mic] [--audio-file PATH] 
 vizcore render SCENE_FILE [--audio-source dummy|file|mic] [--audio-file PATH] [--out frames] [--frames 60] [--fps 30]
 vizcore gallery [--host 127.0.0.1] [--port 4568]
 vizcore layers
+vizcore dsl-docs
 vizcore shader new NAME [--out shaders/name.frag]
 vizcore shader-docs
 vizcore new PROJECT_NAME [--template standard|minimal|shader|midi|live-set|rubykaigi]

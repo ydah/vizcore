@@ -27,6 +27,12 @@ module Vizcore::LayerCatalog
   def self.mappable_params_for: (untyped type) -> Array[Symbol]
 end
 
+module Vizcore::CLISupport
+  class DslReference
+    def lines: () -> Array[String]
+  end
+end
+
 module Vizcore::DSL
   type source = { kind: Symbol, ?band: Symbol }
   type transform = {

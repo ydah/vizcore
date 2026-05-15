@@ -153,6 +153,12 @@ RSpec.describe Vizcore::CLI do
       end.to output(/# Vizcore Layer Capabilities.*## particle_field.*Params:.*count: Integer.*Built-in shaders:/m).to_stdout
     end
 
+    it "prints generated Ruby DSL reference" do
+      expect do
+        described_class.start(["dsl-docs"])
+      end.to output(/# Vizcore Ruby DSL Reference.*`scene :name, extends: :base.*Mapping sources:.*beat_confidence.*`particle_field`/m).to_stdout
+    end
+
     it "creates a custom shader template" do
       Dir.mktmpdir("vizcore-cli-shader") do |dir|
         Dir.chdir(dir) do
