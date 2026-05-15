@@ -76,6 +76,12 @@ module Vizcore
         @params[:font_size] = Integer(value)
       end
 
+      # @param value [Numeric] extra spacing between text glyphs in pixels
+      # @return [Float]
+      def letter_spacing(value)
+        @params[:letter_spacing] = normalize_non_negative_param_number(value, :letter_spacing)
+      end
+
       # @param value [Symbol, String] text alignment (`left`, `center`, `right`)
       # @return [Symbol]
       def align(value)

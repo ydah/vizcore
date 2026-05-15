@@ -55,9 +55,9 @@ export class TextRenderer {
     this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
   }
 
-  render({ content, fontSize, audio, time, color, fontFamily, align, strokeWidth, strokeColor, shadowColor, shadowBlur, glowStrength }) {
-    const text = String(content || "").trim();
-    if (!text) {
+  render({ content, fontSize, audio, time, color, fontFamily, align, letterSpacing, strokeWidth, strokeColor, shadowColor, shadowBlur, glowStrength }) {
+    const lines = normalizeTextLines(content);
+    if (!lines.length) {
       return;
     }
 
@@ -65,17 +65,20 @@ export class TextRenderer {
 
     const amp = clamp(Number(audio?.amplitude || 0), 0, 1);
     const beatBoost = audio?.beat ? 1.0 : 0.0;
-    const maxFontSize = Math.max(48, Math.floor(this.canvas.height * 0.22));
+    const singleLineMax = Math.floor(this.canvas.height * 0.22);
+    const multilineMax = Math.floor((this.canvas.height * 0.58) / Math.max(lines.length, 1));
+    const maxFontSize = Math.max(32, Math.min(singleLineMax, multilineMax));
     const dynamicSize = Math.round(
       clamp(Number(fontSize || 96), 18, maxFontSize) * (1 + amp * 0.08 + beatBoost * 0.04)
     );
     this.drawTextToCanvas({
-      text,
+      lines,
       fontSize: dynamicSize,
       time,
       color,
       fontFamily,
       align,
+      letterSpacing,
       strokeWidth,
       strokeColor,
       shadowColor,
@@ -87,7 +90,7 @@ export class TextRenderer {
     this.drawQuad({ intensity: 0.85 + amp * 0.15 });
   }
 
-  drawTextToCanvas({ text, fontSize, time, color, fontFamily, align, strokeWidth, strokeColor, shadowColor, shadowBlur, amplitude, glowStrength }) {
+  drawTextToCanvas({ lines, fontSize, time, color, fontFamily, align, letterSpacing, strokeWidth, strokeColor, shadowColor, shadowBlur, amplitude, glowStrength }) {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -98,6 +101,7 @@ export class TextRenderer {
     const glow = clamp(Number(glowStrength || 0), 0, 1) * (1.5 + amplitude * 5.0);
     const xShift = Math.sin(time * 2.0) * (2 + amplitude * 4);
     const textAlign = normalizeTextAlign(align);
+    const spacing = normalizeLetterSpacing(letterSpacing);
     const stroke = clamp(Number(strokeWidth || 0), 0, 24);
     const shadow = shadowBlur === undefined ? glow : clamp(Number(shadowBlur || 0), 0, 80);
 
@@ -108,14 +112,18 @@ export class TextRenderer {
     ctx.shadowBlur = shadow;
     ctx.fillStyle = safeColor;
     const x = resolveTextX(this.canvas.width, textAlign) + xShift;
-    const y = this.canvas.height / 2;
-    if (stroke > 0) {
-      ctx.lineJoin = "round";
-      ctx.lineWidth = stroke;
-      ctx.strokeStyle = normalizeTextColor(strokeColor, safeColor);
-      ctx.strokeText(text, x, y);
-    }
-    ctx.fillText(text, x, y);
+    const lineHeight = fontSize * 1.16;
+    const startY = this.canvas.height / 2 - ((lines.length - 1) * lineHeight) / 2;
+    lines.forEach((line, index) => {
+      const y = startY + index * lineHeight;
+      if (stroke > 0) {
+        ctx.lineJoin = "round";
+        ctx.lineWidth = stroke;
+        ctx.strokeStyle = normalizeTextColor(strokeColor, safeColor);
+        drawText(ctx, { text: line, x, y, align: textAlign, letterSpacing: spacing, method: "strokeText" });
+      }
+      drawText(ctx, { text: line, x, y, align: textAlign, letterSpacing: spacing, method: "fillText" });
+    });
   }
 
   syncCanvasSize() {
@@ -174,6 +182,38 @@ export const resolveTextX = (width, align) => {
   return canvasWidth * 0.5;
 };
 
+export const normalizeTextLines = (value) => {
+  return String(value || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .slice(0, 6);
+};
+
+export const normalizeLetterSpacing = (value) => {
+  const spacing = Number(value);
+  if (!Number.isFinite(spacing)) return 0;
+  return clamp(spacing, 0, 96);
+};
+
+export const measureLetterSpacedText = (ctx, text, letterSpacing = 0) => {
+  const chars = Array.from(String(text || ""));
+  if (!chars.length) return 0;
+
+  const spacing = normalizeLetterSpacing(letterSpacing);
+  const glyphWidth = chars.reduce((total, char) => {
+    return total + Number(ctx.measureText(char)?.width || 0);
+  }, 0);
+  return glyphWidth + spacing * (chars.length - 1);
+};
+
+export const resolveLetterSpacedStartX = (ctx, text, x, align, letterSpacing = 0) => {
+  const width = measureLetterSpacedText(ctx, text, letterSpacing);
+  if (align === "right") return x - width;
+  if (align === "center") return x - width / 2;
+  return x;
+};
+
 export const normalizeFontFamily = (value) => {
   const family = String(value || "").trim();
   if (!family) return "\"IBM Plex Sans\", \"Noto Sans JP\", sans-serif";
@@ -185,4 +225,20 @@ export const normalizeFontFamily = (value) => {
 const normalizeTextColor = (value, fallback) => {
   const color = String(value || "").trim();
   return color || fallback;
+};
+
+const drawText = (ctx, { text, x, y, align, letterSpacing, method }) => {
+  if (letterSpacing <= 0) {
+    ctx[method](text, x, y);
+    return;
+  }
+
+  const originalAlign = ctx.textAlign;
+  ctx.textAlign = "left";
+  let cursor = resolveLetterSpacedStartX(ctx, text, x, align, letterSpacing);
+  for (const char of Array.from(text)) {
+    ctx[method](char, cursor, y);
+    cursor += Number(ctx.measureText(char)?.width || 0) + letterSpacing;
+  }
+  ctx.textAlign = originalAlign;
 };

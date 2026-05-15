@@ -64,9 +64,10 @@ Vizcore.define do
 
     layer :title do
       type :text
-      content "DROP"
+      content "DROP\nNOW"
       font "Inter Black"
       font_size 96
+      letter_spacing 4
       align :center
       fill "#ffffff"
       stroke width: 2, color: "#111111"

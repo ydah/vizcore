@@ -69,6 +69,7 @@ module Vizcore
         params: COMMON_PARAMS.merge(
           content: "String",
           font_size: "Integer",
+          letter_spacing: "Float",
           font: "String",
           align: "Symbol",
           stroke_width: "Float",
@@ -77,7 +78,7 @@ module Vizcore
           shadow_blur: "Float",
           glow_strength: "Float"
         ),
-        mappable_params: %i[font_size glow_strength],
+        mappable_params: %i[font_size letter_spacing glow_strength],
         description: "Canvas text rendered into the WebGL scene."
       )
     ].freeze

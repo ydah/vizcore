@@ -405,6 +405,7 @@ export class LayerManager {
       color: resolveLayerCssColor(params, "#e5f3ff", paletteIndex),
       fontFamily: params.font || params.font_family,
       align: params.align,
+      letterSpacing: params.letter_spacing,
       strokeWidth: params.stroke_width,
       strokeColor: params.stroke_color,
       shadowColor: params.shadow_color,

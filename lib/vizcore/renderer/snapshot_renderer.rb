@@ -77,8 +77,16 @@ module Vizcore
       end
 
       def render_text_layer(canvas, layer, audio, color)
-        content = layer.dig(:params, :content) || layer.dig("params", "content") || layer[:name] || layer["name"] || "Vizcore"
-        canvas.draw_label(content.to_s, x: width * 0.5, y: height * 0.72, color: color, alpha: 0.62 + clamp(audio[:beat_pulse]) * 0.28)
+        params = Hash(layer[:params] || layer["params"] || {})
+        content = params[:content] || params["content"] || layer[:name] || layer["name"] || "Vizcore"
+        canvas.draw_label(
+          content.to_s,
+          x: width * 0.5,
+          y: height * 0.72,
+          color: color,
+          alpha: 0.62 + clamp(audio[:beat_pulse]) * 0.28,
+          letter_spacing: normalize_letter_spacing(params)
+        )
       end
 
       def render_geometry_layer(canvas, audio, color, index)
@@ -158,6 +166,12 @@ module Vizcore
         0.0
       end
 
+      def normalize_letter_spacing(params)
+        Float(params[:letter_spacing] || params["letter_spacing"] || 0).clamp(0.0, 96.0)
+      rescue ArgumentError, TypeError
+        0.0
+      end
+
       # Tiny RGBA canvas with alpha blending and a few primitive drawing helpers.
       class Canvas
         def initialize(width:, height:)
@@ -221,9 +235,9 @@ module Vizcore
           end
         end
 
-        def draw_label(text, x:, y:, color:, alpha:)
+        def draw_label(text, x:, y:, color:, alpha:, letter_spacing: 0.0)
           chars = text.each_byte.first(24)
-          char_width = 14
+          char_width = 14 + Float(letter_spacing).clamp(0.0, 96.0).round
           total_width = chars.length * char_width
           start_x = x.round - total_width / 2
           chars.each_with_index do |byte, index|

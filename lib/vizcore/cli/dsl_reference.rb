@@ -34,6 +34,7 @@ module Vizcore
         Entry.new(syntax: "type :particle_field", description: "Set the layer renderer type."),
         Entry.new(syntax: "shader :neon_grid / shader \"shaders/liquid.frag\"", description: "Use a built-in or custom fragment shader."),
         Entry.new(syntax: "glsl \"shaders/liquid.frag\"", description: "Load a custom fragment shader file."),
+        Entry.new(syntax: "font \"Inter\" / letter_spacing 4", description: "Set text presentation params."),
         Entry.new(syntax: "palette \"#ff0055\", \"#00ffff\"", description: "Set ordered colors for supported layer renderers."),
         Entry.new(syntax: "blend :add / effect :bloom / vj_effect :mirror", description: "Set compositing and browser effects."),
         Entry.new(syntax: "param :wobble, default: 0.3, range: 0.0..2.0", description: "Declare numeric shader parameter metadata."),

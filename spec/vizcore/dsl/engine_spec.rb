@@ -292,6 +292,7 @@ RSpec.describe Vizcore::DSL::Engine do
             content "DROP"
             font "Inter Black"
             align :center
+            letter_spacing 4
             fill "#ffffff"
             stroke width: 2, color: "#111111"
             shadow color: "rgba(0, 0, 0, 0.45)", blur: 18
@@ -304,6 +305,7 @@ RSpec.describe Vizcore::DSL::Engine do
         content: "DROP",
         font: "Inter Black",
         align: :center,
+        letter_spacing: 4.0,
         color: "#ffffff",
         stroke_width: 2.0,
         stroke_color: "#111111",

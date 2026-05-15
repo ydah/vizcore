@@ -204,6 +204,7 @@ module Vizcore::DSL
     def count: (Integer value) -> Integer
     def content: (String value) -> String
     def font_size: (Integer value) -> Integer
+    def letter_spacing: (Numeric value) -> Float
     def align: (Symbol | String value) -> Symbol
     def font: (String value) -> String
     def fill: (String value) -> String
