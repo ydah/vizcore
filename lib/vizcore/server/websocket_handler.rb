@@ -10,6 +10,8 @@ module Vizcore
     # Stateless WebSocket endpoint manager for frame broadcast transport.
     class WebSocketHandler
       PROTOCOL_VERSION = "vizcore.frame.v1"
+      MAX_BUFFERED_FRAME_BYTES = 1_000_000
+      DROPPABLE_MESSAGE_TYPES = Set["audio_frame"].freeze
 
       class << self
         # Rack endpoint for WebSocket upgrade handling.
@@ -41,7 +43,7 @@ module Vizcore
           message = JSON.generate(protocol: PROTOCOL_VERSION, type: type, payload: payload)
 
           each_socket do |socket|
-            send_message(socket, message)
+            send_message(socket, message, type: type)
           end
 
           true
@@ -55,6 +57,11 @@ module Vizcore
         # @return [StandardError, nil]
         def last_error
           mutex.synchronize { @last_error }
+        end
+
+        # @return [Integer]
+        def dropped_frame_count
+          mutex.synchronize { @dropped_frame_count || 0 }
         end
 
         # Register one inbound message handler for client -> server control messages.
@@ -81,19 +88,42 @@ module Vizcore
           nil
         end
 
-        def send_message(socket, message)
+        def send_message(socket, message, type:)
+          return if drop_for_backpressure?(socket, type)
+
           if event_machine_reactor_running?
-            EventMachine.schedule { safe_send(socket, message) }
+            EventMachine.schedule { safe_send(socket, message, type: type) }
           else
-            safe_send(socket, message)
+            safe_send(socket, message, type: type)
           end
         end
 
-        def safe_send(socket, message)
+        def safe_send(socket, message, type:)
+          return if drop_for_backpressure?(socket, type)
+
           socket.send(message)
         rescue StandardError => e
           set_last_error(e)
           unregister(socket)
+        end
+
+        def drop_for_backpressure?(socket, type)
+          return false unless DROPPABLE_MESSAGE_TYPES.include?(type.to_s)
+
+          buffered_amount = socket_buffered_amount(socket)
+          return false unless buffered_amount && buffered_amount > MAX_BUFFERED_FRAME_BYTES
+
+          increment_dropped_frame_count
+          true
+        end
+
+        def socket_buffered_amount(socket)
+          return socket.buffered_amount if socket.respond_to?(:buffered_amount)
+          return socket.bufferedAmount if socket.respond_to?(:bufferedAmount)
+
+          nil
+        rescue StandardError
+          nil
         end
 
         def event_machine_reactor_running?
@@ -139,6 +169,10 @@ module Vizcore
 
         def set_last_error(error)
           mutex.synchronize { @last_error = error }
+        end
+
+        def increment_dropped_frame_count
+          mutex.synchronize { @dropped_frame_count = (@dropped_frame_count || 0) + 1 }
         end
 
         def dispatch_message(message)
