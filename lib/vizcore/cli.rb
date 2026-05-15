@@ -24,6 +24,73 @@ module Vizcore
 
     default_command :help
 
+    SCAFFOLD_TEMPLATES = {
+      "standard" => {
+        label: "standard",
+        start_scene: "scenes/basic.rb",
+        files: [
+          ["basic_scene.rb", "scenes/basic.rb", "Minimal wireframe starter"],
+          ["intro_drop_scene.rb", "scenes/intro_drop.rb", "Transition flow with beat trigger"],
+          ["midi_control_scene.rb", "scenes/midi_control.rb", "MIDI note/CC mapping example"],
+          ["custom_shader_scene.rb", "scenes/custom_shader.rb", "Custom GLSL + post/VJ effect example"],
+          ["custom_wave.frag", "shaders/custom_wave.frag", "Custom GLSL fragment shader"]
+        ],
+        notes: [
+          "`scenes/custom_shader.rb` references `shaders/custom_wave.frag`.",
+          "Use `vizcore devices midi` before running `scenes/midi_control.rb`."
+        ]
+      },
+      "minimal" => {
+        label: "minimal",
+        start_scene: "scenes/basic.rb",
+        files: [
+          ["basic_scene.rb", "scenes/basic.rb", "Minimal wireframe starter"]
+        ],
+        notes: []
+      },
+      "shader" => {
+        label: "shader",
+        start_scene: "scenes/custom_shader.rb",
+        files: [
+          ["custom_shader_scene.rb", "scenes/custom_shader.rb", "Custom GLSL + post/VJ effect example"],
+          ["custom_wave.frag", "shaders/custom_wave.frag", "Custom GLSL fragment shader"]
+        ],
+        notes: [
+          "`scenes/custom_shader.rb` references `shaders/custom_wave.frag`."
+        ]
+      },
+      "midi" => {
+        label: "midi",
+        start_scene: "scenes/midi_control.rb",
+        files: [
+          ["midi_control_scene.rb", "scenes/midi_control.rb", "MIDI note/CC mapping example"]
+        ],
+        notes: [
+          "Run `vizcore devices midi` before starting the MIDI scene."
+        ]
+      },
+      "live-set" => {
+        label: "live-set",
+        start_scene: "scenes/live_set.rb",
+        files: [
+          ["intro_drop_scene.rb", "scenes/live_set.rb", "Two-scene transition flow with beat trigger"]
+        ],
+        notes: [
+          "Use file audio or a microphone input with clear beats for transition triggers."
+        ]
+      },
+      "rubykaigi" => {
+        label: "rubykaigi",
+        start_scene: "scenes/rubykaigi.rb",
+        files: [
+          ["rubykaigi_scene.rb", "scenes/rubykaigi.rb", "Ruby conference visual starter"]
+        ],
+        notes: [
+          "This scene uses Ruby-red text and audio-reactive geometry for talk or event visuals."
+        ]
+      }
+    }.freeze
+
     desc "start SCENE_FILE", "Start vizcore HTTP/WebSocket server"
     option :host, type: :string, default: Config::DEFAULT_HOST, desc: "Bind host"
     option :port, type: :numeric, default: Config::DEFAULT_PORT, desc: "Bind port"
@@ -77,24 +144,28 @@ module Vizcore
     end
 
     desc "new NAME", "Create a starter project scaffold"
+    option :template,
+           type: :string,
+           default: "standard",
+           desc: "Scaffold template: standard, minimal, shader, midi, live-set, rubykaigi"
     # Generate a new Vizcore project scaffold.
     #
     # @param name [String] directory name for the new project
     # @return [void]
     def new(name)
+      scaffold = scaffold_template(options.fetch(:template))
       root = Pathname.new(name).expand_path
-      FileUtils.mkdir_p(root.join("scenes"))
-      FileUtils.mkdir_p(root.join("shaders"))
+      FileUtils.mkdir_p(root)
 
-      write_template("project_readme.md", root.join("README.md"), project_name: name)
-      write_template("basic_scene.rb", root.join("scenes", "basic.rb"), project_name: name)
-      write_template("intro_drop_scene.rb", root.join("scenes", "intro_drop.rb"), project_name: name)
-      write_template("midi_control_scene.rb", root.join("scenes", "midi_control.rb"), project_name: name)
-      write_template("custom_shader_scene.rb", root.join("scenes", "custom_shader.rb"), project_name: name)
-      write_template("custom_wave.frag", root.join("shaders", "custom_wave.frag"), project_name: name)
+      write_project_readme(root.join("README.md"), project_name: name, scaffold: scaffold)
+      scaffold.fetch(:files).each do |template_name, destination, _description|
+        write_template(template_name, root.join(destination), project_name: name)
+      end
 
-      say("Created project scaffold: #{root}")
-      say("Next: cd #{name} && vizcore start scenes/basic.rb")
+      say("Created project scaffold (#{scaffold.fetch(:label)}): #{root}")
+      say("Next: cd #{name} && vizcore start #{scaffold.fetch(:start_scene)}")
+    rescue ArgumentError => e
+      raise Thor::Error, e.message
     end
 
     desc "devices [TYPE]", "Show available devices (audio or midi)"
@@ -183,7 +254,42 @@ module Vizcore
     def write_template(template_name, destination, project_name:)
       template_path = Vizcore.templates_root.join(template_name)
       body = template_path.read.gsub("{{project_name}}", project_name)
+      FileUtils.mkdir_p(destination.dirname)
       destination.write(body)
+    end
+
+    def write_project_readme(destination, project_name:, scaffold:)
+      template_path = Vizcore.templates_root.join("project_readme.md")
+      body = template_path.read
+                          .gsub("{{project_name}}", project_name)
+                          .gsub("{{template_name}}", scaffold.fetch(:label))
+                          .gsub("{{start_scene}}", scaffold.fetch(:start_scene))
+                          .gsub("{{included_files}}", scaffold_files(scaffold))
+                          .gsub("{{template_notes}}", scaffold_notes(scaffold))
+      FileUtils.mkdir_p(destination.dirname)
+      destination.write(body)
+    end
+
+    def scaffold_template(name)
+      key = name.to_s.strip.downcase
+      key = "standard" if key.empty? || key == "default"
+      scaffold = SCAFFOLD_TEMPLATES[key]
+      return scaffold if scaffold
+
+      raise ArgumentError, "Unknown template: #{name}. Use one of: #{SCAFFOLD_TEMPLATES.keys.join(', ')}"
+    end
+
+    def scaffold_files(scaffold)
+      scaffold.fetch(:files).map do |_template_name, destination, description|
+        "- `#{destination}`: #{description}"
+      end.join("\n")
+    end
+
+    def scaffold_notes(scaffold)
+      notes = Array(scaffold[:notes])
+      return "No extra setup is required." if notes.empty?
+
+      notes.map { |note| "- #{note}" }.join("\n")
     end
 
     def print_audio_devices

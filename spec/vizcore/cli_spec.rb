@@ -26,8 +26,43 @@ RSpec.describe Vizcore::CLI do
           expect(Pathname("my_show/scenes/custom_shader.rb")).to exist
           expect(Pathname("my_show/shaders/custom_wave.frag")).to exist
           expect(Pathname("my_show/shaders")).to exist
+          expect(Pathname("my_show/README.md").read).to include("Template: `standard`")
         end
       end
+    end
+
+    it "creates focused project scaffolds from templates" do
+      templates = {
+        "minimal" => ["scenes/basic.rb"],
+        "shader" => ["scenes/custom_shader.rb", "shaders/custom_wave.frag"],
+        "midi" => ["scenes/midi_control.rb"],
+        "live-set" => ["scenes/live_set.rb"],
+        "rubykaigi" => ["scenes/rubykaigi.rb"]
+      }
+
+      Dir.mktmpdir("vizcore-cli-templates") do |dir|
+        Dir.chdir(dir) do
+          templates.each do |template, expected_paths|
+            project = "show_#{template.tr('-', '_')}"
+            expect do
+              described_class.start(["new", project, "--template", template])
+            end.to output(/Created project scaffold \(#{Regexp.escape(template)}\)/).to_stdout
+
+            expected_paths.each do |path|
+              expect(Pathname(project).join(path)).to exist
+            end
+            expect(Pathname(project).join("README.md").read).to include("Template: `#{template}`")
+          end
+        end
+      end
+    end
+
+    it "rejects unknown project scaffold templates" do
+      expect do
+        expect do
+          described_class.start(["new", "bad_show", "--template", "unknown"])
+        end.to raise_error(SystemExit)
+      end.to output(/Unknown template: unknown/).to_stderr
     end
 
     it "prints audio devices" do

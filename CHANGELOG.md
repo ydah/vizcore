@@ -6,6 +6,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+- Add `vizcore new --template` scaffold variants for minimal, shader, MIDI, live-set, and rubykaigi starters.
 - Add `/control` for a separate HUD/operator panel alongside projector output.
 - Add projector output mode via `vizcore start --projector`, `vizcore demo --projector`, and `/projector`.
 - Add a browser HUD performance monitor for FPS, frame time, WebSocket latency, dropped-frame estimates, audio processing time, shader compile time, and reconnect count.

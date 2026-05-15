@@ -185,7 +185,7 @@ vizcore demo [--host 127.0.0.1] [--port 4567] [--projector]
 vizcore doctor
 vizcore validate SCENE_FILE
 vizcore inspect SCENE_FILE
-vizcore new PROJECT_NAME
+vizcore new PROJECT_NAME [--template standard|minimal|shader|midi|live-set|rubykaigi]
 vizcore devices [audio|midi]
 ```
 
