@@ -20,6 +20,10 @@ export class Engine {
       wobbleAmount: 1,
     };
     this.visualAudioState = null;
+    this.liveControls = {
+      blackout: false,
+      freeze: false,
+    };
     this.beatHoldUntil = 0;
     this.frame = {
       audio: {
@@ -73,6 +77,13 @@ export class Engine {
     };
   }
 
+  setLiveControls(controls = {}) {
+    this.liveControls = {
+      blackout: !!controls?.blackout,
+      freeze: !!controls?.freeze,
+    };
+  }
+
   start() {
     this.lastTime = performance.now();
     requestAnimationFrame((time) => this.render(time));
@@ -109,6 +120,18 @@ export class Engine {
       this.lastMediaTime = currentMediaTime;
     } else {
       this.lastMediaTime = null;
+    }
+
+    if (this.liveControls.blackout) {
+      this.gl.clearColor(0, 0, 0, 1);
+      this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+      requestAnimationFrame((nextTime) => this.render(nextTime));
+      return;
+    }
+
+    if (this.liveControls.freeze) {
+      requestAnimationFrame((nextTime) => this.render(nextTime));
+      return;
     }
 
     const rawAudio = this.frame?.audio || {};

@@ -1,4 +1,10 @@
 import { BAND_KEYS, DEFAULT_FFT_BINS, buildAudioInspectorState, formatMeterValue } from "./audio-inspector.js";
+import {
+  createLiveControlState,
+  liveControlStatusText,
+  shortcutActionForKey,
+  toggleLiveControl,
+} from "./live-controls.js";
 import { Engine } from "./renderer/engine.js";
 import { SHADER_ERROR_EVENT, formatShaderErrorMessage, formatShaderErrorTitle } from "./shader-error-overlay.js";
 import { WebSocketClient } from "./websocket-client.js";
@@ -10,6 +16,9 @@ const transitionStatusElement = document.querySelector("#transition-status");
 const frameStatusElement = document.querySelector("#frame-status");
 const bpmStatusElement = document.querySelector("#bpm-status");
 const beatStatusElement = document.querySelector("#beat-status");
+const blackoutButton = document.querySelector("#blackout-toggle");
+const freezeButton = document.querySelector("#freeze-toggle");
+const liveControlStatusElement = document.querySelector("#live-control-status");
 const inspectorPeakElement = document.querySelector("#inspector-peak");
 const inspectorAmplitudeFill = document.querySelector("#inspector-amplitude-fill");
 const inspectorAmplitudeValue = document.querySelector("#inspector-amplitude-value");
@@ -46,14 +55,18 @@ const visualSettings = {
   beatHoldMs: 180,
   wobbleAmount: 1.0,
 };
+const liveControls = createLiveControlState();
 const engine = new Engine(canvas);
 engine.init();
 engine.setVisualSettings(visualSettings);
+engine.setLiveControls(liveControls);
+bindLiveControls();
 bindVisualControl(visualGainControl, "visualGain");
 bindVisualControl(bassBoostControl, "bassBoost");
 bindVisualControl(smoothingControl, "smoothing");
 bindVisualControl(beatHoldControl, "beatHoldMs");
 bindVisualControl(wobbleControl, "wobbleAmount");
+renderLiveControlStatus();
 renderReactivityStatus();
 bindShaderErrorOverlay();
 const fftBars = initializeFftPreview(fftPreviewElement);
@@ -239,6 +252,52 @@ function renderSceneButtons() {
     return button;
   });
   sceneSwitcherElement.replaceChildren(...buttons);
+}
+
+function bindLiveControls() {
+  bindLiveControlButton(blackoutButton, "blackout");
+  bindLiveControlButton(freezeButton, "freeze");
+  window.addEventListener("keydown", (event) => {
+    const action = shortcutActionForKey(event);
+    if (!action) {
+      return;
+    }
+
+    event.preventDefault();
+    applyLiveControls(toggleLiveControl(liveControls, action));
+  });
+}
+
+function bindLiveControlButton(button, control) {
+  if (!button) {
+    return;
+  }
+
+  button.addEventListener("click", () => {
+    applyLiveControls(toggleLiveControl(liveControls, control));
+  });
+}
+
+function applyLiveControls(nextState) {
+  Object.assign(liveControls, nextState);
+  engine.setLiveControls(liveControls);
+  renderLiveControlStatus();
+}
+
+function renderLiveControlStatus() {
+  if (liveControlStatusElement) {
+    liveControlStatusElement.textContent = liveControlStatusText(liveControls);
+  }
+
+  if (blackoutButton) {
+    blackoutButton.classList.toggle("is-active", liveControls.blackout);
+    blackoutButton.setAttribute("aria-pressed", String(liveControls.blackout));
+  }
+
+  if (freezeButton) {
+    freezeButton.classList.toggle("is-active", liveControls.freeze);
+    freezeButton.setAttribute("aria-pressed", String(liveControls.freeze));
+  }
 }
 
 function setupAudioPlayback(audioUrl) {

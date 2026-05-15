@@ -125,6 +125,40 @@
       cursor: not-allowed;
     }
 
+    .live-controls {
+      margin-top: 0.5rem;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.35rem;
+    }
+
+    .live-controls button {
+      margin-top: 0;
+      padding: 0.42rem 0.5rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .live-controls button.is-active {
+      border-color: rgba(248, 250, 252, 0.52);
+      color: #fff7ed;
+    }
+
+    #blackout-toggle.is-active {
+      background: rgba(127, 29, 29, 0.78);
+    }
+
+    #freeze-toggle.is-active {
+      background: rgba(133, 77, 14, 0.78);
+    }
+
+    .hud .live-controls__status {
+      grid-column: 1 / -1;
+      margin-top: 0;
+      color: #d9e8ff;
+      font-variant-numeric: tabular-nums;
+    }
+
     .reactivity-controls {
       margin-top: 0.55rem;
       padding-top: 0.55rem;
@@ -312,6 +346,11 @@
       <p id="frame-status">Amplitude: 0.0000</p>
       <p id="bpm-status" class="is-accent">BPM: --</p>
       <p id="beat-status">Beat: off | Count: 0</p>
+      <div class="live-controls" aria-label="Live emergency controls">
+        <button id="blackout-toggle" type="button" aria-pressed="false">Blackout</button>
+        <button id="freeze-toggle" type="button" aria-pressed="false">Freeze</button>
+        <p id="live-control-status" class="live-controls__status">Live: output</p>
+      </div>
       <div class="audio-inspector" aria-label="Audio inspector">
         <div class="audio-inspector__header">
           <span>Audio</span>
