@@ -13,6 +13,7 @@ RSpec.describe Vizcore::Server::RackApp do
     expect(response.headers["content-type"]).to include("text/html")
     expect(response.body).to include("Vizcore Live")
     expect(response.body).to include('data-projector-mode="false"')
+    expect(response.body).to include('data-display-mode="auto"')
   end
 
   it "returns health status as json" do
@@ -43,15 +44,28 @@ RSpec.describe Vizcore::Server::RackApp do
 
     expect(response.status).to eq(200)
     expect(response.body).to include('data-projector-mode="true"')
+    expect(response.body).to include('data-display-mode="projector"')
+  end
+
+  it "serves a control panel with operator UI enabled" do
+    response = Rack::MockRequest.new(app).get("/control")
+
+    expect(response.status).to eq(200)
+    expect(response.body).to include('data-projector-mode="false"')
+    expect(response.body).to include('data-display-mode="control"')
   end
 
   it "serves the root entrypoint in projector mode when configured" do
     projector_app = described_class.new(frontend_root: Vizcore.frontend_root, projector_mode: true)
 
     root = Rack::MockRequest.new(projector_app).get("/")
+    control = Rack::MockRequest.new(projector_app).get("/control")
     runtime = Rack::MockRequest.new(projector_app).get("/runtime")
 
     expect(root.body).to include('data-projector-mode="true"')
+    expect(root.body).to include('data-display-mode="projector"')
+    expect(control.body).to include('data-projector-mode="false"')
+    expect(control.body).to include('data-display-mode="control"')
     expect(runtime.body).to include("\"projector_mode\":true")
   end
 

@@ -71,6 +71,7 @@ module Vizcore
 
         @output.puts("Vizcore server listening at http://#{@config.host}:#{@config.port}")
         @output.puts("Projector output: http://#{@config.host}:#{@config.port}/projector")
+        @output.puts("Control panel: http://#{@config.host}:#{@config.port}/control")
         @output.puts("Scene: #{scene[:name]}")
         @output.puts("Audio playback: http://#{@config.host}:#{@config.port}/audio-file") if @config.audio_source == :file
         @output.puts("Press Ctrl+C to stop.")

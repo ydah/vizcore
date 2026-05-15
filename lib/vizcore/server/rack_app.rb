@@ -10,6 +10,7 @@ module Vizcore
     # Rack app serving frontend assets, health endpoint, and WebSocket upgrade.
     class RackApp
       AUDIO_FILE_PATH = "/audio-file"
+      CONTROL_PATH = "/control"
       PROJECTOR_PATH = "/projector"
       RUNTIME_PATH = "/runtime"
 
@@ -44,8 +45,9 @@ module Vizcore
         return health_response if request.path_info == "/health"
         return runtime_response if request.path_info == RUNTIME_PATH
         return audio_file_response(request) if request.path_info == AUDIO_FILE_PATH
-        return serve_index(projector_mode: @projector_mode) if request.path_info == "/"
-        return serve_index(projector_mode: true) if request.path_info == PROJECTOR_PATH
+        return serve_index(display_mode: root_display_mode) if request.path_info == "/"
+        return serve_index(display_mode: "control") if request.path_info == CONTROL_PATH
+        return serve_index(display_mode: "projector") if request.path_info == PROJECTOR_PATH
 
         serve_static(request.path_info)
       end
@@ -109,16 +111,24 @@ module Vizcore
         static_response(body, content_type: Rack::Mime.mime_type(File.extname(full_path), "text/plain"))
       end
 
-      def serve_index(projector_mode:)
+      def serve_index(display_mode:)
         full_path = @frontend_root.join("index.html")
         return not_found_response unless full_path.file?
 
         body = File.binread(full_path)
         body = body.gsub(
           'data-projector-mode="false"',
-          "data-projector-mode=\"#{projector_mode ? 'true' : 'false'}\""
+          "data-projector-mode=\"#{display_mode == 'projector' ? 'true' : 'false'}\""
+        )
+        body = body.gsub(
+          'data-display-mode="auto"',
+          "data-display-mode=\"#{display_mode}\""
         )
         static_response(body, content_type: "text/html")
+      end
+
+      def root_display_mode
+        @projector_mode ? "projector" : "auto"
       end
 
       def static_response(body, content_type:)
