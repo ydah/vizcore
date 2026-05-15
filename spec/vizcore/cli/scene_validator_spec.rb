@@ -23,6 +23,8 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
             map beat_confidence => :sync_strength
             map beat_pulse => :size
             map onset(:high) => :spark
+            map kick => :pulse
+            map hihat => :scatter
           end
         end
 

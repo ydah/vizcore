@@ -57,6 +57,8 @@ module Vizcore
           audio[:fft]
         when :onset
           resolve_onset(source, audio)
+        when :kick, :snare, :hihat
+          audio.dig(:drums, source[:kind].to_sym)
         when :beat
           audio[:beat]
         when :beat_confidence

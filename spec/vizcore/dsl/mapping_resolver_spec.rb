@@ -20,6 +20,8 @@ RSpec.describe Vizcore::DSL::MappingResolver do
             { source: { kind: :beat_pulse }, target: :pulse },
             { source: { kind: :onset }, target: :burst },
             { source: { kind: :onset, band: :high }, target: :spark },
+            { source: { kind: :kick }, target: :kick_flash },
+            { source: { kind: :hihat }, target: :hihat_scatter },
             { source: { kind: :bpm }, target: :tempo }
           ]
         }
@@ -33,6 +35,7 @@ RSpec.describe Vizcore::DSL::MappingResolver do
         beat_pulse: 0.82,
         onset: 0.31,
         onsets: { high: 0.44 },
+        drums: { kick: 0.51, hihat: 0.29 },
         beat_count: 12,
         bpm: 128.5
       }
@@ -52,6 +55,8 @@ RSpec.describe Vizcore::DSL::MappingResolver do
         pulse: 0.82,
         burst: 0.31,
         spark: 0.44,
+        kick_flash: 0.51,
+        hihat_scatter: 0.29,
         tempo: 128.5
       )
     end

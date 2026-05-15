@@ -260,6 +260,21 @@ module Vizcore
         source(:onset, **options)
       end
 
+      # @return [Hash] source descriptor for low-band percussive confidence
+      def kick
+        source(:kick)
+      end
+
+      # @return [Hash] source descriptor for mid-band percussive confidence
+      def snare
+        source(:snare)
+      end
+
+      # @return [Hash] source descriptor for high-band percussive confidence
+      def hihat
+        source(:hihat)
+      end
+
       # @return [Hash] source descriptor for beat trigger
       def beat?
         source(:beat)

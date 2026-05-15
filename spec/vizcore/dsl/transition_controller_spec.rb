@@ -135,6 +135,28 @@ RSpec.describe Vizcore::DSL::TransitionController do
       )
     end
 
+    it "exposes simple drum confidence to transition trigger context" do
+      controller = described_class.new(
+        scenes: [
+          { name: :intro, layers: [] },
+          { name: :drop, layers: [] }
+        ],
+        transitions: [
+          {
+            from: :intro,
+            to: :drop,
+            trigger: proc { kick > 0.5 || snare > 0.5 || hihat > 0.5 }
+          }
+        ]
+      )
+
+      expect(controller.next_transition(scene_name: :intro, audio: { drums: { kick: 0.2 } })).to be_nil
+      expect(controller.next_transition(scene_name: :intro, audio: { drums: { kick: 0.8 } })).to include(
+        from: :intro,
+        to: :drop
+      )
+    end
+
     it "exposes beat as an alias for beat? in transition triggers" do
       controller = described_class.new(
         scenes: [

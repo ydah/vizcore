@@ -32,6 +32,7 @@ export class Engine {
         fft: [],
         onset: 0,
         onsets: { sub: 0, low: 0, mid: 0, high: 0 },
+        drums: { kick: 0, snare: 0, hihat: 0 },
         beat: false,
         beat_pulse: 0,
         beat_count: 0,
@@ -189,6 +190,7 @@ export const applyVisualSettings = ({ audio, settings, previous }) => {
 
   const rawBands = audio?.bands || {};
   const rawOnsets = audio?.onsets || {};
+  const rawDrums = audio?.drums || {};
   const next = {
     ...audio,
     amplitude: clamp(Number(audio?.amplitude || 0) * visualGain, 0, 1),
@@ -206,6 +208,12 @@ export const applyVisualSettings = ({ audio, settings, previous }) => {
       low: clamp(Number(rawOnsets.low || 0) * bassBoost, 0, 1),
       mid: clamp(Number(rawOnsets.mid || 0) * visualGain, 0, 1),
       high: clamp(Number(rawOnsets.high || 0) * visualGain, 0, 1),
+    },
+    drums: {
+      ...rawDrums,
+      kick: clamp(Number(rawDrums.kick || 0) * bassBoost, 0, 1),
+      snare: clamp(Number(rawDrums.snare || 0) * visualGain, 0, 1),
+      hihat: clamp(Number(rawDrums.hihat || 0) * visualGain, 0, 1),
     },
     visual_gain: visualGain,
     bass_boost: bassBoost,
@@ -238,6 +246,7 @@ export const applyVisualSettings = ({ audio, settings, previous }) => {
 const isSilentAudio = (audio) => {
   const bands = audio?.bands || {};
   const onsets = audio?.onsets || {};
+  const drums = audio?.drums || {};
   return Number(audio?.amplitude || 0) <= 0
     && Number(audio?.onset || 0) <= 0
     && Number(audio?.beat_pulse || 0) <= 0
@@ -249,7 +258,10 @@ const isSilentAudio = (audio) => {
     && Number(onsets.sub || 0) <= 0
     && Number(onsets.low || 0) <= 0
     && Number(onsets.mid || 0) <= 0
-    && Number(onsets.high || 0) <= 0;
+    && Number(onsets.high || 0) <= 0
+    && Number(drums.kick || 0) <= 0
+    && Number(drums.snare || 0) <= 0
+    && Number(drums.hihat || 0) <= 0;
 };
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);

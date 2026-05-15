@@ -126,6 +126,9 @@ module Vizcore::DSL
     def fft_spectrum: () -> source
     def onset: () -> source
              | (Symbol | String band) -> source
+    def kick: () -> source
+    def snare: () -> source
+    def hihat: () -> source
     def beat?: () -> source
     def beat: () -> source
     def beat_confidence: () -> source

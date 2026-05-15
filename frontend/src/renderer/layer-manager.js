@@ -246,6 +246,7 @@ export class LayerManager {
 
     const bands = audio?.bands || {};
     const onsets = audio?.onsets || {};
+    const drums = audio?.drums || {};
     this.setUniform1f(program, "u_time", time);
     this.setUniform2f(program, "u_resolution", resolution[0], resolution[1]);
     this.setUniform1f(program, "u_amplitude", audio?.amplitude || 0);
@@ -259,6 +260,9 @@ export class LayerManager {
     this.setUniform1f(program, "u_low_onset", onsets.low || 0);
     this.setUniform1f(program, "u_mid_onset", onsets.mid || 0);
     this.setUniform1f(program, "u_high_onset", onsets.high || 0);
+    this.setUniform1f(program, "u_kick", drums.kick || 0);
+    this.setUniform1f(program, "u_snare", drums.snare || 0);
+    this.setUniform1f(program, "u_hihat", drums.hihat || 0);
     this.setUniform1f(program, "u_bpm", audio?.bpm || 0);
     const spectrum = normalizeSpectrum(audio?.fft, 32);
     this.setUniform1fv(program, "u_fft[0]", spectrum);

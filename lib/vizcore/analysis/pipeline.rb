@@ -68,6 +68,7 @@ module Vizcore
           fft: preview_spectrum(fft[:magnitudes])
         )
         onsets = detect_onsets(amplitude: normalized[:amplitude], bands: normalized[:bands])
+        drums = detect_drum_sources(bands: normalized[:bands], onsets: onsets[:bands])
 
         {
           amplitude: @smoother.smooth(:amplitude, normalized[:amplitude]),
@@ -75,6 +76,7 @@ module Vizcore
           fft: @smoother.smooth_array(normalized[:fft], namespace: :fft),
           onset: onsets[:amplitude],
           onsets: onsets[:bands],
+          drums: drums,
           beat: beat_detected,
           beat_confidence: confidence,
           beat_pulse: @beat_pulse,
@@ -152,6 +154,25 @@ module Vizcore
         [current - previous, 0.0].max.clamp(0.0, 1.0)
       end
 
+      def detect_drum_sources(bands:, onsets:)
+        band_values = Hash(bands)
+        onset_values = Hash(onsets)
+
+        {
+          kick: drum_confidence([:sub, :low], band_values, onset_values),
+          snare: drum_confidence([:mid], band_values, onset_values),
+          hihat: drum_confidence([:high], band_values, onset_values)
+        }
+      end
+
+      def drum_confidence(keys, bands, onsets)
+        level = keys.map { |key| Float(bands[key] || 0.0) }.max || 0.0
+        rise = keys.map { |key| Float(onsets[key] || 0.0) }.max || 0.0
+        (level * rise).clamp(0.0, 1.0)
+      rescue ArgumentError, TypeError
+        0.0
+      end
+
       def silent_frame(reset_tempo:)
         @beat_pulse = 0.0
         reset_tempo_state if reset_tempo
@@ -165,6 +186,7 @@ module Vizcore
           fft: Array.new(32, 0.0),
           onset: 0.0,
           onsets: { sub: 0.0, low: 0.0, mid: 0.0, high: 0.0 },
+          drums: { kick: 0.0, snare: 0.0, hihat: 0.0 },
           beat: false,
           beat_confidence: 0.0,
           beat_pulse: 0.0,

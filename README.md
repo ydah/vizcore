@@ -93,6 +93,7 @@ layer :liquid do
   map amplitude, to: :wobble, gain: 3.5, range: 0.12..1.4, curve: :sqrt
   map frequency_band(:low), to: :warp, gain: 2.2, range: 0.25..2.4
   map onset(:high), to: :spark, range: 0.0..1.0
+  map kick, to: :pulse, range: 0.0..1.0
   map beat_pulse, to: :effect_intensity, range: 0.08..0.35
 end
 ```
@@ -263,6 +264,7 @@ to print the generated uniform reference. Common uniforms include:
 - `u_beat`
 - `u_beat_pulse`
 - `u_onset` / `u_low_onset` / `u_mid_onset` / `u_high_onset`
+- `u_kick` / `u_snare` / `u_hihat`
 - `u_bpm`
 - `u_fft[32]`
 - `u_fft_size`

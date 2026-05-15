@@ -109,6 +109,7 @@ module Vizcore
           @audio = symbolize_hash(audio)
           @bands = symbolize_hash(@audio[:bands])
           @onsets = symbolize_hash(@audio[:onsets])
+          @drums = symbolize_hash(@audio[:drums])
           @frame_count = Integer(frame_count)
         rescue StandardError
           @frame_count = 0
@@ -166,6 +167,21 @@ module Vizcore
           return @audio[:onset].to_f if name.nil?
 
           @onsets[name.to_sym].to_f
+        end
+
+        # @return [Float]
+        def kick
+          @drums[:kick].to_f
+        end
+
+        # @return [Float]
+        def snare
+          @drums[:snare].to_f
+        end
+
+        # @return [Float]
+        def hihat
+          @drums[:hihat].to_f
         end
 
         # @return [Boolean]

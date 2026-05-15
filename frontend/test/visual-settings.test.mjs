@@ -9,6 +9,7 @@ test("applyVisualSettings boosts and clamps audio values", () => {
     bands: { sub: 0.2, low: 0.3, mid: 0.4, high: 0.5 },
     onset: 0.5,
     onsets: { sub: 0.1, low: 0.2, mid: 0.3, high: 0.4 },
+    drums: { kick: 0.2, snare: 0.3, hihat: 0.4 },
   };
   const result = applyVisualSettings({
     audio,
@@ -21,6 +22,8 @@ test("applyVisualSettings boosts and clamps audio values", () => {
   assert.equal(result.onset, 1);
   assert.equal(result.onsets.low, 0.8);
   assert.equal(result.onsets.high, 1);
+  assert.equal(result.drums.kick, 0.8);
+  assert.equal(result.drums.hihat, 1);
   assert.equal(result.visual_gain, 3);
   assert.equal(result.wobble_amount, 1.5);
 });

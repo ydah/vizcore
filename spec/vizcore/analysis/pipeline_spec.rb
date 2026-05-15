@@ -14,7 +14,7 @@ RSpec.describe Vizcore::Analysis::Pipeline do
 
     result = pipeline.call(samples)
 
-    expect(result).to include(:amplitude, :bands, :fft, :onset, :onsets, :beat, :beat_confidence, :beat_pulse, :beat_count, :bpm, :peak_frequency)
+    expect(result).to include(:amplitude, :bands, :fft, :onset, :onsets, :drums, :beat, :beat_confidence, :beat_pulse, :beat_count, :bpm, :peak_frequency)
     expect(result[:bands].keys).to contain_exactly(:sub, :low, :mid, :high)
     expect(result[:fft].length).to eq(32)
     expect(result[:peak_frequency]).to be_within(50.0).of(440.0)
@@ -32,6 +32,7 @@ RSpec.describe Vizcore::Analysis::Pipeline do
     expect(result[:beat_pulse]).to eq(0.0)
     expect(result[:onset]).to eq(0.0)
     expect(result[:onsets]).to eq(sub: 0.0, low: 0.0, mid: 0.0, high: 0.0)
+    expect(result[:drums]).to eq(kick: 0.0, snare: 0.0, hihat: 0.0)
     expect(result[:bpm]).to eq(0.0)
     expect(result[:peak_frequency]).to eq(0.0)
   end
@@ -114,6 +115,19 @@ RSpec.describe Vizcore::Analysis::Pipeline do
 
     expect(result[:onset]).to be > 0.0
     expect(result[:onsets].fetch(:low)).to be >= 0.0
+  end
+
+  it "reports simple drum confidence from band onsets" do
+    pipeline = described_class.new(sample_rate: 44_100, fft_size: 1024)
+    silence = Array.new(1024, 0.0)
+    kick = sine_samples(frequency_hz: 90.0, sample_rate: 44_100, count: 1024, amplitude: 0.9)
+
+    pipeline.call(silence)
+    result = pipeline.call(kick)
+
+    expect(result[:drums].fetch(:kick)).to be > 0.0
+    expect(result[:drums].fetch(:snare)).to be >= 0.0
+    expect(result[:drums].fetch(:hihat)).to be >= 0.0
   end
 
   it "can adaptively normalize feature levels when enabled" do
