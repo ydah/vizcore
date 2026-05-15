@@ -93,6 +93,24 @@ end
 
 Available transform options are `gain`, `range`, `min`, `max`, `curve`, `attack`, and `release`. `curve` supports `:linear`, `:sqrt`, and `:square`. Existing mappings such as `map amplitude => :speed` continue to work.
 
+For a more music-oriented style, `react_to` groups the same mappings by source:
+
+```ruby
+layer :particles do
+  type :particle_field
+
+  react_to bass do
+    change :size, gain: 4.0, range: 2.0..8.0, curve: :sqrt
+  end
+
+  react_to beat do
+    trigger :burst
+  end
+end
+```
+
+`react_to` is additive syntax; it serializes to the same mapping model as `map`.
+
 Frequency bands can be written with musical aliases when that reads better in a scene:
 
 ```ruby

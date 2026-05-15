@@ -6,6 +6,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+- Add `react_to` layer DSL for grouping source-driven `change` and `trigger` mappings.
 - Add `vizcore demo` for launching a bundled scene with bundled audio.
 - Show GLSL compile/link failures in a browser shader error overlay while keeping fallback rendering.
 - Add `vizcore doctor`, `vizcore validate`, and `vizcore inspect` CLI commands for setup and scene diagnostics.

@@ -27,7 +27,7 @@ RSpec.describe Vizcore::DSL::ReactionBuilder do
     builder = described_class.new(mapping_factory: ->(_target, _options) { {} })
 
     expect do
-      builder.evaluate {}
+      builder.evaluate { nil }
     end.to raise_error(ArgumentError, /at least one change or trigger/)
   end
 end
