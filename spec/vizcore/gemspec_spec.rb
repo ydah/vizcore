@@ -17,6 +17,12 @@ RSpec.describe "vizcore.gemspec" do
     )
   end
 
+  it "packages every bundled example scene and example asset" do
+    example_files = Dir.glob("examples/**/*").select { |path| File.file?(path) }.sort
+
+    expect(specification.files).to include(*example_files)
+  end
+
   it "does not package frontend test files" do
     expect(specification.files.grep(%r{\Afrontend/test/})).to be_empty
   end
