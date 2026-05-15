@@ -357,6 +357,28 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "stores asset file params for video layers" do
+      definition = described_class.define do
+        scene :footage_scene do
+          layer :footage do
+            type :video
+            file "assets/loop.mp4"
+            fit :cover
+            playback_rate 1.25
+            map beat?, to: :invert
+          end
+        end
+      end
+
+      layer = definition[:scenes].first[:layers].first
+      expect(layer[:type]).to eq(:video)
+      expect(layer[:params]).to include(file: "assets/loop.mp4", fit: :cover, playback_rate: 1.25)
+      expect(layer[:mappings]).to include(
+        source: { kind: :beat },
+        target: :invert
+      )
+    end
+
     it "stores waveform layer params and source" do
       definition = described_class.define do
         scene :audio_scope do

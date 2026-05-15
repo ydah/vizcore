@@ -13,11 +13,13 @@ precision mediump float;
 in vec2 v_uv;
 uniform sampler2D u_texture;
 uniform float u_intensity;
+uniform float u_invert;
 out vec4 outColor;
 
 void main() {
   vec4 texel = texture(u_texture, v_uv);
-  outColor = vec4(texel.rgb, texel.a * u_intensity);
+  vec3 color = mix(texel.rgb, vec3(1.0) - texel.rgb, clamp(u_invert, 0.0, 1.0));
+  outColor = vec4(color, texel.a * u_intensity);
 }
 `;
 
@@ -37,7 +39,8 @@ export class ImageRenderer {
     this.uvLocation = this.gl.getAttribLocation(this.program, "a_uv");
     this.textureLocation = this.gl.getUniformLocation(this.program, "u_texture");
     this.intensityLocation = this.gl.getUniformLocation(this.program, "u_intensity");
-    this.images = new Map();
+    this.invertLocation = this.gl.getUniformLocation(this.program, "u_invert");
+    this.media = new Map();
 
     this.buffer = this.gl.createBuffer();
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.buffer);
@@ -56,12 +59,14 @@ export class ImageRenderer {
     this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
   }
 
-  render({ src, audio, fit, scale, rotation }) {
+  render({ src, audio, fit, scale, rotation, playbackRate, invert }) {
     const source = resolveMediaSource(src);
     if (!source) return;
 
-    const image = this.loadImage(source);
-    if (!image?.complete || Number(image.naturalWidth || 0) <= 0 || Number(image.naturalHeight || 0) <= 0) {
+    const media = this.loadMedia(source);
+    this.ensureVideoPlayback(media, playbackRate);
+    const dimensions = resolveMediaDimensions(media);
+    if (!isRenderableMedia(media, dimensions)) {
       return;
     }
 
@@ -69,18 +74,23 @@ export class ImageRenderer {
     const amplitude = clamp(Number(audio?.amplitude || 0), 0, 1);
     const pulse = clamp(Number(audio?.beat_pulse || 0), 0, 1);
     this.drawImageToCanvas({
-      image,
+      media,
+      dimensions,
       fit,
       scale: normalizeScale(scale) * (1 + amplitude * 0.04 + pulse * 0.03),
       rotation: normalizeRotation(rotation)
     });
     this.uploadTexture();
-    this.drawQuad({ intensity: 0.9 + amplitude * 0.1 });
+    this.drawQuad({ intensity: 0.9 + amplitude * 0.1, invert: normalizeInvert(invert) });
+  }
+
+  loadMedia(src) {
+    return isVideoSource(src) ? this.loadVideo(src) : this.loadImage(src);
   }
 
   loadImage(src) {
-    if (this.images.has(src)) {
-      return this.images.get(src);
+    if (this.media.has(src)) {
+      return this.media.get(src);
     }
 
     const image = new Image();
@@ -89,18 +99,56 @@ export class ImageRenderer {
     }
     image.decoding = "async";
     image.src = src;
-    this.images.set(src, image);
+    this.media.set(src, image);
     return image;
   }
 
-  drawImageToCanvas({ image, fit, scale, rotation }) {
+  loadVideo(src) {
+    if (this.media.has(src)) {
+      return this.media.get(src);
+    }
+
+    const video = document.createElement("video");
+    if (!src.startsWith("data:")) {
+      video.crossOrigin = "anonymous";
+    }
+    video.muted = true;
+    video.loop = true;
+    video.playsInline = true;
+    video.preload = "auto";
+    video.src = src;
+    this.media.set(src, video);
+    return video;
+  }
+
+  ensureVideoPlayback(media, playbackRate) {
+    if (!isVideoElement(media)) {
+      return;
+    }
+
+    const rate = normalizePlaybackRate(playbackRate);
+    if (media.playbackRate !== rate) {
+      media.playbackRate = rate;
+    }
+
+    if (!media.paused) {
+      return;
+    }
+
+    const playback = media.play();
+    if (playback?.catch) {
+      playback.catch(() => {});
+    }
+  }
+
+  drawImageToCanvas({ media, dimensions, fit, scale, rotation }) {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     const rect = resolveImageRect({
       canvasWidth: this.canvas.width,
       canvasHeight: this.canvas.height,
-      imageWidth: image.naturalWidth,
-      imageHeight: image.naturalHeight,
+      imageWidth: dimensions.width,
+      imageHeight: dimensions.height,
       fit,
       scale
     });
@@ -108,7 +156,7 @@ export class ImageRenderer {
     ctx.save();
     ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
     ctx.rotate(rotation);
-    ctx.drawImage(image, -rect.width / 2, -rect.height / 2, rect.width, rect.height);
+    ctx.drawImage(media, -rect.width / 2, -rect.height / 2, rect.width, rect.height);
     ctx.restore();
   }
 
@@ -134,7 +182,7 @@ export class ImageRenderer {
     );
   }
 
-  drawQuad({ intensity }) {
+  drawQuad({ intensity, invert }) {
     const gl = this.gl;
     gl.useProgram(this.program);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
@@ -147,6 +195,7 @@ export class ImageRenderer {
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
     gl.uniform1i(this.textureLocation, 0);
     gl.uniform1f(this.intensityLocation, clamp(Number(intensity || 1), 0, 1));
+    gl.uniform1f(this.invertLocation, normalizeInvert(invert));
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 }
@@ -173,6 +222,39 @@ export const normalizeRotation = (value) => {
   return Number.isFinite(rotation) ? rotation : 0;
 };
 
+export const normalizePlaybackRate = (value) => {
+  const rate = Number(value);
+  if (!Number.isFinite(rate)) return 1;
+  return clamp(rate, 0.1, 4);
+};
+
+export const normalizeInvert = (value) => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return 0;
+  return clamp(amount, 0, 1);
+};
+
+export const isVideoSource = (value) => {
+  const source = resolveMediaSource(value);
+  if (!source) return false;
+  if (/^data:video\//i.test(source)) return true;
+  return /\.(mp4|webm|ogv|ogg)(?:[?#].*)?$/i.test(source);
+};
+
+export const resolveMediaDimensions = (media) => {
+  if (isVideoElement(media)) {
+    return {
+      width: Number(media.videoWidth || 0),
+      height: Number(media.videoHeight || 0)
+    };
+  }
+
+  return {
+    width: Number(media?.naturalWidth || 0),
+    height: Number(media?.naturalHeight || 0)
+  };
+};
+
 export const resolveImageRect = ({ canvasWidth, canvasHeight, imageWidth, imageHeight, fit, scale = 1 }) => {
   const width = Math.max(Number(canvasWidth) || 0, 1);
   const height = Math.max(Number(canvasHeight) || 0, 1);
@@ -192,6 +274,18 @@ export const resolveImageRect = ({ canvasWidth, canvasHeight, imageWidth, imageH
     width: sourceWidth * multiplier * resolvedScale,
     height: sourceHeight * multiplier * resolvedScale
   };
+};
+
+const isRenderableMedia = (media, dimensions) => {
+  if (isVideoElement(media)) {
+    return media.readyState >= 2 && dimensions.width > 0 && dimensions.height > 0;
+  }
+
+  return !!media?.complete && dimensions.width > 0 && dimensions.height > 0;
+};
+
+const isVideoElement = (media) => {
+  return media?.tagName === "VIDEO" || (typeof media?.play === "function" && "videoWidth" in media);
 };
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);

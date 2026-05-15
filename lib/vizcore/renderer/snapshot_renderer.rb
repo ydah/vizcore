@@ -48,7 +48,7 @@ module Vizcore
           render_particle_layer(canvas, layer, audio, color)
         when "text"
           render_text_layer(canvas, layer, audio, color)
-        when "svg", "svg_layer", "image", "image_layer", "photo"
+        when "svg", "svg_layer", "image", "image_layer", "photo", "video", "video_layer", "footage"
           render_image_layer(canvas, layer, audio, color)
         when "waveform", "waveform_layer"
           render_waveform_layer(canvas, layer, audio, color)

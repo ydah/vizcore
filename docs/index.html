@@ -74,7 +74,7 @@
             </div>
             <div class="signal-step">
               <strong>Render</strong>
-              <span>GLSL / particles / text / waveform</span>
+              <span>GLSL / video / particles / waveform</span>
             </div>
           </div>
         </div>
@@ -124,6 +124,12 @@
       source :audio
       style :ribbon
       map amplitude, to: :height
+    end
+
+    layer :footage do
+      type :video
+      file "assets/loop.mp4"
+      map beat? =&gt; :invert
     end
   end
 end</code></pre>

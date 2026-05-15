@@ -251,7 +251,7 @@ export class LayerManager {
       this.renderTextLayer(layer, audio, time, paletteIndex);
       return;
     }
-    if (isImageLayer(layer)) {
+    if (isImageLayer(layer) || isVideoLayer(layer)) {
       this.renderImageLayer(layer, audio);
       return;
     }
@@ -465,6 +465,8 @@ export class LayerManager {
       fit: params.fit,
       scale: params.scale,
       rotation: params.rotation,
+      playbackRate: params.playback_rate,
+      invert: params.invert,
       audio
     });
   }
@@ -696,6 +698,11 @@ const isRasterImageLayer = (layer) => {
 };
 
 const isImageLayer = (layer) => isSvgLayer(layer) || isRasterImageLayer(layer);
+
+const isVideoLayer = (layer) => {
+  const type = String(layer?.type || "").toLowerCase();
+  return type === "video" || type === "video_layer" || type === "footage";
+};
 
 const isWaveformLayer = (layer) => {
   const type = String(layer?.type || "").toLowerCase();

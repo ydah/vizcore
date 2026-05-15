@@ -108,6 +108,21 @@ module Vizcore
         description: "Inline PNG/JPEG/GIF/WebP image asset rendered as a textured visual layer."
       ),
       Capability.new(
+        type: :video,
+        aliases: %i[video_layer footage],
+        params: COMMON_PARAMS.merge(
+          file: "String",
+          src: "String",
+          fit: "Symbol",
+          scale: "Float",
+          rotation: "Float",
+          playback_rate: "Float",
+          invert: "Float"
+        ),
+        mappable_params: %i[scale rotation opacity playback_rate invert],
+        description: "Inline MP4/WebM/OGV video texture rendered as a looping visual layer."
+      ),
+      Capability.new(
         type: :waveform,
         aliases: %i[waveform_layer],
         params: COMMON_PARAMS.merge(

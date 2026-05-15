@@ -96,6 +96,13 @@ Vizcore.define do
       blend :screen
       map amplitude, to: :opacity, range: 0.25..0.85
     end
+
+    layer :footage do
+      type :video
+      file "assets/loop.mp4"
+      fit :cover
+      map beat?, to: :invert
+    end
   end
 
   transition from: :intro, to: :drop do
@@ -255,6 +262,18 @@ layer :scope do
   source :audio
   style :ribbon
   map amplitude, to: :height, range: 0.2..0.7
+end
+```
+
+Video layers embed MP4/WebM/OGV assets as muted looping textures. They share
+`fit`, `scale`, `rotation`, `blend`, and post-effect params with image layers:
+
+```ruby
+layer :footage do
+  type :video
+  file "assets/loop.mp4"
+  fit :cover
+  map beat?, to: :invert
 end
 ```
 

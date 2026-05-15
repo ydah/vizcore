@@ -13,7 +13,10 @@ module Vizcore
         ".jpeg" => "image/jpeg",
         ".png" => "image/png",
         ".svg" => "image/svg+xml",
-        ".webp" => "image/webp"
+        ".webp" => "image/webp",
+        ".mp4" => "video/mp4",
+        ".ogv" => "video/ogg",
+        ".webm" => "video/webm"
       }.freeze
 
       # @param definition [Hash] DSL definition payload
@@ -65,6 +68,8 @@ module Vizcore
         mime_type = MEDIA_MIME_TYPES[full_path.extname.downcase]
         raise ArgumentError, "Unsupported #{media_layer_label(layer_hash)} file extension: #{media_path}" unless mime_type
         raise ArgumentError, "Unsupported SVG file extension: #{media_path}" if svg_layer?(layer_hash) && mime_type != "image/svg+xml"
+        raise ArgumentError, "Unsupported Image file extension: #{media_path}" if image_layer?(layer_hash) && !mime_type.start_with?("image/")
+        raise ArgumentError, "Unsupported Video file extension: #{media_path}" if video_layer?(layer_hash) && !mime_type.start_with?("video/")
 
         params[:file] = media_path.to_s
         params[:src] = "data:#{mime_type};base64,#{Base64.strict_encode64(full_path.binread)}"
@@ -80,12 +85,19 @@ module Vizcore
         %i[image image_layer photo].include?(layer_hash[:type]&.to_sym)
       end
 
+      def video_layer?(layer_hash)
+        %i[video video_layer footage].include?(layer_hash[:type]&.to_sym)
+      end
+
       def media_layer?(layer_hash)
-        svg_layer?(layer_hash) || image_layer?(layer_hash)
+        svg_layer?(layer_hash) || image_layer?(layer_hash) || video_layer?(layer_hash)
       end
 
       def media_layer_label(layer_hash)
-        svg_layer?(layer_hash) ? "SVG" : "Image"
+        return "SVG" if svg_layer?(layer_hash)
+        return "Video" if video_layer?(layer_hash)
+
+        "Image"
       end
 
       def resolve_path(base_dir:, relative_path: nil, shader_path: nil)

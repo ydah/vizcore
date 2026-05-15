@@ -36,6 +36,7 @@ module Vizcore
         Entry.new(syntax: "glsl \"shaders/liquid.frag\"", description: "Load a custom fragment shader file."),
         Entry.new(syntax: "type :svg / file \"assets/logo.svg\"", description: "Render an SVG asset resolved relative to the scene file."),
         Entry.new(syntax: "type :image / file \"assets/noise.png\"", description: "Render a PNG/JPEG/GIF/WebP asset resolved relative to the scene file."),
+        Entry.new(syntax: "type :video / file \"assets/loop.mp4\"", description: "Render a looping MP4/WebM/OGV video texture."),
         Entry.new(syntax: "type :waveform / source :audio / style :ribbon", description: "Render an audio feature waveform layer."),
         Entry.new(syntax: "font \"Inter\" / letter_spacing 4", description: "Set text presentation params."),
         Entry.new(syntax: "palette \"#ff0055\", \"#00ffff\"", description: "Set ordered colors for supported layer renderers."),
