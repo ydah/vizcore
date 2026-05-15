@@ -6,6 +6,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+- Add concept, architecture, DSL guide, cookbook, one-line walkthrough, and troubleshooting docs.
 - Add initial RBS signatures for the public Ruby DSL.
 - Add shader parameter schema metadata through the Ruby `param` layer DSL.
 - Add `vizcore shader new NAME` for generating custom GLSL starter shaders.
