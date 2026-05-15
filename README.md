@@ -198,6 +198,17 @@ layer :sparks do
 end
 ```
 
+Layers can also apply browser-side post effects. Supported effects are
+`:bloom`, `:glitch`, `:chromatic`, `:feedback`, `:motion_blur`, and `:crt`:
+
+```ruby
+layer :tunnel do
+  shader :bass_tunnel
+  effect :motion_blur
+  map bass, to: :effect_intensity, range: 0.1..0.7
+end
+```
+
 Reusable layer styles keep repeated visual params in one place:
 
 ```ruby

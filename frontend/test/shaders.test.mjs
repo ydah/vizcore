@@ -39,5 +39,7 @@ test("getBuiltinShader resolves unyo_geometry shader", () => {
 test("getPostEffectShader resolves known effects and returns null for unknown", () => {
   assert.equal(getPostEffectShader("bloom"), POST_EFFECT_SHADERS.bloom);
   assert.equal(getPostEffectShader("chromatic"), POST_EFFECT_SHADERS.chromatic);
+  assert.equal(getPostEffectShader("motion_blur"), POST_EFFECT_SHADERS.motion_blur);
+  assert.equal(getPostEffectShader("crt"), POST_EFFECT_SHADERS.crt);
   assert.equal(getPostEffectShader("unknown"), null);
 });

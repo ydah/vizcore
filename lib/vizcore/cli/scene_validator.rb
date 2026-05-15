@@ -26,7 +26,7 @@ module Vizcore
         alpha normal add additive multiply screen difference
       ].freeze
       SUPPORTED_POST_EFFECTS = %i[
-        bloom glitch chromatic feedback
+        bloom glitch chromatic feedback motion_blur crt
       ].freeze
       SUPPORTED_VJ_EFFECTS = %i[
         mirror color_shift pixelate

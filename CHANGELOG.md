@@ -17,6 +17,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 - Add BPM lock settings via Ruby DSL and CLI options.
 - Add opt-in browser tap tempo for locking BPM during live control.
 - Add `beat_confidence` analysis output and DSL mapping source.
+- Add `motion_blur` and `crt` browser post effects for layers.
 - Validate unsupported layer `effect` and `vj_effect` names in `vizcore validate`.
 - Add text layer `font`, `align`, `fill`, `stroke`, and `shadow` styling.
 - Add browser HUD save/load for visual reactivity controls.

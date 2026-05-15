@@ -109,6 +109,28 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
     end
   end
 
+  it "accepts supported layer post effects" do
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :effects do
+          layer :blurred do
+            type :shader
+            effect :motion_blur
+          end
+
+          layer :retro do
+            type :shader
+            effect :crt
+          end
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+
+      expect(result).to be_valid
+    end
+  end
+
   it "formats scene structure for inspection" do
     with_scene_file(<<~RUBY) do |scene_path|
       Vizcore.define do
