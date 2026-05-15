@@ -30,6 +30,7 @@ module Vizcore
       # @return [void]
       def run
         validate_scene_file!
+        validate_feature_settings!
         validate_audio_settings!
         definition = load_definition!
         @tap_tempo_key = tap_tempo_key(definition)
@@ -37,8 +38,8 @@ module Vizcore
 
         app = RackApp.new(
           frontend_root: Vizcore.frontend_root,
-          audio_source: @config.audio_source,
-          audio_file: @config.audio_file,
+          audio_source: runtime_audio_source,
+          audio_file: runtime_audio_file,
           scene_names: scene_names_for(definition),
           tap_tempo_key: @tap_tempo_key,
           key_mappings: key_mappings_for(definition),
@@ -49,17 +50,14 @@ module Vizcore
         server.add_tcp_listener(@config.host, @config.port)
         server.run
 
-        input_manager = Vizcore::Audio::InputManager.new(
-          source: @config.audio_source,
-          file_path: @config.audio_file&.to_s,
-          audio_device: @config.audio_device
-        )
+        input_manager = build_input_manager
         broadcaster = FrameBroadcaster.new(
           scene_name: scene[:name].to_s,
           scene_layers: scene[:layers],
           scene_catalog: definition[:scenes],
           transitions: definition[:transitions],
           input_manager: input_manager,
+          analysis_pipeline: replay_pipeline,
           noise_gate: @config.noise_gate,
           audio_normalize: audio_normalize_settings(definition),
           bpm: bpm_setting(definition),
@@ -67,7 +65,7 @@ module Vizcore
           error_reporter: ->(message) { @output.puts(message) }
         )
         replace_scene_catalog(definition[:scenes])
-        if @config.audio_source == :file
+        if file_transport_enabled?
           broadcaster.sync_transport(playing: false, position_seconds: 0.0)
         end
         broadcaster.start
@@ -84,7 +82,8 @@ module Vizcore
         @output.puts("Control panel: http://#{@config.host}:#{@config.port}/control")
         @output.puts("Scene: #{scene[:name]}")
         @output.puts("Hot reload: #{@config.reload? ? 'enabled' : 'disabled'}")
-        @output.puts("Audio playback: http://#{@config.host}:#{@config.port}/audio-file") if @config.audio_source == :file
+        @output.puts("Audio playback: http://#{@config.host}:#{@config.port}/audio-file") if file_transport_enabled?
+        @output.puts("Feature replay: #{@config.feature_file}") if feature_replay?
         @output.puts("Press Ctrl+C to stop.")
 
         wait_for_interrupt
@@ -121,10 +120,48 @@ module Vizcore
       end
 
       def validate_audio_settings!
+        return if feature_replay?
         return unless @config.audio_source == :file
         return if @config.audio_file && @config.audio_file.file?
 
         raise Vizcore::ConfigurationError, "Audio file not found: #{@config.audio_file || '(nil)'}"
+      end
+
+      def validate_feature_settings!
+        return unless feature_replay?
+        return if @config.feature_file.file?
+
+        raise Vizcore::ConfigurationError, "Feature file not found: #{@config.feature_file}"
+      end
+
+      def build_input_manager
+        Vizcore::Audio::InputManager.new(
+          source: feature_replay? ? :dummy : @config.audio_source,
+          file_path: runtime_audio_file&.to_s,
+          audio_device: feature_replay? ? nil : @config.audio_device
+        )
+      end
+
+      def replay_pipeline
+        return nil unless feature_replay?
+
+        Vizcore::Analysis::FeatureReplay.new(path: @config.feature_file)
+      end
+
+      def feature_replay?
+        !!@config.feature_file
+      end
+
+      def file_transport_enabled?
+        @config.audio_source == :file && !feature_replay?
+      end
+
+      def runtime_audio_source
+        feature_replay? ? :features : @config.audio_source
+      end
+
+      def runtime_audio_file
+        feature_replay? ? nil : @config.audio_file
       end
 
       def wait_for_interrupt
@@ -263,7 +300,7 @@ module Vizcore
         when "latency_probe"
           respond_to_latency_probe(socket, payload)
         when "transport_sync"
-          return unless @config.audio_source == :file
+          return unless file_transport_enabled?
 
           values = Hash(payload)
           broadcaster.sync_transport(

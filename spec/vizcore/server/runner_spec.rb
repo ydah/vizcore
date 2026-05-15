@@ -126,6 +126,42 @@ RSpec.describe Vizcore::Server::Runner do
       expect(broadcaster).to have_received(:sync_transport).with(playing: false, position_seconds: 0.0)
     end
 
+    it "uses recorded features instead of live audio when a feature file is configured" do
+      Dir.mktmpdir("vizcore-runner-features") do |dir|
+        feature_path = File.join(dir, "features.json")
+        File.write(feature_path, "{}")
+        feature_config = Vizcore::Config.new(
+          scene_file: scene_file.to_s,
+          host: "127.0.0.1",
+          port: 4567,
+          audio_source: :file,
+          feature_file: feature_path
+        )
+        replay = instance_double(Vizcore::Analysis::FeatureReplay)
+        allow(Vizcore::Analysis::FeatureReplay).to receive(:new).and_return(replay)
+        allow(Vizcore::Server::RackApp).to receive(:new).and_return(rack_app)
+        allow(Puma::Server).to receive(:new).and_return(puma_server)
+        allow(Vizcore::Audio::InputManager).to receive(:new).and_return(input_manager)
+        allow(Vizcore::Server::FrameBroadcaster).to receive(:new).and_return(broadcaster)
+
+        runner = described_class.new(feature_config, output: output)
+        allow(runner).to receive(:wait_for_interrupt)
+
+        runner.run
+
+        expect(Vizcore::Server::RackApp).to have_received(:new).with(
+          hash_including(audio_source: :features, audio_file: nil)
+        )
+        expect(Vizcore::Audio::InputManager).to have_received(:new).with(source: :dummy, file_path: nil, audio_device: nil)
+        expect(Vizcore::Analysis::FeatureReplay).to have_received(:new).with(path: feature_config.feature_file)
+        expect(Vizcore::Server::FrameBroadcaster).to have_received(:new).with(
+          hash_including(analysis_pipeline: replay)
+        )
+        expect(broadcaster).not_to have_received(:sync_transport)
+        expect(output.string).to include("Feature replay: #{feature_config.feature_file}")
+      end
+    end
+
     it "passes projector mode to RackApp" do
       projector_config = Vizcore::Config.new(
         scene_file: scene_file.to_s,

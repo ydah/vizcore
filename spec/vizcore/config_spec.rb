@@ -23,6 +23,13 @@ RSpec.describe Vizcore::Config do
     expect(config.audio_device).to eq("5")
   end
 
+  it "parses optional feature replay file" do
+    config = described_class.new(scene_file: scene_file, feature_file: "features.json")
+
+    expect(config.feature_file).to be_a(Pathname)
+    expect(config.feature_file.to_s).to end_with("features.json")
+  end
+
   it "parses optional noise gate" do
     config = described_class.new(scene_file: scene_file, noise_gate: "0.03")
 

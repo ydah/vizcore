@@ -314,6 +314,8 @@ RSpec.describe Vizcore::CLI do
           "--bpm",
           "128",
           "--bpm-lock",
+          "--feature-file",
+          "features.json",
           "--no-reload",
           "--projector"
         ]
@@ -326,6 +328,7 @@ RSpec.describe Vizcore::CLI do
         expect(config.noise_gate).to eq(0.03)
         expect(config.bpm).to eq(128.0)
         expect(config.bpm_lock?).to eq(true)
+        expect(config.feature_file.to_s).to end_with("features.json")
         expect(config.reload?).to eq(false)
         expect(config.projector_mode).to eq(true)
       end

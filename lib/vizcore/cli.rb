@@ -102,6 +102,7 @@ module Vizcore
     option :audio_source, type: :string, default: Config::DEFAULT_AUDIO_SOURCE.to_s, desc: "Audio source: mic, file, dummy"
     option :audio_file, type: :string, desc: "Path to audio file used when --audio-source file (wav/mp3/flac)"
     option :audio_device, type: :string, desc: "Audio input device index or name used when --audio-source mic"
+    option :feature_file, type: :string, desc: "Replay recorded feature JSON instead of live audio analysis"
     option :noise_gate, type: :numeric, default: Config::DEFAULT_NOISE_GATE, desc: "RMS level below which audio is treated as silence"
     option :bpm, type: :numeric, desc: "Fixed BPM value used with --bpm-lock"
     option :bpm_lock, type: :boolean, default: false, desc: "Lock analysis BPM output to --bpm"
@@ -120,6 +121,7 @@ module Vizcore
         audio_source: options.fetch(:audio_source),
         audio_file: options[:audio_file],
         audio_device: options[:audio_device],
+        feature_file: options[:feature_file],
         noise_gate: options.fetch(:noise_gate),
         bpm: options[:bpm],
         bpm_lock: options.fetch(:bpm_lock),

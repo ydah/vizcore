@@ -364,7 +364,7 @@ end
 ## CLI
 
 ```bash
-vizcore start SCENE_FILE [--host 127.0.0.1] [--port 4567] [--audio-source mic|file|dummy] [--audio-file PATH] [--audio-device INDEX_OR_NAME] [--noise-gate RMS] [--bpm BPM --bpm-lock] [--reload|--no-reload] [--projector]
+vizcore start SCENE_FILE [--host 127.0.0.1] [--port 4567] [--audio-source mic|file|dummy] [--audio-file PATH] [--audio-device INDEX_OR_NAME] [--feature-file features.json] [--noise-gate RMS] [--bpm BPM --bpm-lock] [--reload|--no-reload] [--projector]
 vizcore demo [--host 127.0.0.1] [--port 4567] [--projector]
 vizcore doctor
 vizcore validate SCENE_FILE
@@ -405,6 +405,10 @@ vizcore start scene.rb --audio-source file --audio-file track.wav
 
 # MP3/FLAC (requires ffmpeg)
 vizcore start scene.rb --audio-source file --audio-file set.mp3
+
+# Recorded analysis features
+vizcore record-features track.wav --out features.json --frames 300 --fps 30
+vizcore start scene.rb --feature-file features.json
 ```
 
 When using file source, the HUD exposes **Play Audio** / **Pause Audio** controls and shows BPM, Beat, and Beat Count.
@@ -420,7 +424,7 @@ Use `vizcore snapshot scene.rb --audio-source dummy --out screenshot.png` to cre
 
 Use `vizcore render scene.rb --audio-source file --audio-file track.wav --out frames --frames 120 --fps 30` to write a software-rendered PNG image sequence, or `--out movie.mp4` to encode the frames to MP4 with `ffmpeg`.
 
-Use `vizcore record-features track.wav --out features.json --frames 300 --fps 30` to capture the same audio analysis values as JSON for debugging mappings or comparing tracks.
+Use `vizcore record-features track.wav --out features.json --frames 300 --fps 30` to capture the same audio analysis values as JSON for debugging mappings or comparing tracks. Replay the file with `vizcore start scene.rb --feature-file features.json` when you want deterministic visual behavior without live audio input.
 
 ## Requirements
 

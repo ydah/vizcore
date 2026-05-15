@@ -51,6 +51,14 @@ module Vizcore::Analysis
 
     def write: (out: String | Pathname) -> Hash[Symbol, untyped]
   end
+
+  class FeatureReplay
+    attr_reader metadata: Hash[Symbol, untyped]
+
+    def initialize: (path: String | Pathname path) -> void
+    def call: (?Array[Float]? samples) -> Hash[Symbol, untyped]
+    def frame_count: () -> Integer
+  end
 end
 
 module Vizcore::DSL
