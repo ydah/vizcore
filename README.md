@@ -408,6 +408,7 @@ Run `vizcore gallery` to open a browser gallery of bundled examples with scene c
 | `examples/complex_audio_showcase.rb` | Dense multi-layer showcase |
 | `examples/rhythm_geometry.rb` | Single large morphing geometric pattern scene with drum-reactive motion |
 | `examples/ruby_crystal_show.rb` | Ruby-themed crystal, particles, and title visual |
+| `examples/parser_visualizer.rb` | Parser-themed token, AST, and reduce visual sketch |
 | `examples/live_coding_minimal.rb` | Tiny scene for live-coding demos |
 | `examples/club_intro_drop.rb` | Intro, build, and drop flow for rhythmic file input |
 | `examples/shader_playground.rb` | Focused shader scene with declared params |

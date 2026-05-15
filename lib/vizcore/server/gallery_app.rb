@@ -18,6 +18,7 @@ module Vizcore
         "complex_audio_showcase.rb" => "Dense multi-scene showcase for audio-reactive layers.",
         "rhythm_geometry.rb" => "Morphing geometric pattern driven by rhythm and bands.",
         "ruby_crystal_show.rb" => "Ruby-themed crystal, particles, and text showcase.",
+        "parser_visualizer.rb" => "Parser-themed token, AST, and reduce visual sketch.",
         "live_coding_minimal.rb" => "Tiny live-coding scene with a pulsing blob.",
         "club_intro_drop.rb" => "Intro, build, and drop flow for rhythmic file input.",
         "shader_playground.rb" => "Focused liquid shader scene with mapped params.",
@@ -31,6 +32,7 @@ module Vizcore
         complex_audio_showcase.rb
         rhythm_geometry.rb
         ruby_crystal_show.rb
+        parser_visualizer.rb
         club_intro_drop.rb
         audio_inspector.rb
       ].freeze

@@ -30,6 +30,7 @@ RSpec.describe "example scenes" do
     "examples/complex_audio_showcase.rb" => { expected_scene: "build" },
     "examples/rhythm_geometry.rb" => { expected_scene: "rhythm_geometry" },
     "examples/ruby_crystal_show.rb" => { expected_scene: "ruby_crystal" },
+    "examples/parser_visualizer.rb" => { expected_scene: "parser_visualizer" },
     "examples/live_coding_minimal.rb" => { expected_scene: "main" },
     "examples/club_intro_drop.rb" => { expected_scene: "intro" },
     "examples/shader_playground.rb" => { expected_scene: "shader_playground" },
