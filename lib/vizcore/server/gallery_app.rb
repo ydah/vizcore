@@ -25,6 +25,7 @@ module Vizcore
         "audio_inspector.rb" => "Audio feature visualization scene with bars and blob.",
         "midi_scene_switch.rb" => "MIDI note and CC driven scene switching.",
         "midi_controller_show.rb" => "MIDI pads switch scenes and knobs drive global shader uniforms.",
+        "kansai_rubykaigi_visual.rb" => "Event showcase with ruby crystal, water ripple, and Kyoto-inspired pattern.",
         "custom_shader.rb" => "Custom GLSL fragment shader example.",
         "unyo_liquid.rb" => "Organic liquid wobble scene with FFT blobs and particles."
       }.freeze
@@ -36,6 +37,7 @@ module Vizcore
         parser_visualizer.rb
         club_intro_drop.rb
         audio_inspector.rb
+        kansai_rubykaigi_visual.rb
       ].freeze
       ORDER = DESCRIPTIONS.keys.freeze
 

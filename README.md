@@ -419,6 +419,7 @@ Run `vizcore gallery` to open a browser gallery of bundled examples with scene c
 | `examples/audio_inspector.rb` | Audio bars and blob for analysis visualization |
 | `examples/midi_scene_switch.rb` | MIDI-driven scene switching |
 | `examples/midi_controller_show.rb` | MIDI pads for scenes and knobs for global shader intensity/color |
+| `examples/kansai_rubykaigi_visual.rb` | Event showcase with ruby crystal, water ripple, and Kyoto-inspired pattern |
 | `examples/custom_shader.rb` | Custom GLSL shader with audio mapping |
 | `examples/unyo_liquid.rb` | Organic liquid wobble scene with FFT blob and particles |
 

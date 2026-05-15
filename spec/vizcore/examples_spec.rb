@@ -37,6 +37,7 @@ RSpec.describe "example scenes" do
     "examples/audio_inspector.rb" => { expected_scene: "audio_inspector" },
     "examples/midi_scene_switch.rb" => { expected_scene: "warmup" },
     "examples/midi_controller_show.rb" => { expected_scene: "midi_warmup" },
+    "examples/kansai_rubykaigi_visual.rb" => { expected_scene: "kansai_rubykaigi" },
     "examples/custom_shader.rb" => { expected_scene: "shader_art", expect_glsl_source: true },
     "examples/unyo_liquid.rb" => { expected_scene: "unyo" }
   }.each do |path, expectation|
