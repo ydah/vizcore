@@ -29,6 +29,13 @@ RSpec.describe Vizcore::Config do
     expect(config.noise_gate).to eq(0.03)
   end
 
+  it "parses optional BPM lock settings" do
+    config = described_class.new(scene_file: scene_file, bpm: "128", bpm_lock: true)
+
+    expect(config.bpm).to eq(128.0)
+    expect(config.bpm_lock?).to eq(true)
+  end
+
   it "parses projector mode" do
     config = described_class.new(scene_file: scene_file, projector_mode: true)
 

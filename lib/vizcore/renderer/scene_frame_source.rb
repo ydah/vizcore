@@ -76,7 +76,9 @@ module Vizcore
           sample_rate: @input_manager.sample_rate,
           fft_size: supported_fft_size(@input_manager.frame_size),
           noise_gate: @config.noise_gate,
-          audio_normalize: audio_normalize_settings
+          audio_normalize: audio_normalize_settings,
+          bpm: bpm_setting,
+          bpm_lock: bpm_lock_setting
         )
       end
 
@@ -84,6 +86,18 @@ module Vizcore
         Hash(@definition[:analysis] || {})[:audio_normalize]
       rescue StandardError
         nil
+      end
+
+      def bpm_setting
+        @config.bpm || Hash(@definition[:analysis] || {})[:bpm]
+      rescue StandardError
+        @config.bpm
+      end
+
+      def bpm_lock_setting
+        @config.bpm_lock? || !!Hash(@definition[:analysis] || {})[:bpm_lock]
+      rescue StandardError
+        @config.bpm_lock?
       end
 
       def supported_fft_size(size)

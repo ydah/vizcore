@@ -18,7 +18,7 @@ module Vizcore
     # Supported CLI audio source values.
     SUPPORTED_AUDIO_SOURCES = %i[mic file dummy].freeze
 
-    attr_reader :host, :port, :scene_file, :audio_source, :audio_file, :audio_device, :noise_gate, :projector_mode
+    attr_reader :host, :port, :scene_file, :audio_source, :audio_file, :audio_device, :noise_gate, :bpm, :projector_mode
 
     # @param scene_file [String, Pathname] scene DSL file path
     # @param host [String] bind host
@@ -27,6 +27,8 @@ module Vizcore
     # @param audio_file [String, Pathname, nil] file path used with `audio_source=:file`
     # @param audio_device [String, Integer, nil] input device index/name used with `audio_source=:mic`
     # @param noise_gate [Numeric] RMS threshold below which live input is treated as silence
+    # @param bpm [Numeric, nil] fixed BPM value used when BPM lock is enabled
+    # @param bpm_lock [Boolean] true when the analysis output BPM should stay fixed
     # @param reload [Boolean] true when scene file changes should be reloaded while running
     # @param projector_mode [Boolean] true when the browser should hide operator UI by default
     def initialize(
@@ -37,6 +39,8 @@ module Vizcore
       audio_file: nil,
       audio_device: nil,
       noise_gate: DEFAULT_NOISE_GATE,
+      bpm: nil,
+      bpm_lock: false,
       reload: DEFAULT_RELOAD,
       projector_mode: false
     )
@@ -47,6 +51,8 @@ module Vizcore
       @audio_file = audio_file ? Pathname.new(audio_file).expand_path : nil
       @audio_device = normalize_audio_device(audio_device)
       @noise_gate = normalize_noise_gate(noise_gate)
+      @bpm = normalize_bpm(bpm)
+      @bpm_lock = !!bpm_lock
       @reload = !!reload
       @projector_mode = !!projector_mode
     end
@@ -64,6 +70,11 @@ module Vizcore
     # @return [Boolean] true when scene hot reload is enabled.
     def reload?
       @reload
+    end
+
+    # @return [Boolean] true when BPM output should use the fixed BPM value.
+    def bpm_lock?
+      @bpm_lock
     end
 
     private
@@ -88,6 +99,17 @@ module Vizcore
       Float(value).clamp(0.0, 1.0)
     rescue ArgumentError, TypeError
       raise ArgumentError, "Noise gate must be numeric"
+    end
+
+    def normalize_bpm(value)
+      return nil if value.nil?
+
+      numeric = Float(value)
+      raise ArgumentError, "BPM must be positive" unless numeric.positive?
+
+      numeric
+    rescue ArgumentError, TypeError
+      raise ArgumentError, "BPM must be a positive number"
     end
   end
 end

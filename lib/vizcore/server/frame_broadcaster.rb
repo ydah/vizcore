@@ -25,6 +25,8 @@ module Vizcore
       # @param transition_controller [Vizcore::DSL::TransitionController, nil]
       # @param noise_gate [Numeric]
       # @param audio_normalize [Hash, nil]
+      # @param bpm [Numeric, nil]
+      # @param bpm_lock [Boolean]
       # @param error_reporter [#call, nil]
       def initialize(
         scene_name: "basic",
@@ -39,6 +41,8 @@ module Vizcore
         transition_controller: nil,
         noise_gate: Vizcore::Analysis::Pipeline::DEFAULT_NOISE_GATE,
         audio_normalize: nil,
+        bpm: nil,
+        bpm_lock: false,
         error_reporter: nil
       )
         @scene_name = scene_name
@@ -50,7 +54,9 @@ module Vizcore
           sample_rate: @input_manager.sample_rate,
           fft_size: fft_size,
           noise_gate: noise_gate,
-          audio_normalize: audio_normalize
+          audio_normalize: audio_normalize,
+          bpm: bpm,
+          bpm_lock: bpm_lock
         )
         @mapping_resolver = mapping_resolver || Vizcore::DSL::MappingResolver.new
         @scene_serializer = scene_serializer || Vizcore::Renderer::SceneSerializer.new
@@ -157,11 +163,14 @@ module Vizcore
       # Replace audio analysis settings after scene hot reload.
       #
       # @param audio_normalize [Hash, nil]
+      # @param bpm [Numeric, nil]
+      # @param bpm_lock [Boolean]
       # @return [void]
-      def update_analysis_settings(audio_normalize:)
+      def update_analysis_settings(audio_normalize:, bpm: nil, bpm_lock: false)
         return unless @analysis_pipeline.respond_to?(:audio_normalize=)
 
         @analysis_pipeline.audio_normalize = audio_normalize
+        @analysis_pipeline.bpm_lock = { bpm: bpm, locked: bpm_lock } if @analysis_pipeline.respond_to?(:bpm_lock=)
       end
 
       # Build one frame payload for transport to frontend.

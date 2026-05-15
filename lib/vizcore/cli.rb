@@ -100,6 +100,8 @@ module Vizcore
     option :audio_file, type: :string, desc: "Path to audio file used when --audio-source file (wav/mp3/flac)"
     option :audio_device, type: :string, desc: "Audio input device index or name used when --audio-source mic"
     option :noise_gate, type: :numeric, default: Config::DEFAULT_NOISE_GATE, desc: "RMS level below which audio is treated as silence"
+    option :bpm, type: :numeric, desc: "Fixed BPM value used with --bpm-lock"
+    option :bpm_lock, type: :boolean, default: false, desc: "Lock analysis BPM output to --bpm"
     option :reload, type: :boolean, default: Config::DEFAULT_RELOAD, desc: "Reload the scene file when it changes"
     option :projector, type: :boolean, default: false, desc: "Hide browser operator UI for projection output"
     # Start the Vizcore server with the given scene file.
@@ -116,6 +118,8 @@ module Vizcore
         audio_file: options[:audio_file],
         audio_device: options[:audio_device],
         noise_gate: options.fetch(:noise_gate),
+        bpm: options[:bpm],
+        bpm_lock: options.fetch(:bpm_lock),
         reload: options.fetch(:reload),
         projector_mode: options.fetch(:projector)
       )
@@ -128,6 +132,8 @@ module Vizcore
     option :host, type: :string, default: Config::DEFAULT_HOST, desc: "Bind host"
     option :port, type: :numeric, default: Config::DEFAULT_PORT, desc: "Bind port"
     option :noise_gate, type: :numeric, default: Config::DEFAULT_NOISE_GATE, desc: "RMS level below which audio is treated as silence"
+    option :bpm, type: :numeric, desc: "Fixed BPM value used with --bpm-lock"
+    option :bpm_lock, type: :boolean, default: false, desc: "Lock analysis BPM output to --bpm"
     option :projector, type: :boolean, default: false, desc: "Hide browser operator UI for projection output"
     # Start a bundled scene with bundled audio for first-run verification.
     #
@@ -140,6 +146,8 @@ module Vizcore
         audio_source: :file,
         audio_file: Vizcore.root.join("examples", "assets", "complex_demo_loop.wav"),
         noise_gate: options.fetch(:noise_gate),
+        bpm: options[:bpm],
+        bpm_lock: options.fetch(:bpm_lock),
         projector_mode: options.fetch(:projector)
       )
       Server::Runner.new(config).run
@@ -281,6 +289,8 @@ module Vizcore
     option :audio_file, type: :string, desc: "Path to audio file used when --audio-source file"
     option :audio_device, type: :string, desc: "Audio input device index or name used when --audio-source mic"
     option :noise_gate, type: :numeric, default: Config::DEFAULT_NOISE_GATE, desc: "RMS level below which audio is treated as silence"
+    option :bpm, type: :numeric, desc: "Fixed BPM value used with --bpm-lock"
+    option :bpm_lock, type: :boolean, default: false, desc: "Lock analysis BPM output to --bpm"
     option :out, type: :string, default: "snapshot.png", desc: "Output PNG path"
     option :width, type: :numeric, default: Vizcore::Renderer::SnapshotRenderer::DEFAULT_WIDTH, desc: "Snapshot width"
     option :height, type: :numeric, default: Vizcore::Renderer::SnapshotRenderer::DEFAULT_HEIGHT, desc: "Snapshot height"
@@ -295,7 +305,9 @@ module Vizcore
         audio_source: options.fetch(:audio_source),
         audio_file: options[:audio_file],
         audio_device: options[:audio_device],
-        noise_gate: options.fetch(:noise_gate)
+        noise_gate: options.fetch(:noise_gate),
+        bpm: options[:bpm],
+        bpm_lock: options.fetch(:bpm_lock)
       )
       validate_snapshot_config!(config)
 
@@ -314,6 +326,8 @@ module Vizcore
     option :audio_file, type: :string, desc: "Path to audio file used when --audio-source file"
     option :audio_device, type: :string, desc: "Audio input device index or name used when --audio-source mic"
     option :noise_gate, type: :numeric, default: Config::DEFAULT_NOISE_GATE, desc: "RMS level below which audio is treated as silence"
+    option :bpm, type: :numeric, desc: "Fixed BPM value used with --bpm-lock"
+    option :bpm_lock, type: :boolean, default: false, desc: "Lock analysis BPM output to --bpm"
     option :out, type: :string, default: "frames", desc: "Output directory for PNG frames"
     option :frames, type: :numeric, default: Vizcore::Renderer::RenderSequence::DEFAULT_FRAME_COUNT, desc: "Number of frames to write"
     option :fps, type: :numeric, default: Vizcore::Renderer::RenderSequence::DEFAULT_FRAME_RATE, desc: "Render frame rate"
@@ -330,7 +344,9 @@ module Vizcore
         audio_source: options.fetch(:audio_source),
         audio_file: options[:audio_file],
         audio_device: options[:audio_device],
-        noise_gate: options.fetch(:noise_gate)
+        noise_gate: options.fetch(:noise_gate),
+        bpm: options[:bpm],
+        bpm_lock: options.fetch(:bpm_lock)
       )
       validate_snapshot_config!(config)
 

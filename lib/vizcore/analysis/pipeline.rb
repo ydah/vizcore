@@ -20,7 +20,9 @@ module Vizcore
       # @param smoother [Vizcore::Analysis::Smoother, nil]
       # @param noise_gate [Numeric] RMS threshold below which input is treated as silence
       # @param audio_normalize [Hash, nil] optional audio normalization settings
-      def initialize(sample_rate: 44_100, fft_size: 1024, window: :hamming, beat_detector: nil, bpm_estimator: nil, smoother: nil, noise_gate: DEFAULT_NOISE_GATE, audio_normalize: nil)
+      # @param bpm [Numeric, nil] fixed BPM value used when bpm_lock is true
+      # @param bpm_lock [Boolean] true when BPM output should stay fixed
+      def initialize(sample_rate: 44_100, fft_size: 1024, window: :hamming, beat_detector: nil, bpm_estimator: nil, smoother: nil, noise_gate: DEFAULT_NOISE_GATE, audio_normalize: nil, bpm: nil, bpm_lock: false)
         @fft_processor = FFTProcessor.new(sample_rate: sample_rate, fft_size: fft_size, window: window)
         @band_splitter = BandSplitter.new(sample_rate: sample_rate, fft_size: fft_size)
         @beat_detector = beat_detector || BeatDetector.new
@@ -28,6 +30,7 @@ module Vizcore
         @bpm_estimator = bpm_estimator || BPMEstimator.new(frame_rate: @analysis_frame_rate)
         @smoother = smoother || Smoother.new(alpha: 0.35)
         @noise_gate = normalize_noise_gate(noise_gate)
+        self.bpm_lock = { bpm: bpm, locked: bpm_lock }
         self.audio_normalize = audio_normalize
         @beat_pulse = 0.0
         @last_bpm = 0.0
@@ -41,6 +44,14 @@ module Vizcore
       def audio_normalize=(settings)
         @audio_normalize = normalize_audio_normalize(settings)
         @normalizer = build_normalizer(@audio_normalize)
+      end
+
+      # @param settings [Hash]
+      # @return [Float, nil]
+      def bpm_lock=(settings)
+        values = symbolize_hash(settings)
+        @locked_bpm = normalize_locked_bpm(values[:bpm], bpm_lock: values[:locked])
+        @last_bpm = @locked_bpm if @locked_bpm
       end
 
       # @param samples [Array<Numeric>] audio frame samples
@@ -104,6 +115,17 @@ module Vizcore
         raise ArgumentError, "unsupported audio_normalize mode: #{settings[:mode]}" unless %i[off adaptive].include?(mode)
 
         settings.merge(mode: mode)
+      end
+
+      def normalize_locked_bpm(value, bpm_lock:)
+        return nil unless bpm_lock
+
+        numeric = Float(value)
+        raise ArgumentError, "bpm must be positive when bpm_lock is enabled" unless numeric.positive?
+
+        numeric
+      rescue ArgumentError, TypeError
+        raise ArgumentError, "bpm must be a positive number when bpm_lock is enabled"
       end
 
       def build_normalizer(settings)
@@ -197,7 +219,7 @@ module Vizcore
       end
 
       def reset_tempo_state
-        @last_bpm = 0.0
+        @last_bpm = @locked_bpm || 0.0
         @bpm_estimator.reset if @bpm_estimator.respond_to?(:reset)
       end
 
@@ -232,6 +254,8 @@ module Vizcore
       end
 
       def resolve_bpm(beat_detected)
+        return @last_bpm = @locked_bpm if @locked_bpm
+
         bpm = @bpm_estimator.call(beat: beat_detected)
         @last_bpm = @smoother.smooth(:bpm, bpm, alpha: 0.2).to_f
       end

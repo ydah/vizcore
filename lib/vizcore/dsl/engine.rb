@@ -140,6 +140,22 @@ module Vizcore
         @analysis_settings[:audio_normalize] = settings
       end
 
+      # Set a fixed BPM value for analysis output.
+      #
+      # @param value [Numeric]
+      # @return [Float]
+      def bpm(value)
+        @analysis_settings[:bpm] = positive_float(value, "bpm")
+      end
+
+      # Enable or disable fixed BPM output.
+      #
+      # @param value [Boolean]
+      # @return [Boolean]
+      def bpm_lock(value = true)
+        @analysis_settings[:bpm_lock] = !!value
+      end
+
       # Define a scene and its layers.
       #
       # @param name [Symbol, String] scene identifier

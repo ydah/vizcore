@@ -14,6 +14,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 - Add opt-in adaptive `audio_normalize` DSL for repeatable audio feature levels.
 - Add `onset` and band onset analysis sources for mappings, transitions, and shaders.
 - Add simple `kick`, `snare`, and `hihat` percussive confidence sources.
+- Add BPM lock settings via Ruby DSL and CLI options.
 - Add `beat_confidence` analysis output and DSL mapping source.
 - Validate unsupported layer `effect` and `vj_effect` names in `vizcore validate`.
 - Add text layer `font`, `align`, `fill`, `stroke`, and `shadow` styling.

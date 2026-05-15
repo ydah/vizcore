@@ -10,6 +10,8 @@ RSpec.describe Vizcore::DSL::Engine do
       definition = described_class.define do
         audio :mic, device: :default, sample_rate: 44_100
         audio_normalize mode: :adaptive, window: 3.0, target: 0.8, floor: 0.05
+        bpm 128
+        bpm_lock true
         midi :controller, device: "Launchpad"
         set :global_intensity, 0.75
 
@@ -30,7 +32,11 @@ RSpec.describe Vizcore::DSL::Engine do
       end
 
       expect(definition[:audio]).to eq([{ name: :mic, options: { device: :default, sample_rate: 44_100 } }])
-      expect(definition[:analysis]).to eq(audio_normalize: { mode: :adaptive, window: 3.0, target: 0.8, floor: 0.05 })
+      expect(definition[:analysis]).to eq(
+        audio_normalize: { mode: :adaptive, window: 3.0, target: 0.8, floor: 0.05 },
+        bpm: 128.0,
+        bpm_lock: true
+      )
       expect(definition[:midi]).to eq([{ name: :controller, options: { device: "Launchpad" } }])
       expect(definition[:globals]).to eq(global_intensity: 0.75)
       expect(definition[:scenes].length).to eq(1)

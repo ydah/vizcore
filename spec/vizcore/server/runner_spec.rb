@@ -182,7 +182,7 @@ RSpec.describe Vizcore::Server::Runner do
         scenes: [hash_including(name: :updated)],
         transitions: []
       )
-      expect(broadcaster).to have_received(:update_analysis_settings).with(audio_normalize: nil)
+      expect(broadcaster).to have_received(:update_analysis_settings).with(audio_normalize: nil, bpm: nil, bpm_lock: false)
       expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
         type: "config_update",
         payload: hash_including(

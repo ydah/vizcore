@@ -206,6 +206,9 @@ RSpec.describe Vizcore::CLI do
           "5",
           "--noise-gate",
           "0.03",
+          "--bpm",
+          "128",
+          "--bpm-lock",
           "--no-reload",
           "--projector"
         ]
@@ -216,6 +219,8 @@ RSpec.describe Vizcore::CLI do
         expect(config.audio_file.to_s).to end_with("spec/fixtures/audio/pulse16_mono.wav")
         expect(config.audio_device).to eq("5")
         expect(config.noise_gate).to eq(0.03)
+        expect(config.bpm).to eq(128.0)
+        expect(config.bpm_lock?).to eq(true)
         expect(config.reload?).to eq(false)
         expect(config.projector_mode).to eq(true)
       end

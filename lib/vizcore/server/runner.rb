@@ -58,6 +58,8 @@ module Vizcore
           input_manager: input_manager,
           noise_gate: @config.noise_gate,
           audio_normalize: audio_normalize_settings(definition),
+          bpm: bpm_setting(definition),
+          bpm_lock: bpm_lock_setting(definition),
           error_reporter: ->(message) { @output.puts(message) }
         )
         replace_scene_catalog(definition[:scenes])
@@ -140,7 +142,11 @@ module Vizcore
             scenes: Array(definition[:scenes]),
             transitions: Array(definition[:transitions])
           )
-          broadcaster.update_analysis_settings(audio_normalize: audio_normalize_settings(definition))
+          broadcaster.update_analysis_settings(
+            audio_normalize: audio_normalize_settings(definition),
+            bpm: bpm_setting(definition),
+            bpm_lock: bpm_lock_setting(definition)
+          )
           broadcaster.update_scene(scene_name: scene[:name], scene_layers: scene[:layers])
           on_reload&.call(definition)
           WebSocketHandler.broadcast(
@@ -348,6 +354,18 @@ module Vizcore
         Hash(definition[:analysis] || {})[:audio_normalize]
       rescue StandardError
         nil
+      end
+
+      def bpm_setting(definition)
+        @config.bpm || Hash(definition[:analysis] || {})[:bpm]
+      rescue StandardError
+        @config.bpm
+      end
+
+      def bpm_lock_setting(definition)
+        @config.bpm_lock? || !!Hash(definition[:analysis] || {})[:bpm_lock]
+      rescue StandardError
+        @config.bpm_lock?
       end
 
       def switch_scene_from_client(target_name, broadcaster)

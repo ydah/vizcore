@@ -223,6 +223,24 @@ RSpec.describe Vizcore::Analysis::Pipeline do
     expect(result[:bpm]).to eq(126.5)
   end
 
+  it "can lock BPM output to a fixed value" do
+    bpm_estimator = instance_double(Vizcore::Analysis::BPMEstimator)
+    allow(bpm_estimator).to receive(:call)
+    pipeline = described_class.new(
+      sample_rate: 44_100,
+      fft_size: 1024,
+      bpm_estimator: bpm_estimator,
+      bpm: 128,
+      bpm_lock: true
+    )
+    samples = sine_samples(frequency_hz: 220.0, sample_rate: 44_100, count: 1024, amplitude: 0.6)
+
+    result = pipeline.call(samples)
+
+    expect(result[:bpm]).to eq(128.0)
+    expect(bpm_estimator).not_to have_received(:call)
+  end
+
   it "emits a decaying beat pulse" do
     beat_detector = instance_double(Vizcore::Analysis::BeatDetector)
     allow(beat_detector).to receive(:call).and_return(

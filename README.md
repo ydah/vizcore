@@ -125,6 +125,14 @@ audio_normalize mode: :adaptive, window: 3.0, target: 0.85, floor: 0.05
 This keeps `amplitude` and FFT-driven mappings in a repeatable range without
 changing the default analysis behavior.
 
+When the detected tempo should not drift during a prepared file or live set,
+lock BPM at the top of the scene file:
+
+```ruby
+bpm 128
+bpm_lock true
+```
+
 For a more music-oriented style, `react_to` groups the same mappings by source:
 
 ```ruby
@@ -300,7 +308,7 @@ end
 ## CLI
 
 ```bash
-vizcore start SCENE_FILE [--host 127.0.0.1] [--port 4567] [--audio-source mic|file|dummy] [--audio-file PATH] [--audio-device INDEX_OR_NAME] [--noise-gate RMS] [--reload|--no-reload] [--projector]
+vizcore start SCENE_FILE [--host 127.0.0.1] [--port 4567] [--audio-source mic|file|dummy] [--audio-file PATH] [--audio-device INDEX_OR_NAME] [--noise-gate RMS] [--bpm BPM --bpm-lock] [--reload|--no-reload] [--projector]
 vizcore demo [--host 127.0.0.1] [--port 4567] [--projector]
 vizcore doctor
 vizcore validate SCENE_FILE
