@@ -186,6 +186,7 @@ vizcore doctor
 vizcore validate SCENE_FILE
 vizcore inspect SCENE_FILE
 vizcore snapshot SCENE_FILE [--audio-source dummy|file|mic] [--audio-file PATH] [--out screenshot.png]
+vizcore render SCENE_FILE [--audio-source dummy|file|mic] [--audio-file PATH] [--out frames] [--frames 60] [--fps 30]
 vizcore new PROJECT_NAME [--template standard|minimal|shader|midi|live-set|rubykaigi]
 vizcore devices [audio|midi]
 ```
@@ -223,6 +224,8 @@ The browser HUD also includes an Audio Inspector with amplitude, sub/low/mid/hig
 `vizcore demo` starts a bundled scene with bundled audio, so it is the quickest way to verify a fresh installation.
 
 Use `vizcore snapshot scene.rb --audio-source dummy --out screenshot.png` to create a software-rendered PNG preview for README, social cards, or quick visual checks without starting the browser.
+
+Use `vizcore render scene.rb --audio-source file --audio-file track.wav --out frames --frames 120 --fps 30` to write a software-rendered PNG image sequence. Direct MP4 output is not implemented yet; encode the generated frames with `ffmpeg` when you need a video file.
 
 ## Requirements
 

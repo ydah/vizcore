@@ -142,6 +142,37 @@ RSpec.describe Vizcore::CLI do
       end
     end
 
+    it "writes a PNG image sequence" do
+      Dir.mktmpdir("vizcore-cli-render") do |dir|
+        out = File.join(dir, "frames")
+
+        expect do
+          described_class.start(
+            [
+              "render",
+              "examples/basic.rb",
+              "--audio-source",
+              "dummy",
+              "--out",
+              out,
+              "--frames",
+              "2",
+              "--fps",
+              "15",
+              "--width",
+              "160",
+              "--height",
+              "90"
+            ]
+          )
+        end.to output(/Frames written: #{Regexp.escape(out)}/).to_stdout
+
+        frames = Dir[File.join(out, "frame_*.png")].sort
+        expect(frames.map { |path| File.basename(path) }).to eq(%w[frame_00001.png frame_00002.png])
+        expect(File.binread(frames.first, 8)).to eq(Vizcore::Renderer::PngWriter::SIGNATURE)
+      end
+    end
+
     it "passes audio options to config" do
       described_class.start(
         [

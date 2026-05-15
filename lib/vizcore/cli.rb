@@ -264,6 +264,46 @@ module Vizcore
       raise Thor::Error, e.message
     end
 
+    desc "render SCENE_FILE", "Render a PNG image sequence for a scene"
+    option :audio_source, type: :string, default: "dummy", desc: "Audio source: dummy, file, mic"
+    option :audio_file, type: :string, desc: "Path to audio file used when --audio-source file"
+    option :audio_device, type: :string, desc: "Audio input device index or name used when --audio-source mic"
+    option :noise_gate, type: :numeric, default: Config::DEFAULT_NOISE_GATE, desc: "RMS level below which audio is treated as silence"
+    option :out, type: :string, default: "frames", desc: "Output directory for PNG frames"
+    option :frames, type: :numeric, default: Vizcore::Renderer::RenderSequence::DEFAULT_FRAME_COUNT, desc: "Number of frames to write"
+    option :fps, type: :numeric, default: Vizcore::Renderer::RenderSequence::DEFAULT_FRAME_RATE, desc: "Render frame rate"
+    option :width, type: :numeric, default: Vizcore::Renderer::SnapshotRenderer::DEFAULT_WIDTH, desc: "Frame width"
+    option :height, type: :numeric, default: Vizcore::Renderer::SnapshotRenderer::DEFAULT_HEIGHT, desc: "Frame height"
+    # Load a scene DSL file and write a software-rendered PNG image sequence.
+    #
+    # @param scene_file [String] path to a Ruby scene DSL file
+    # @raise [Thor::Error] when scene loading or frame writing fails
+    # @return [void]
+    def render(scene_file)
+      config = Config.new(
+        scene_file: scene_file,
+        audio_source: options.fetch(:audio_source),
+        audio_file: options[:audio_file],
+        audio_device: options[:audio_device],
+        noise_gate: options.fetch(:noise_gate)
+      )
+      validate_snapshot_config!(config)
+
+      result = Vizcore::Renderer::RenderSequence.new(
+        config: config,
+        frames: options.fetch(:frames),
+        fps: options.fetch(:fps),
+        width: options.fetch(:width),
+        height: options.fetch(:height)
+      ).write(out: options.fetch(:out))
+      say(
+        "Frames written: #{result[:path]} " \
+        "(scene=#{result[:scene]}, frames=#{result[:frames]}, fps=#{result[:fps]}, #{result[:width]}x#{result[:height]})"
+      )
+    rescue StandardError => e
+      raise Thor::Error, e.message
+    end
+
     private
 
     def status_label(status)
