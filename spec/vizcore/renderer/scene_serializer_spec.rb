@@ -28,7 +28,12 @@ RSpec.describe Vizcore::Renderer::SceneSerializer do
             glsl_source: "void main() { }",
             params: { intensity: 0.5 }
           }
-        ]
+        ],
+        metrics: {
+          frame_id: 12,
+          audio_capture_ms: 0.12345,
+          audio_analysis_ms: 1.98765
+        }
       )
 
       expect(frame[:timestamp]).to eq(1.23456)
@@ -56,6 +61,11 @@ RSpec.describe Vizcore::Renderer::SceneSerializer do
         ]
       )
       expect(frame[:transition]).to be_nil
+      expect(frame[:metrics]).to eq(
+        frame_id: 12,
+        audio_capture_ms: 0.1235,
+        audio_analysis_ms: 1.9877
+      )
     end
   end
 end

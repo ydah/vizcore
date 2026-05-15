@@ -6,6 +6,7 @@ void main() {
   gl_Position = vec4(a_position, 0.0, 1.0);
 }
 `;
+export const SHADER_COMPILE_EVENT = "vizcore:shader-compile";
 
 export class ShaderManager {
   constructor(gl) {
@@ -20,8 +21,13 @@ export class ShaderManager {
       return cached;
     }
 
+    const startedAtMs = nowMs();
     const program = this.createProgram(vertexSource, fragmentSource);
     this.programCache.set(key, program);
+    dispatchShaderCompileEvent({
+      cacheKey: key,
+      compileMs: nowMs() - startedAtMs,
+    });
     return program;
   }
 
@@ -66,4 +72,24 @@ const compileShader = (gl, type, source) => {
     throw new Error(`Shader compilation failed: ${info}`);
   }
   return shader;
+};
+
+const nowMs = () => {
+  if (typeof performance !== "undefined" && typeof performance.now === "function") {
+    return performance.now();
+  }
+
+  return Date.now();
+};
+
+const dispatchShaderCompileEvent = (detail) => {
+  if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") {
+    return;
+  }
+
+  if (typeof CustomEvent !== "function") {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent(SHADER_COMPILE_EVENT, { detail }));
 };

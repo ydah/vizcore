@@ -9,14 +9,17 @@ module Vizcore
       # @param scene_name [String, Symbol]
       # @param scene_layers [Array<Hash>]
       # @param transition [Hash, nil]
+      # @param metrics [Hash, nil]
       # @return [Hash]
-      def audio_frame(timestamp:, audio:, scene_name:, scene_layers:, transition: nil)
-        {
+      def audio_frame(timestamp:, audio:, scene_name:, scene_layers:, transition: nil, metrics: nil)
+        frame = {
           timestamp: Float(timestamp),
           audio: serialize_audio(audio),
           scene: serialize_scene(scene_name, scene_layers),
           transition: transition
         }
+        frame[:metrics] = serialize_metrics(metrics) if metrics
+        frame
       end
 
       private
@@ -55,6 +58,14 @@ module Vizcore
         output[:glsl] = values[:glsl].to_s if values[:glsl]
         output[:glsl_source] = values[:glsl_source].to_s if values[:glsl_source]
         output
+      end
+
+      def serialize_metrics(metrics)
+        symbolize_hash(metrics).each_with_object({}) do |(key, value), output|
+          output[key] = key == :frame_id ? Integer(value) : round_float(value)
+        rescue StandardError
+          output[key] = 0
+        end
       end
 
       def symbolize_hash(value)

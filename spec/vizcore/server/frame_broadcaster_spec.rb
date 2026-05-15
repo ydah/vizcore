@@ -33,9 +33,16 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
     it "returns a frame payload compatible with frontend expectations" do
       frame = described_class.new(scene_name: "basic").build_frame(1.25)
 
-      expect(frame).to include(:timestamp, :audio, :scene, :transition)
+      expect(frame).to include(:timestamp, :audio, :scene, :transition, :metrics)
       expect(frame[:audio]).to include(:amplitude, :bands, :fft, :beat, :beat_count, :bpm)
       expect(frame[:scene]).to include(:name, :layers)
+      expect(frame[:metrics]).to include(
+        :frame_id,
+        :audio_capture_ms,
+        :audio_analysis_ms,
+        :scene_build_ms,
+        :server_frame_ms
+      )
       expect(frame[:scene][:name]).to eq("basic")
       expect(frame[:audio][:fft].length).to eq(32)
     end

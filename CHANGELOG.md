@@ -6,6 +6,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+- Add a browser HUD performance monitor for FPS, frame time, WebSocket latency, dropped-frame estimates, audio processing time, shader compile time, and reconnect count.
 - Add browser HUD Blackout/Freeze emergency controls for live output.
 - Add explicit layer `blend` DSL support and frontend compositing for alpha/add/multiply/screen/difference modes.
 - Add `react_to` layer DSL for grouping source-driven `change` and `trigger` mappings.

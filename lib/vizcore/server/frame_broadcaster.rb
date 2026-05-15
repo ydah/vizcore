@@ -158,17 +158,25 @@ module Vizcore
       # @raise [Vizcore::FrameBuildError] when frame construction fails
       # @return [Hash]
       def build_frame(_elapsed_seconds, samples = nil)
-        audio_samples = samples || capture_samples
-        analyzed = @analysis_pipeline.call(audio_samples)
+        started_at_ms = monotonic_ms
+        audio_samples, audio_capture_ms = capture_or_use_samples(samples)
+        analyzed, audio_analysis_ms = measure_ms { @analysis_pipeline.call(audio_samples) }
         scene = current_scene
-        layers = build_scene_layers(scene[:layers], analyzed)
+        layers, scene_build_ms = measure_ms { build_scene_layers(scene[:layers], analyzed) }
 
         @scene_serializer.audio_frame(
           timestamp: Time.now.to_f,
           audio: analyzed,
           scene_name: scene[:name],
           scene_layers: layers,
-          transition: nil
+          transition: nil,
+          metrics: {
+            frame_id: @frame_count,
+            audio_capture_ms: audio_capture_ms,
+            audio_analysis_ms: audio_analysis_ms,
+            scene_build_ms: scene_build_ms,
+            server_frame_ms: monotonic_ms - started_at_ms
+          }
         )
       rescue StandardError => e
         report_error(e, context: "frame build failed")
@@ -176,6 +184,22 @@ module Vizcore
       end
 
       private
+
+      def capture_or_use_samples(samples)
+        return [samples, 0.0] if samples
+
+        measure_ms { capture_samples }
+      end
+
+      def measure_ms
+        started_at = monotonic_ms
+        result = yield
+        [result, monotonic_ms - started_at]
+      end
+
+      def monotonic_ms
+        Process.clock_gettime(Process::CLOCK_MONOTONIC, :float_millisecond)
+      end
 
       def capture_samples
         ingest_count =

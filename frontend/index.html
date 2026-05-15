@@ -159,6 +159,15 @@
       font-variant-numeric: tabular-nums;
     }
 
+    .hud .performance-monitor {
+      margin-top: 0.45rem;
+      padding-top: 0.45rem;
+      border-top: 1px solid rgba(153, 195, 255, 0.16);
+      color: #a8d8ff;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.35;
+    }
+
     .reactivity-controls {
       margin-top: 0.55rem;
       padding-top: 0.55rem;
@@ -351,6 +360,7 @@
         <button id="freeze-toggle" type="button" aria-pressed="false">Freeze</button>
         <p id="live-control-status" class="live-controls__status">Live: output</p>
       </div>
+      <p id="performance-monitor" class="performance-monitor">Perf: -- FPS | Frame -- | WS -- | Drop 0 | Audio -- | Shader -- | Reconnect 0</p>
       <div class="audio-inspector" aria-label="Audio inspector">
         <div class="audio-inspector__header">
           <span>Audio</span>

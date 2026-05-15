@@ -5,7 +5,16 @@ import {
   shortcutActionForKey,
   toggleLiveControl,
 } from "./live-controls.js";
+import {
+  createPerformanceMonitorState,
+  formatPerformanceMonitorText,
+  recordConnectionStatus,
+  recordRenderFrame,
+  recordShaderCompile,
+  recordSocketFrame,
+} from "./performance-monitor.js";
 import { Engine } from "./renderer/engine.js";
+import { SHADER_COMPILE_EVENT } from "./renderer/shader-manager.js";
 import { SHADER_ERROR_EVENT, formatShaderErrorMessage, formatShaderErrorTitle } from "./shader-error-overlay.js";
 import { WebSocketClient } from "./websocket-client.js";
 
@@ -19,6 +28,7 @@ const beatStatusElement = document.querySelector("#beat-status");
 const blackoutButton = document.querySelector("#blackout-toggle");
 const freezeButton = document.querySelector("#freeze-toggle");
 const liveControlStatusElement = document.querySelector("#live-control-status");
+const performanceMonitorElement = document.querySelector("#performance-monitor");
 const inspectorPeakElement = document.querySelector("#inspector-peak");
 const inspectorAmplitudeFill = document.querySelector("#inspector-amplitude-fill");
 const inspectorAmplitudeValue = document.querySelector("#inspector-amplitude-value");
@@ -56,7 +66,9 @@ const visualSettings = {
   wobbleAmount: 1.0,
 };
 const liveControls = createLiveControlState();
+const performanceMonitor = createPerformanceMonitorState();
 const engine = new Engine(canvas);
+bindShaderCompileMetrics();
 engine.init();
 engine.setVisualSettings(visualSettings);
 engine.setLiveControls(liveControls);
@@ -67,10 +79,12 @@ bindVisualControl(smoothingControl, "smoothing");
 bindVisualControl(beatHoldControl, "beatHoldMs");
 bindVisualControl(wobbleControl, "wobbleAmount");
 renderLiveControlStatus();
+renderPerformanceMonitor();
 renderReactivityStatus();
 bindShaderErrorOverlay();
 const fftBars = initializeFftPreview(fftPreviewElement);
 engine.start();
+startPerformanceMonitorLoop();
 
 let currentSceneName = "unknown";
 let audioElement = null;
@@ -85,6 +99,7 @@ let pendingSceneRequestedAt = 0;
 const websocketUrl = buildWebSocketUrl();
 const client = new WebSocketClient(websocketUrl, {
   onFrame: (frame) => {
+    updatePerformanceMonitor(recordSocketFrame(performanceMonitor, frame, Date.now()));
     engine.setAudioFrame(frame);
     frameCount += 1;
     let sceneName = String(frame?.scene?.name || currentSceneName);
@@ -140,6 +155,7 @@ const client = new WebSocketClient(websocketUrl, {
     }
   },
   onStatus: (status) => {
+    updatePerformanceMonitor(recordConnectionStatus(performanceMonitor, status));
     if (status === "connected") {
       lastConnectedAt = new Date();
       syncAudioTransportToServer({ force: true });
@@ -252,6 +268,32 @@ function renderSceneButtons() {
     return button;
   });
   sceneSwitcherElement.replaceChildren(...buttons);
+}
+
+function startPerformanceMonitorLoop() {
+  requestAnimationFrame((time) => {
+    updatePerformanceMonitor(recordRenderFrame(performanceMonitor, time));
+    startPerformanceMonitorLoop();
+  });
+}
+
+function updatePerformanceMonitor(nextState) {
+  Object.assign(performanceMonitor, nextState);
+  renderPerformanceMonitor();
+}
+
+function renderPerformanceMonitor() {
+  if (!performanceMonitorElement) {
+    return;
+  }
+
+  performanceMonitorElement.textContent = formatPerformanceMonitorText(performanceMonitor);
+}
+
+function bindShaderCompileMetrics() {
+  window.addEventListener(SHADER_COMPILE_EVENT, (event) => {
+    updatePerformanceMonitor(recordShaderCompile(performanceMonitor, event.detail));
+  });
 }
 
 function bindLiveControls() {
