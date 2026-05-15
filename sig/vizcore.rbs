@@ -1,0 +1,108 @@
+module Vizcore
+  VERSION: String
+
+  def self.root: () -> Pathname
+  def self.frontend_root: () -> Pathname
+  def self.templates_root: () -> Pathname
+  def self.define: () { () -> void } -> Hash[Symbol, untyped]
+end
+
+module Vizcore::DSL
+  type source = { kind: Symbol, ?band: Symbol }
+  type transform = {
+    ?gain: Float,
+    ?min: Float,
+    ?max: Float,
+    ?curve: Symbol,
+    ?attack: Float,
+    ?release: Float
+  }
+  type mapping = { source: source, target: Symbol, ?transform: transform }
+  type param_schema_entry = {
+    name: Symbol,
+    ?default: Float,
+    ?min: Float,
+    ?max: Float,
+    ?step: Float
+  }
+  type layer = {
+    name: Symbol,
+    type: Symbol,
+    params: Hash[Symbol, untyped],
+    ?shader: Symbol,
+    ?glsl: String,
+    ?param_schema: Array[param_schema_entry],
+    ?mappings: Array[mapping]
+  }
+  type scene = { name: Symbol, layers: Array[layer] }
+
+  class Engine
+    def self.define: () { () -> void } -> Hash[Symbol, untyped]
+    def self.load_file: (String | Pathname path) -> Hash[Symbol, untyped]
+    def self.watch_file: (String | Pathname path, ?poll_interval: Float poll_interval, ?listener_factory: untyped listener_factory) { (Hash[Symbol, untyped], Pathname) -> void } -> FileWatcher
+
+    def audio: (Symbol | String name, **untyped options) -> Array[Hash[Symbol, untyped]]
+    def midi: (Symbol | String name, **untyped options) -> Array[Hash[Symbol, untyped]]
+    def scene: (Symbol | String name) { () -> void } -> void
+    def transition: (from: Symbol | String, to: Symbol | String) { () -> void } -> void
+    def midi_map: (?note: Integer? note, ?cc: Integer? cc, ?pc: Integer? pc) { (*untyped) -> void } -> void
+    def set: (Symbol | String key, untyped value) -> untyped
+    def to_h: () -> Hash[Symbol, untyped]
+  end
+
+  class SceneBuilder
+    def initialize: (name: Symbol | String name) -> void
+    def evaluate: () ?{ () -> void } -> SceneBuilder
+    def layer: (Symbol | String name) ?{ () -> void } -> void
+    def to_h: () -> scene
+  end
+
+  class LayerBuilder
+    def initialize: (name: Symbol | String name) -> void
+    def evaluate: () ?{ () -> void } -> LayerBuilder
+    def type: (Symbol | String value) -> Symbol
+    def shader: (Symbol | String value, ?reload: bool? reload) -> Symbol
+    def glsl: (String | Pathname path) -> String
+    def count: (Integer value) -> Integer
+    def content: (String value) -> String
+    def font_size: (Integer value) -> Integer
+    def blend: (Symbol | String value) -> Symbol
+    def param: (
+      Symbol | String name,
+      ?default: Numeric? default,
+      ?range: Range[Numeric]? | [Numeric, Numeric]? range,
+      ?min: Numeric? min,
+      ?max: Numeric? max,
+      ?step: Numeric? step
+    ) -> Hash[Symbol, untyped]
+    def map: (?Hash[untyped, untyped] | Symbol | String definition, **untyped options) -> void
+    def react_to: (Hash[Symbol, untyped] | Symbol | String source_value) { () -> void } -> void
+    def amplitude: () -> source
+    def frequency_band: (Symbol | String name) -> source
+    def sub: () -> source
+    def low: () -> source
+    def bass: () -> source
+    def mid: () -> source
+    def high: () -> source
+    def treble: () -> source
+    def fft_spectrum: () -> source
+    def beat?: () -> source
+    def beat: () -> source
+    def beat_pulse: () -> source
+    def beat_count: () -> source
+    def bpm: () -> source
+    def to_h: () -> layer
+  end
+
+  class ReactionBuilder
+    def initialize: (mapping_factory: ^(Symbol | String, Hash[Symbol, untyped]) -> mapping mapping_factory) -> void
+    def evaluate: () { () -> void } -> Array[mapping]
+    def change: (Symbol | String target, **untyped options) -> mapping
+    def trigger: (Symbol | String target, **untyped options) -> mapping
+  end
+
+  class MappingResolver
+    def initialize: () -> void
+    def resolve_layers: (scene_layers: Array[Hash[Symbol, untyped]], audio: Hash[Symbol, untyped]) -> Array[Hash[Symbol, untyped]]
+  end
+end
