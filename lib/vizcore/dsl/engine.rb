@@ -156,6 +156,17 @@ module Vizcore
         @analysis_settings[:bpm_lock] = !!value
       end
 
+      # Enable browser keyboard tap tempo.
+      #
+      # @param key [Symbol, String] key that should send tap tempo events
+      # @return [Hash]
+      def tap_tempo(key: :t)
+        normalized_key = key.to_s.strip.downcase
+        raise ArgumentError, "tap_tempo key must not be empty" if normalized_key.empty?
+
+        @analysis_settings[:tap_tempo] = { key: normalized_key }
+      end
+
       # Define a scene and its layers.
       #
       # @param name [Symbol, String] scene identifier

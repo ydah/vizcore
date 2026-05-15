@@ -15,6 +15,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 - Add `onset` and band onset analysis sources for mappings, transitions, and shaders.
 - Add simple `kick`, `snare`, and `hihat` percussive confidence sources.
 - Add BPM lock settings via Ruby DSL and CLI options.
+- Add opt-in browser tap tempo for locking BPM during live control.
 - Add `beat_confidence` analysis output and DSL mapping source.
 - Validate unsupported layer `effect` and `vj_effect` names in `vizcore validate`.
 - Add text layer `font`, `align`, `fill`, `stroke`, and `shadow` styling.

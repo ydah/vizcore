@@ -1,6 +1,7 @@
 import { BAND_KEYS, DEFAULT_FFT_BINS, buildAudioInspectorState, formatMeterValue } from "./audio-inspector.js";
 import {
   createLiveControlState,
+  isTapTempoShortcut,
   liveControlStatusText,
   shortcutActionForKey,
   shortcutSceneIndexForKey,
@@ -104,6 +105,7 @@ let beatFlashUntil = 0;
 let availableSceneNames = [];
 let pendingSceneName = null;
 let pendingSceneRequestedAt = 0;
+let tapTempoKey = null;
 
 const websocketUrl = buildWebSocketUrl();
 const client = new WebSocketClient(websocketUrl, {
@@ -162,6 +164,9 @@ const client = new WebSocketClient(websocketUrl, {
       sceneStatusElement.textContent = `Scene: ${currentSceneName}`;
       renderSceneButtons();
     }
+    if (Object.prototype.hasOwnProperty.call(payload || {}, "tap_tempo_key")) {
+      updateTapTempoKey(payload?.tap_tempo_key);
+    }
   },
   onLatencyProbe: (payload) => {
     updatePerformanceMonitor(recordLatencyProbe(performanceMonitor, payload, Date.now()));
@@ -217,6 +222,7 @@ function applyRuntime(runtime) {
   const source = String(runtime?.audio_source || "unknown");
   audioSourceStatusElement.textContent = `Audio Source: ${source}`;
   updateAvailableScenes(runtime?.scene_names);
+  updateTapTempoKey(runtime?.tap_tempo_key);
 
   const fileName = runtime?.audio_file_name;
   const fileUrl = runtime?.audio_file_url;
@@ -239,6 +245,11 @@ function updateAvailableScenes(sceneValues) {
   }
   availableSceneNames = names;
   renderSceneButtons();
+}
+
+function updateTapTempoKey(key) {
+  const value = String(key || "").trim().toLowerCase();
+  tapTempoKey = value || null;
 }
 
 function normalizeSceneNames(sceneValues) {
@@ -362,6 +373,15 @@ function bindLiveControls() {
 
     event.preventDefault();
     requestSceneSwitch(availableSceneNames[sceneIndex]);
+  });
+
+  window.addEventListener("keydown", (event) => {
+    if (!isTapTempoShortcut(event, tapTempoKey)) {
+      return;
+    }
+
+    event.preventDefault();
+    client.send("tap_tempo", { client_tapped_at_ms: Date.now() });
   });
 }
 

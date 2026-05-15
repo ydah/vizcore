@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   createLiveControlState,
+  isTapTempoShortcut,
   isEditableShortcutTarget,
   liveControlStatusText,
   shortcutActionForKey,
@@ -50,6 +51,15 @@ test("shortcutSceneIndexForKey maps number keys to available scene indexes", () 
   assert.equal(shortcutSceneIndexForKey({ key: "4", target: { tagName: "DIV" } }, 3), null);
   assert.equal(shortcutSceneIndexForKey({ key: "0", target: { tagName: "DIV" } }, 9), null);
   assert.equal(shortcutSceneIndexForKey({ key: "1", target: { tagName: "INPUT" } }, 3), null);
+});
+
+test("isTapTempoShortcut matches configured keys outside editable fields", () => {
+  assert.equal(isTapTempoShortcut({ key: "T", target: { tagName: "DIV" } }, "t"), true);
+  assert.equal(isTapTempoShortcut({ key: " ", target: { tagName: "DIV" } }, "space"), true);
+  assert.equal(isTapTempoShortcut({ key: "Spacebar", target: { tagName: "DIV" } }, "space"), true);
+  assert.equal(isTapTempoShortcut({ key: "x", target: { tagName: "DIV" } }, "t"), false);
+  assert.equal(isTapTempoShortcut({ key: "T", target: { tagName: "INPUT" } }, "t"), false);
+  assert.equal(isTapTempoShortcut({ key: "T", target: { tagName: "DIV" } }, null), false);
 });
 
 test("isEditableShortcutTarget detects editable controls", () => {

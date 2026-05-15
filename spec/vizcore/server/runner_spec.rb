@@ -47,6 +47,7 @@ RSpec.describe Vizcore::Server::Runner do
         audio_source: :mic,
         audio_file: nil,
         scene_names: ["basic"],
+        tap_tempo_key: nil,
         projector_mode: false
       )
       expect(Puma::Server).to have_received(:new).with(rack_app, nil, min_threads: 0, max_threads: 4)
@@ -115,6 +116,7 @@ RSpec.describe Vizcore::Server::Runner do
         audio_source: :file,
         audio_file: file_config.audio_file,
         scene_names: ["basic"],
+        tap_tempo_key: nil,
         projector_mode: false
       )
       expect(broadcaster).to have_received(:sync_transport).with(playing: false, position_seconds: 0.0)
@@ -251,6 +253,42 @@ RSpec.describe Vizcore::Server::Runner do
           server_sent_at_ms: 1_101.5
         }
       )
+    end
+
+    it "applies tap tempo messages from the browser" do
+      runner = described_class.new(config, output: output)
+      broadcaster = instance_double(Vizcore::Server::FrameBroadcaster)
+      runner.instance_variable_set(:@tap_tempo_key, "t")
+      allow(broadcaster).to receive(:tap_tempo).and_return(120.0)
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+
+      runner.send(
+        :handle_client_message,
+        { "type" => "tap_tempo", "payload" => { "client_tapped_at_ms" => 1_500.0 } },
+        broadcaster
+      )
+
+      expect(broadcaster).to have_received(:tap_tempo).with(timestamp_ms: 1_500.0)
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "config_update",
+        payload: hash_including(bpm: 120.0, bpm_lock: true, source: "tap_tempo")
+      )
+    end
+
+    it "ignores tap tempo messages until tap tempo is configured" do
+      runner = described_class.new(config, output: output)
+      broadcaster = instance_double(Vizcore::Server::FrameBroadcaster)
+      allow(broadcaster).to receive(:tap_tempo)
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+
+      runner.send(
+        :handle_client_message,
+        { "type" => "tap_tempo", "payload" => { "client_tapped_at_ms" => 1_500.0 } },
+        broadcaster
+      )
+
+      expect(broadcaster).not_to have_received(:tap_tempo)
+      expect(Vizcore::Server::WebSocketHandler).not_to have_received(:broadcast)
     end
 
     it "raises when file source is selected without an existing file" do

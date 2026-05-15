@@ -19,6 +19,7 @@ module Vizcore
       # @param audio_source [Symbol, String, nil]
       # @param audio_file [String, Pathname, nil]
       # @param scene_names [Array<String, Symbol>, nil]
+      # @param tap_tempo_key [String, Symbol, nil]
       # @param projector_mode [Boolean]
       def initialize(
         frontend_root:,
@@ -26,6 +27,7 @@ module Vizcore
         audio_source: nil,
         audio_file: nil,
         scene_names: nil,
+        tap_tempo_key: nil,
         projector_mode: false
       )
         @frontend_root = frontend_root.expand_path
@@ -33,6 +35,7 @@ module Vizcore
         @audio_source = audio_source&.to_sym
         @audio_file = audio_file ? Pathname.new(audio_file).expand_path : nil
         @scene_names = normalize_scene_names(scene_names)
+        @tap_tempo_key = normalize_tap_tempo_key(tap_tempo_key)
         @projector_mode = !!projector_mode
       end
 
@@ -66,6 +69,7 @@ module Vizcore
           audio_file_name: nil,
           audio_file_url: nil,
           scene_names: @scene_names,
+          tap_tempo_key: @tap_tempo_key,
           projector_mode: @projector_mode
         }
 
@@ -174,6 +178,15 @@ module Vizcore
         end.uniq
       rescue StandardError
         []
+      end
+
+      def normalize_tap_tempo_key(value)
+        key = value.to_s.strip.downcase
+        return nil if key.empty?
+
+        key
+      rescue StandardError
+        nil
       end
 
       def parse_byte_range(raw_range, file_size)

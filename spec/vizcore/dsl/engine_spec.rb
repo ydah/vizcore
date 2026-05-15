@@ -12,6 +12,7 @@ RSpec.describe Vizcore::DSL::Engine do
         audio_normalize mode: :adaptive, window: 3.0, target: 0.8, floor: 0.05
         bpm 128
         bpm_lock true
+        tap_tempo key: :t
         midi :controller, device: "Launchpad"
         set :global_intensity, 0.75
 
@@ -35,7 +36,8 @@ RSpec.describe Vizcore::DSL::Engine do
       expect(definition[:analysis]).to eq(
         audio_normalize: { mode: :adaptive, window: 3.0, target: 0.8, floor: 0.05 },
         bpm: 128.0,
-        bpm_lock: true
+        bpm_lock: true,
+        tap_tempo: { key: "t" }
       )
       expect(definition[:midi]).to eq([{ name: :controller, options: { device: "Launchpad" } }])
       expect(definition[:globals]).to eq(global_intensity: 0.75)

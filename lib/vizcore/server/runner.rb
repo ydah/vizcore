@@ -32,6 +32,7 @@ module Vizcore
         validate_scene_file!
         validate_audio_settings!
         definition = load_definition!
+        @tap_tempo_key = tap_tempo_key(definition)
         scene = first_scene(definition) || fallback_scene
 
         app = RackApp.new(
@@ -39,6 +40,7 @@ module Vizcore
           audio_source: @config.audio_source,
           audio_file: @config.audio_file,
           scene_names: scene_names_for(definition),
+          tap_tempo_key: @tap_tempo_key,
           projector_mode: @config.projector_mode
         )
         server = Puma::Server.new(app, nil, min_threads: 0, max_threads: 4)
@@ -137,6 +139,7 @@ module Vizcore
         watcher = Vizcore::Server::SceneDependencyWatcher.new(scene_file: @config.scene_file.to_s, definition: definition) do |definition, _changed_path|
           definition = resolve_shader_sources(definition)
           replace_scene_catalog(definition[:scenes])
+          @tap_tempo_key = tap_tempo_key(definition)
           scene = first_scene(definition) || fallback_scene
           broadcaster.update_transition_definition(
             scenes: Array(definition[:scenes]),
@@ -153,7 +156,8 @@ module Vizcore
             type: "config_update",
             payload: {
               scene: scene,
-              scenes: scene_names_for(definition)
+              scenes: scene_names_for(definition),
+              tap_tempo_key: @tap_tempo_key
             }
           )
           @output.puts("Scene reloaded: #{scene[:name]}")
@@ -266,6 +270,8 @@ module Vizcore
           values = Hash(payload)
           target_name = values.fetch("scene", values.fetch(:scene, values.fetch("scene_name", values.fetch(:scene_name, nil))))
           switch_scene_from_client(target_name, broadcaster)
+        when "tap_tempo"
+          apply_tap_tempo(payload, broadcaster)
         end
       rescue StandardError => e
         @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "Client control message failed"))
@@ -366,6 +372,32 @@ module Vizcore
         @config.bpm_lock? || !!Hash(definition[:analysis] || {})[:bpm_lock]
       rescue StandardError
         @config.bpm_lock?
+      end
+
+      def tap_tempo_key(definition)
+        settings = Hash(definition.dig(:analysis, :tap_tempo) || {})
+        key = settings[:key] || settings["key"]
+        key.to_s unless key.nil? || key.to_s.empty?
+      rescue StandardError
+        nil
+      end
+
+      def apply_tap_tempo(payload, broadcaster)
+        return unless @tap_tempo_key
+
+        values = Hash(payload)
+        tapped_at_ms = finite_float(values["client_tapped_at_ms"] || values[:client_tapped_at_ms]) || wall_clock_ms
+        bpm = broadcaster.tap_tempo(timestamp_ms: tapped_at_ms)
+        return unless bpm
+
+        WebSocketHandler.broadcast(
+          type: "config_update",
+          payload: {
+            bpm: bpm,
+            bpm_lock: true,
+            source: "tap_tempo"
+          }
+        )
       end
 
       def switch_scene_from_client(target_name, broadcaster)

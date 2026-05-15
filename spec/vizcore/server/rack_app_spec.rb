@@ -98,13 +98,15 @@ RSpec.describe Vizcore::Server::RackApp do
   it "includes scene names in runtime metadata" do
     runtime_app = described_class.new(
       frontend_root: Vizcore.frontend_root,
-      scene_names: %i[build drop]
+      scene_names: %i[build drop],
+      tap_tempo_key: :t
     )
 
     response = Rack::MockRequest.new(runtime_app).get("/runtime")
 
     expect(response.status).to eq(200)
     expect(response.body).to include("\"scene_names\":[\"build\",\"drop\"]")
+    expect(response.body).to include("\"tap_tempo_key\":\"t\"")
   end
 
   it "supports byte range requests for audio file streaming" do

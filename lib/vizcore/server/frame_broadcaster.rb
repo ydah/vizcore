@@ -69,6 +69,7 @@ module Vizcore
         @frame_count = 0
         @transport_playing = initial_transport_playing_state
         reset_transition_trigger_counters!
+        @tap_tempo = Vizcore::Analysis::TapTempo.new
         @frame_scheduler = frame_scheduler || Vizcore::Renderer::FrameScheduler.new(frame_rate: FRAME_RATE) do |elapsed|
           tick(elapsed)
         end
@@ -171,6 +172,19 @@ module Vizcore
 
         @analysis_pipeline.audio_normalize = audio_normalize
         @analysis_pipeline.bpm_lock = { bpm: bpm, locked: bpm_lock } if @analysis_pipeline.respond_to?(:bpm_lock=)
+      end
+
+      # Apply a manual tap tempo event and lock analysis BPM when enough taps exist.
+      #
+      # @param timestamp_ms [Numeric]
+      # @return [Float, nil]
+      def tap_tempo(timestamp_ms:)
+        bpm = @tap_tempo.tap(timestamp_ms: timestamp_ms)
+        return nil unless bpm
+        return bpm unless @analysis_pipeline.respond_to?(:bpm_lock=)
+
+        @analysis_pipeline.bpm_lock = { bpm: bpm, locked: true }
+        bpm
       end
 
       # Build one frame payload for transport to frontend.

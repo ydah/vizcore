@@ -133,6 +133,16 @@ bpm 128
 bpm_lock true
 ```
 
+When you want to set tempo by ear from the browser during a live set, opt in to
+tap tempo and choose the keyboard key:
+
+```ruby
+tap_tempo key: :space
+```
+
+After two valid taps, Vizcore estimates BPM from recent intervals and applies it
+as a locked BPM so beat-driven visuals stop drifting.
+
 For a more music-oriented style, `react_to` groups the same mappings by source:
 
 ```ruby

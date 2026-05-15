@@ -163,6 +163,19 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
     end
   end
 
+  describe "#tap_tempo" do
+    it "locks the analysis pipeline after two taps" do
+      pipeline = instance_double(Vizcore::Analysis::Pipeline, call: {})
+      allow(pipeline).to receive(:bpm_lock=)
+
+      broadcaster = described_class.new(analysis_pipeline: pipeline)
+
+      expect(broadcaster.tap_tempo(timestamp_ms: 1_000.0)).to be_nil
+      expect(broadcaster.tap_tempo(timestamp_ms: 1_500.0)).to eq(120.0)
+      expect(pipeline).to have_received(:bpm_lock=).with({ bpm: 120.0, locked: true })
+    end
+  end
+
   describe "#tick" do
     it "broadcasts scene_change when a transition condition is met" do
       input_manager = instance_double(

@@ -46,6 +46,33 @@ export const shortcutSceneIndexForKey = (event, sceneCount) => {
   return index;
 };
 
+export const isTapTempoShortcut = (event, configuredKey) => {
+  if (isEditableShortcutTarget(event?.target)) {
+    return false;
+  }
+
+  const key = normalizeShortcutKey(configuredKey);
+  if (!key) {
+    return false;
+  }
+
+  return normalizeShortcutKey(event?.key) === key;
+};
+
+const normalizeShortcutKey = (value) => {
+  const raw = String(value || "");
+  if (raw === " ") {
+    return "space";
+  }
+
+  const key = raw.trim().toLowerCase();
+  if (key === "spacebar") {
+    return "space";
+  }
+
+  return key;
+};
+
 export const isEditableShortcutTarget = (target) => {
   if (!target) {
     return false;
