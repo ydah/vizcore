@@ -48,6 +48,7 @@ RSpec.describe Vizcore::Server::Runner do
         audio_file: nil,
         scene_names: ["basic"],
         tap_tempo_key: nil,
+        key_mappings: [],
         globals: {},
         projector_mode: false
       )
@@ -118,6 +119,7 @@ RSpec.describe Vizcore::Server::Runner do
         audio_file: file_config.audio_file,
         scene_names: ["basic"],
         tap_tempo_key: nil,
+        key_mappings: [],
         globals: {},
         projector_mode: false
       )
@@ -167,6 +169,9 @@ RSpec.describe Vizcore::Server::Runner do
                 name: :updated,
                 layers: [{ name: :layer, type: :shader, params: {} }]
               }
+            ],
+            key_mappings: [
+              { key: "u", action: { type: :switch_scene, scene: "updated" } }
             ]
           },
           scene_file
@@ -191,7 +196,8 @@ RSpec.describe Vizcore::Server::Runner do
         type: "config_update",
         payload: hash_including(
           scene: hash_including(name: :updated),
-          scenes: ["updated"]
+          scenes: ["updated"],
+          key_mappings: [hash_including(key: "u")]
         )
       )
     end

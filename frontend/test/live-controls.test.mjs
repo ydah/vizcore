@@ -5,7 +5,9 @@ import {
   createLiveControlState,
   isTapTempoShortcut,
   isEditableShortcutTarget,
+  keyboardActionForKey,
   liveControlStatusText,
+  normalizeKeyboardMappings,
   shortcutActionForKey,
   shortcutSceneIndexForKey,
   toggleLiveControl,
@@ -51,6 +53,25 @@ test("shortcutSceneIndexForKey maps number keys to available scene indexes", () 
   assert.equal(shortcutSceneIndexForKey({ key: "4", target: { tagName: "DIV" } }, 3), null);
   assert.equal(shortcutSceneIndexForKey({ key: "0", target: { tagName: "DIV" } }, 9), null);
   assert.equal(shortcutSceneIndexForKey({ key: "1", target: { tagName: "INPUT" } }, 3), null);
+});
+
+test("keyboardActionForKey resolves configured runtime key mappings", () => {
+  const mappings = normalizeKeyboardMappings([
+    { key: "D", action: { type: "switch_scene", scene: "drop" } },
+    { key: " ", action: { type: "live_control", control: "freeze" } },
+    { key: "x", action: { type: "unknown" } },
+  ]);
+
+  assert.deepEqual(
+    keyboardActionForKey({ key: "d", target: { tagName: "DIV" } }, mappings),
+    { type: "switch_scene", scene: "drop" },
+  );
+  assert.deepEqual(
+    keyboardActionForKey({ key: "Spacebar", target: { tagName: "DIV" } }, mappings),
+    { type: "live_control", control: "freeze" },
+  );
+  assert.equal(keyboardActionForKey({ key: "x", target: { tagName: "DIV" } }, mappings), null);
+  assert.equal(keyboardActionForKey({ key: "d", target: { tagName: "INPUT" } }, mappings), null);
 });
 
 test("isTapTempoShortcut matches configured keys outside editable fields", () => {

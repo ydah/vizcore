@@ -65,6 +65,8 @@ module Vizcore::DSL
   type style = { name: Symbol, params: Hash[Symbol, untyped] }
   type theme = { name: Symbol, params: Hash[Symbol, untyped] }
   type timeline_entry = { at: Float, unit: Symbol, scene: Symbol }
+  type key_action = { type: Symbol, ?scene: String, ?control: Symbol }
+  type key_mapping = { key: String, action: key_action }
 
   class Engine
     def self.define: () { () -> void } -> Hash[Symbol, untyped]
@@ -80,6 +82,7 @@ module Vizcore::DSL
     def bpm_lock: () -> bool
                 | (bool value) -> bool
     def tap_tempo: (?key: Symbol | String key) -> Hash[Symbol, untyped]
+    def key: (Symbol | String value) { () -> void } -> void
     def scene: (Symbol | String name, ?extends: Symbol | String? extends) { () -> void } -> void
     def section: (Symbol | String name, bars: Integer bars, ?beats_per_bar: Integer beats_per_bar) { () -> void } -> void
     def timeline: (?beats_per_bar: Integer beats_per_bar) { () -> void } -> void
@@ -113,6 +116,15 @@ module Vizcore::DSL
     def trigger: () { () -> bool } -> void
     def on_beat: (Integer count) -> void
     def on_bar: (Integer count, ?beats_per_bar: Integer beats_per_bar) -> void
+    def to_h: () -> Hash[Symbol, untyped]
+  end
+
+  class Engine::KeyBindingBuilder
+    def initialize: () -> void
+    def switch_scene: (Symbol | String name) -> void
+    def blackout: () -> void
+    def freeze: () -> void
+    def live_control: (Symbol | String control) -> void
     def to_h: () -> Hash[Symbol, untyped]
   end
 

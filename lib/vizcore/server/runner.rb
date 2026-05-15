@@ -41,6 +41,7 @@ module Vizcore
           audio_file: @config.audio_file,
           scene_names: scene_names_for(definition),
           tap_tempo_key: @tap_tempo_key,
+          key_mappings: key_mappings_for(definition),
           globals: globals_for(definition),
           projector_mode: @config.projector_mode
         )
@@ -159,6 +160,7 @@ module Vizcore
               scene: scene,
               scenes: scene_names_for(definition),
               tap_tempo_key: @tap_tempo_key,
+              key_mappings: key_mappings_for(definition),
               globals: globals_for(definition)
             }
           )
@@ -338,6 +340,19 @@ module Vizcore
         Hash(definition[:globals] || {})
       rescue StandardError
         {}
+      end
+
+      def key_mappings_for(definition)
+        Array(definition[:key_mappings]).map do |mapping|
+          key = mapping[:key] || mapping["key"]
+          action = mapping[:action] || mapping["action"]
+          {
+            key: key.to_s,
+            action: action
+          }
+        end
+      rescue StandardError
+        []
       end
 
       def resolve_shader_sources(definition)

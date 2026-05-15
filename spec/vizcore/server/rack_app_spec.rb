@@ -36,6 +36,7 @@ RSpec.describe Vizcore::Server::RackApp do
     expect(response.headers["content-type"]).to include("application/json")
     expect(response.body).to include("\"audio_source\":\"unknown\"")
     expect(response.body).to include("\"scene_names\":[]")
+    expect(response.body).to include("\"key_mappings\":[]")
     expect(response.body).to include("\"projector_mode\":false")
   end
 
@@ -100,6 +101,10 @@ RSpec.describe Vizcore::Server::RackApp do
       frontend_root: Vizcore.frontend_root,
       scene_names: %i[build drop],
       tap_tempo_key: :t,
+      key_mappings: [
+        { key: "d", action: { type: :switch_scene, scene: :drop } },
+        { key: " ", action: { type: :live_control, control: :freeze } }
+      ],
       globals: { global_intensity: 0.75 }
     )
 
@@ -108,6 +113,8 @@ RSpec.describe Vizcore::Server::RackApp do
     expect(response.status).to eq(200)
     expect(response.body).to include("\"scene_names\":[\"build\",\"drop\"]")
     expect(response.body).to include("\"tap_tempo_key\":\"t\"")
+    expect(response.body).to include("\"key_mappings\":[{\"key\":\"d\",\"action\":{\"type\":\"switch_scene\",\"scene\":\"drop\"}}")
+    expect(response.body).to include("{\"key\":\"space\",\"action\":{\"type\":\"live_control\",\"control\":\"freeze\"}}")
     expect(response.body).to include("\"globals\":{\"global_intensity\":0.75}")
   end
 

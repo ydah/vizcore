@@ -2,7 +2,9 @@ import { BAND_KEYS, DEFAULT_FFT_BINS, buildAudioInspectorState, formatMeterValue
 import {
   createLiveControlState,
   isTapTempoShortcut,
+  keyboardActionForKey,
   liveControlStatusText,
+  normalizeKeyboardMappings,
   shortcutActionForKey,
   shortcutSceneIndexForKey,
   toggleLiveControl,
@@ -108,6 +110,7 @@ let lastTransportSyncAt = 0;
 let latencyProbeTimer = null;
 let beatFlashUntil = 0;
 let availableSceneNames = [];
+let keyboardMappings = [];
 let pendingSceneName = null;
 let pendingSceneRequestedAt = 0;
 let tapTempoKey = null;
@@ -181,6 +184,9 @@ const client = new WebSocketClient(websocketUrl, {
     if (Object.prototype.hasOwnProperty.call(payload || {}, "tap_tempo_key")) {
       updateTapTempoKey(payload?.tap_tempo_key);
     }
+    if (Object.prototype.hasOwnProperty.call(payload || {}, "key_mappings")) {
+      updateKeyboardMappings(payload?.key_mappings);
+    }
     if (Object.prototype.hasOwnProperty.call(payload || {}, "globals")) {
       runtimeGlobalsReceived = true;
       applyRuntimeGlobals(payload?.globals);
@@ -241,6 +247,7 @@ function applyRuntime(runtime) {
   audioSourceStatusElement.textContent = `Audio Source: ${source}`;
   updateAvailableScenes(runtime?.scene_names);
   updateTapTempoKey(runtime?.tap_tempo_key);
+  updateKeyboardMappings(runtime?.key_mappings);
   if (!runtimeGlobalsReceived) {
     applyRuntimeGlobals(runtime?.globals);
   }
@@ -277,6 +284,11 @@ function updateTapTempoKey(key) {
   tapTempoKey = value || null;
 }
 
+function updateKeyboardMappings(mappings) {
+  keyboardMappings = normalizeKeyboardMappings(mappings);
+  renderSceneButtons();
+}
+
 function normalizeSceneNames(sceneValues) {
   const seen = new Set();
   const names = [];
@@ -309,8 +321,10 @@ function renderSceneButtons() {
   sceneSwitcherElement.hidden = false;
   const buttons = availableSceneNames.map((sceneName) => {
     const button = document.createElement("button");
+    const shortcut = sceneShortcutFor(sceneName);
     button.type = "button";
-    button.textContent = sceneName;
+    button.textContent = shortcut ? `${sceneName} [${shortcut}]` : sceneName;
+    button.title = shortcut ? `Shortcut: ${shortcut}` : "";
     button.classList.toggle("is-active", sceneName === currentSceneName);
     button.onclick = () => {
       requestSceneSwitch(sceneName);
@@ -318,6 +332,13 @@ function renderSceneButtons() {
     return button;
   });
   sceneSwitcherElement.replaceChildren(...buttons);
+}
+
+function sceneShortcutFor(sceneName) {
+  const mapping = keyboardMappings.find((entry) => (
+    entry.action?.type === "switch_scene" && entry.action.scene === sceneName
+  ));
+  return mapping?.key || "";
 }
 
 function updateShaderParamControls(layers) {
@@ -406,6 +427,17 @@ function requestSceneSwitch(sceneName) {
   client.send("switch_scene", { scene: sceneName });
 }
 
+function applyKeyboardAction(action) {
+  if (action?.type === "switch_scene") {
+    requestSceneSwitch(action.scene);
+    return;
+  }
+
+  if (action?.type === "live_control") {
+    applyLiveControls(toggleLiveControl(liveControls, action.control));
+  }
+}
+
 function startPerformanceMonitorLoop() {
   requestAnimationFrame((time) => {
     updatePerformanceMonitor(recordRenderFrame(performanceMonitor, time));
@@ -457,6 +489,13 @@ function bindLiveControls() {
   bindLiveControlButton(blackoutButton, "blackout");
   bindLiveControlButton(freezeButton, "freeze");
   window.addEventListener("keydown", (event) => {
+    const keyboardAction = keyboardActionForKey(event, keyboardMappings);
+    if (keyboardAction) {
+      event.preventDefault();
+      applyKeyboardAction(keyboardAction);
+      return;
+    }
+
     const action = shortcutActionForKey(event);
     if (action) {
       event.preventDefault();

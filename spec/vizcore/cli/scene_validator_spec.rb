@@ -31,6 +31,10 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
         transition from: :intro, to: :drop do
           trigger { beat_count >= 16 }
         end
+
+        key "d" do
+          switch_scene :drop
+        end
       end
     RUBY
       result = described_class.new(scene_file: scene_path).call
@@ -54,6 +58,10 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
         end
 
         transition from: :broken, to: :missing
+
+        key "m" do
+          switch_scene :missing
+        end
       end
     RUBY
       result = described_class.new(scene_file: scene_path).call
@@ -66,6 +74,7 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
       expect(messages).to include("unsupported frequency band: :ultra")
       expect(messages).to include("unsupported onset band: :ultra")
       expect(messages).to include("unknown target scene: missing")
+      expect(messages).to include("switches to unknown scene: missing")
       expect(result.warnings.map(&:message).join("\n")).to include("has no trigger block")
     end
   end
@@ -175,6 +184,10 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
             map amplitude, to: :intensity, gain: 2.0
           end
         end
+
+        key "i" do
+          switch_scene :inspectable
+        end
       end
     RUBY
       result = described_class.new(scene_file: scene_path).call
@@ -184,6 +197,8 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
       expect(lines).to include("  inspectable")
       expect(lines).to include("    layer background (shader, shader=neon_grid)")
       expect(lines).to include("      amplitude -> intensity [gain=2.0]")
+      expect(lines).to include("Keyboard:")
+      expect(lines).to include("  i -> switch_scene inspectable")
     end
   end
 

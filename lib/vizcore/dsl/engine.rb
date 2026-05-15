@@ -74,6 +74,7 @@ module Vizcore
         @scenes = []
         @transitions = []
         @midi_mappings = []
+        @key_mappings = []
         @global_params = {}
         @analysis_settings = {}
         @section_tail = nil
@@ -251,6 +252,25 @@ module Vizcore
         }
       end
 
+      # Register a browser keyboard shortcut for runtime controls.
+      #
+      # @param value [Symbol, String] browser KeyboardEvent key value
+      # @yield Action block (`switch_scene`, `blackout`, or `freeze`)
+      # @raise [ArgumentError] when the key or action is missing
+      # @return [void]
+      def key(value, &block)
+        binding_key = normalize_keyboard_key(value)
+        builder = KeyBindingBuilder.new
+        builder.instance_eval(&block) if block
+        action = builder.to_h
+        raise ArgumentError, "key #{binding_key.inspect} requires an action" if action.empty?
+
+        @key_mappings << {
+          key: binding_key,
+          action: action
+        }
+      end
+
       # Set a mutable global value shared with scene/runtime logic.
       #
       # @param key [Symbol, String] global key
@@ -268,6 +288,7 @@ module Vizcore
           scenes: @scenes.map { |scene| deep_dup(scene) },
           transitions: @transitions.map { |transition| deep_dup(transition) },
           midi_maps: @midi_mappings.map { |mapping| deep_dup(mapping) },
+          key_mappings: @key_mappings.map { |mapping| deep_dup(mapping) },
           globals: deep_dup(@global_params),
           analysis: deep_dup(@analysis_settings),
           styles: @styles.map { |name, params| { name: name, params: deep_dup(params) } },
@@ -315,6 +336,17 @@ module Vizcore
         raise ArgumentError, "#{name} must be between 0.0 and 1.0" unless numeric.between?(0.0, 1.0)
 
         numeric
+      end
+
+      def normalize_keyboard_key(value)
+        raw = value.to_s
+        return "space" if raw == " "
+
+        normalized = raw.strip.downcase
+        normalized = "space" if normalized == "spacebar"
+        raise ArgumentError, "key value must not be empty" if normalized.empty?
+
+        normalized
       end
 
       def add_section_transition(to:)
@@ -405,6 +437,63 @@ module Vizcore
           output[:effect] = @effect if @effect
           output[:trigger] = @trigger if @trigger
           output
+        end
+      end
+
+      # Builder object for `key` block internals.
+      # @api private
+      class KeyBindingBuilder
+        def initialize
+          @action = nil
+        end
+
+        # Switch to a named scene when the key is pressed.
+        #
+        # @param name [Symbol, String]
+        # @return [void]
+        def switch_scene(name)
+          scene_name = name.to_s.strip
+          raise ArgumentError, "switch_scene scene must not be empty" if scene_name.empty?
+
+          assign_action(type: :switch_scene, scene: scene_name)
+        end
+
+        # Toggle browser blackout output.
+        #
+        # @return [void]
+        def blackout
+          live_control(:blackout)
+        end
+
+        # Toggle browser freeze output.
+        #
+        # @return [void]
+        def freeze
+          live_control(:freeze)
+        end
+
+        # Toggle a browser live control.
+        #
+        # @param control [Symbol, String]
+        # @return [void]
+        def live_control(control)
+          normalized = control.to_s.strip.downcase.to_sym
+          raise ArgumentError, "unsupported live control: #{control}" unless %i[blackout freeze].include?(normalized)
+
+          assign_action(type: :live_control, control: normalized)
+        end
+
+        # @return [Hash] serialized key action
+        def to_h
+          @action || {}
+        end
+
+        private
+
+        def assign_action(action)
+          raise ArgumentError, "key mapping already has an action" if @action
+
+          @action = action
         end
       end
     end

@@ -156,7 +156,7 @@ RSpec.describe Vizcore::CLI do
     it "prints generated Ruby DSL reference" do
       expect do
         described_class.start(["dsl-docs"])
-      end.to output(/# Vizcore Ruby DSL Reference.*`scene :name, extends: :base.*Mapping sources:.*beat_confidence.*`particle_field`/m).to_stdout
+      end.to output(/# Vizcore Ruby DSL Reference.*`scene :name, extends: :base.*`key "d" \{ switch_scene :drop \}`.*Mapping sources:.*beat_confidence.*`particle_field`/m).to_stdout
     end
 
     it "creates a custom shader template" do

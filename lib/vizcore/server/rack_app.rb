@@ -20,6 +20,7 @@ module Vizcore
       # @param audio_file [String, Pathname, nil]
       # @param scene_names [Array<String, Symbol>, nil]
       # @param tap_tempo_key [String, Symbol, nil]
+      # @param key_mappings [Array<Hash>, nil]
       # @param globals [Hash, nil]
       # @param projector_mode [Boolean]
       def initialize(
@@ -29,6 +30,7 @@ module Vizcore
         audio_file: nil,
         scene_names: nil,
         tap_tempo_key: nil,
+        key_mappings: nil,
         globals: nil,
         projector_mode: false
       )
@@ -38,6 +40,7 @@ module Vizcore
         @audio_file = audio_file ? Pathname.new(audio_file).expand_path : nil
         @scene_names = normalize_scene_names(scene_names)
         @tap_tempo_key = normalize_tap_tempo_key(tap_tempo_key)
+        @key_mappings = normalize_key_mappings(key_mappings)
         @globals = normalize_globals(globals)
         @projector_mode = !!projector_mode
       end
@@ -73,6 +76,7 @@ module Vizcore
           audio_file_url: nil,
           scene_names: @scene_names,
           tap_tempo_key: @tap_tempo_key,
+          key_mappings: @key_mappings,
           globals: @globals,
           projector_mode: @projector_mode
         }
@@ -191,6 +195,45 @@ module Vizcore
         key
       rescue StandardError
         nil
+      end
+
+      def normalize_key_mappings(values)
+        Array(values).filter_map do |entry|
+          key = normalize_shortcut_key(entry[:key] || entry["key"])
+          action = entry[:action] || entry["action"]
+          next if key.empty? || !action.is_a?(Hash)
+
+          normalized_action = normalize_key_action(action)
+          next unless normalized_action
+
+          { key: key, action: normalized_action }
+        end
+      rescue StandardError
+        []
+      end
+
+      def normalize_shortcut_key(value)
+        raw = value.to_s
+        return "space" if raw == " "
+
+        key = raw.strip.downcase
+        key == "spacebar" ? "space" : key
+      end
+
+      def normalize_key_action(action)
+        type = (action[:type] || action["type"]).to_s.strip
+        case type
+        when "switch_scene"
+          scene = (action[:scene] || action["scene"]).to_s.strip
+          return nil if scene.empty?
+
+          { type: "switch_scene", scene: scene }
+        when "live_control"
+          control = (action[:control] || action["control"]).to_s.strip
+          return nil unless %w[blackout freeze].include?(control)
+
+          { type: "live_control", control: control }
+        end
       end
 
       def normalize_globals(values)

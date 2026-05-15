@@ -63,4 +63,16 @@ Vizcore.define do
     trigger { beat_count >= 64 || frame_count >= 480 }
     effect :flash, duration: 0.35
   end
+
+  key "i" do
+    switch_scene :intro
+  end
+
+  key "u" do
+    switch_scene :build
+  end
+
+  key "d" do
+    switch_scene :drop
+  end
 end

@@ -15,6 +15,7 @@ module Vizcore
         append_scenes(output, Array(@definition[:scenes]))
         append_timelines(output, Array(@definition[:timelines]))
         append_transitions(output, Array(@definition[:transitions]))
+        append_key_mappings(output, Array(@definition[:key_mappings]))
         output
       end
 
@@ -72,6 +73,15 @@ module Vizcore
         end
       end
 
+      def append_key_mappings(output, mappings)
+        return if mappings.empty?
+
+        output << "Keyboard:"
+        mappings.each do |mapping|
+          output << "  #{mapping[:key]} -> #{format_key_action(mapping[:action])}"
+        end
+      end
+
       def format_layer(layer)
         type = layer[:type] || :geometry
         return "#{type}, shader=#{layer[:shader]}" if layer[:shader]
@@ -103,6 +113,18 @@ module Vizcore
 
         formatted = values.map { |key, value| "#{key}=#{value.inspect}" }.join(", ")
         " (#{formatted})"
+      end
+
+      def format_key_action(action)
+        values = Hash(action || {})
+        case values[:type]&.to_sym
+        when :switch_scene
+          "switch_scene #{values[:scene]}"
+        when :live_control
+          values[:control].to_s
+        else
+          "unknown"
+        end
       end
 
       def format_timeline_position(entry)

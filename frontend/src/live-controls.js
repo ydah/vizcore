@@ -46,6 +46,36 @@ export const shortcutSceneIndexForKey = (event, sceneCount) => {
   return index;
 };
 
+export const keyboardActionForKey = (event, mappings) => {
+  if (isEditableShortcutTarget(event?.target)) {
+    return null;
+  }
+
+  const key = normalizeShortcutKey(event?.key);
+  if (!key) {
+    return null;
+  }
+
+  const mapping = normalizeKeyboardMappings(mappings).find((entry) => entry.key === key);
+  return mapping?.action || null;
+};
+
+export const normalizeKeyboardMappings = (mappings) => {
+  if (!Array.isArray(mappings)) {
+    return [];
+  }
+
+  return mappings.flatMap((entry) => {
+    const key = normalizeShortcutKey(entry?.key);
+    const action = normalizeKeyboardAction(entry?.action);
+    if (!key || !action) {
+      return [];
+    }
+
+    return [{ key, action }];
+  });
+};
+
 export const isTapTempoShortcut = (event, configuredKey) => {
   if (isEditableShortcutTarget(event?.target)) {
     return false;
@@ -59,7 +89,7 @@ export const isTapTempoShortcut = (event, configuredKey) => {
   return normalizeShortcutKey(event?.key) === key;
 };
 
-const normalizeShortcutKey = (value) => {
+export const normalizeShortcutKey = (value) => {
   const raw = String(value || "");
   if (raw === " ") {
     return "space";
@@ -71,6 +101,21 @@ const normalizeShortcutKey = (value) => {
   }
 
   return key;
+};
+
+const normalizeKeyboardAction = (action) => {
+  const type = String(action?.type || "").trim();
+  if (type === "switch_scene") {
+    const scene = String(action?.scene || "").trim();
+    return scene ? { type, scene } : null;
+  }
+
+  if (type === "live_control") {
+    const control = String(action?.control || "").trim();
+    return control === "blackout" || control === "freeze" ? { type, control } : null;
+  }
+
+  return null;
 };
 
 export const isEditableShortcutTarget = (target) => {

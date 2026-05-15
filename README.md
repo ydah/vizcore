@@ -143,6 +143,19 @@ tap_tempo key: :space
 After two valid taps, Vizcore estimates BPM from recent intervals and applies it
 as a locked BPM so beat-driven visuals stop drifting.
 
+Browser keyboard shortcuts can also be declared in the scene file for operators
+who do not have a MIDI controller:
+
+```ruby
+key "d" do
+  switch_scene :drop
+end
+
+key "x" do
+  blackout
+end
+```
+
 For a more music-oriented style, `react_to` groups the same mappings by source:
 
 ```ruby
@@ -395,7 +408,7 @@ vizcore start scene.rb --audio-source file --audio-file set.mp3
 
 When using file source, the HUD exposes **Play Audio** / **Pause Audio** controls and shows BPM, Beat, and Beat Count.
 
-The browser HUD also includes an Audio Inspector with amplitude, sub/low/mid/high meters, FFT preview bars, a performance monitor for FPS/frame/latency/drop/audio/shader/reconnect health, shader compile error overlay, emergency Blackout/Freeze controls, and Visual Gain, Bass Boost, Smoothing, Beat Hold, and Wobble controls for adapting visual response to different tracks and input levels. Reactivity controls can be saved and loaded in the browser for repeatable HUD presets, and scene launcher entries can be selected with `1`-`9`. Use `--projector` or open `/projector` when the browser output should hide operator UI, and open `/control` for a separate operator panel.
+The browser HUD also includes an Audio Inspector with amplitude, sub/low/mid/high meters, FFT preview bars, a performance monitor for FPS/frame/latency/drop/audio/shader/reconnect health, shader compile error overlay, emergency Blackout/Freeze controls, and Visual Gain, Bass Boost, Smoothing, Beat Hold, and Wobble controls for adapting visual response to different tracks and input levels. Reactivity controls can be saved and loaded in the browser for repeatable HUD presets, scene launcher entries can be selected with `1`-`9`, and scene-defined `key` mappings can switch scenes or toggle live controls. Use `--projector` or open `/projector` when the browser output should hide operator UI, and open `/control` for a separate operator panel.
 
 `vizcore demo` starts a bundled scene with bundled audio, so it is the quickest way to verify a fresh installation.
 

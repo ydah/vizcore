@@ -64,6 +64,30 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "builds browser keyboard mappings" do
+      definition = described_class.define do
+        key "d" do
+          switch_scene :drop
+        end
+
+        key "B" do
+          blackout
+        end
+
+        key " " do
+          freeze
+        end
+      end
+
+      expect(definition[:key_mappings]).to eq(
+        [
+          { key: "d", action: { type: :switch_scene, scene: "drop" } },
+          { key: "b", action: { type: :live_control, control: :blackout } },
+          { key: "space", action: { type: :live_control, control: :freeze } }
+        ]
+      )
+    end
+
     it "builds mapping transforms from keyword and target hash syntax" do
       definition = described_class.define do
         scene :reactive do

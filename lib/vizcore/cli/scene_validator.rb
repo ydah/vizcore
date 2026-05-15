@@ -69,7 +69,9 @@ module Vizcore
         issues = []
         scenes = Array(definition[:scenes])
         validate_scenes(scenes, issues)
-        validate_transitions(Array(definition[:transitions]), scene_names(scenes), issues)
+        names = scene_names(scenes)
+        validate_transitions(Array(definition[:transitions]), names, issues)
+        validate_key_mappings(Array(definition[:key_mappings]), names, issues)
         issues
       end
 
@@ -192,6 +194,30 @@ module Vizcore
           unless transition[:trigger].respond_to?(:call)
             issues << warn("transition #{from || '?'} -> #{to || '?'} has no trigger block")
           end
+        end
+      end
+
+      def validate_key_mappings(mappings, names, issues)
+        mappings.each do |mapping|
+          key = mapping[:key] || mapping["key"]
+          action = mapping[:action] || mapping["action"]
+          issues << error("key mapping has empty key") if key.to_s.strip.empty?
+          validate_key_action(action.is_a?(Hash) ? action : {}, names, key, issues)
+        end
+      end
+
+      def validate_key_action(action, names, key, issues)
+        type = (action[:type] || action["type"]).to_s.to_sym
+        case type
+        when :switch_scene
+          scene = action[:scene] || action["scene"]
+          scene_name = scene&.to_sym
+          issues << error("key #{key} switches to unknown scene: #{scene}") unless scene_name && names.include?(scene_name)
+        when :live_control
+          control = (action[:control] || action["control"]).to_s.to_sym
+          issues << error("key #{key} uses unsupported live control: #{control}") unless %i[blackout freeze].include?(control)
+        else
+          issues << error("key #{key} has unsupported action: #{type}")
         end
       end
 
