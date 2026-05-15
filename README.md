@@ -92,6 +92,21 @@ end
 ```
 
 Available transform options are `gain`, `range`, `min`, `max`, `curve`, `attack`, and `release`. `curve` supports `:linear`, `:sqrt`, and `:square`. Existing mappings such as `map amplitude => :speed` continue to work.
+Use block syntax when shaping a mapping reads better:
+
+```ruby
+map amplitude, to: :scale do
+  gain 2.0
+  range 0.8..1.6
+  curve :ease_out
+  smooth attack: 0.02, release: 0.18
+  deadzone 0.05
+end
+```
+
+Block syntax is additive and writes the same transform metadata as keyword
+syntax. `deadzone` suppresses tiny values before gain and curve are applied;
+`curve` also supports `:ease_out`.
 
 For a more music-oriented style, `react_to` groups the same mappings by source:
 

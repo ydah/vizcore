@@ -74,6 +74,42 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "builds mapping transforms from block syntax" do
+      definition = described_class.define do
+        scene :reactive do
+          layer :liquid do
+            shader :gradient_pulse
+
+            map amplitude, to: :scale do
+              gain 2.0
+              range 0.8..1.6
+              curve :ease_out
+              smooth attack: 0.2, release: 0.6
+              deadzone 0.05
+            end
+          end
+        end
+      end
+
+      layer = definition[:scenes].first[:layers].first
+
+      expect(layer[:mappings]).to include(
+        {
+          source: { kind: :amplitude },
+          target: :scale,
+          transform: {
+            deadzone: 0.05,
+            gain: 2.0,
+            min: 0.8,
+            max: 1.6,
+            curve: :ease_out,
+            attack: 0.2,
+            release: 0.6
+          }
+        }
+      )
+    end
+
     it "treats shader path strings as custom GLSL shaders" do
       definition = described_class.define do
         scene :custom do

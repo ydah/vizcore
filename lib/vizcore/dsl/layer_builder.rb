@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative "mapping_transform_builder"
 require_relative "reaction_builder"
 
 module Vizcore
@@ -107,10 +108,11 @@ module Vizcore
       # @param definition [Hash, Symbol, String] mapping pairs or a single source
       # @raise [ArgumentError] when the mapping is empty or invalid
       # @return [void]
-      def map(definition = nil, **options)
+      def map(definition = nil, **options, &block)
         if options.key?(:to)
           transform_options = options.dup
           to = transform_options.delete(:to)
+          transform_options = evaluate_transform_block(transform_options, &block) if block
           @mappings << build_mapping(
             source: normalize_source(definition),
             target: to,
@@ -121,9 +123,11 @@ module Vizcore
 
         mapping = definition.nil? ? options : Hash(definition)
         raise ArgumentError, "map requires at least one mapping pair" if mapping.empty?
+        raise ArgumentError, "map block syntax supports one mapping pair" if block && mapping.length != 1
 
         mapping.each do |source, target|
           target_name, transform = normalize_target(target)
+          transform = normalize_transform(**evaluate_transform_block(transform, &block)) if block
           @mappings << build_mapping(source: normalize_source(source), target: target_name, transform: transform)
         end
       end
@@ -307,6 +311,10 @@ module Vizcore
         output
       end
 
+      def evaluate_transform_block(initial_options, &block)
+        MappingTransformBuilder.new(initial_options).evaluate(&block).to_h
+      end
+
       def normalize_param_name(name)
         key = name.to_s.strip
         raise ArgumentError, "param name is required" if key.empty?
@@ -327,12 +335,13 @@ module Vizcore
         raise ArgumentError, "param min must be less than or equal to max"
       end
 
-      def normalize_transform(gain: nil, range: nil, min: nil, max: nil, curve: nil, attack: nil, release: nil)
+      def normalize_transform(gain: nil, range: nil, min: nil, max: nil, curve: nil, attack: nil, release: nil, deadzone: nil)
         range_min, range_max = normalize_range(range, context: "mapping")
         min = range_min if min.nil?
         max = range_max if max.nil?
 
         output = {}
+        output[:deadzone] = normalize_non_negative_float(deadzone, :deadzone) unless deadzone.nil?
         output[:gain] = normalize_float(gain, :gain) unless gain.nil?
         output[:min] = normalize_float(min, :min) unless min.nil?
         output[:max] = normalize_float(max, :max) unless max.nil?
@@ -362,9 +371,16 @@ module Vizcore
         raise ArgumentError, "mapping #{name} must be numeric"
       end
 
+      def normalize_non_negative_float(value, name)
+        numeric = normalize_float(value, name)
+        raise ArgumentError, "mapping #{name} must be non-negative" if numeric.negative?
+
+        numeric
+      end
+
       def normalize_curve(value)
         curve = value.to_sym
-        return curve if %i[linear sqrt square].include?(curve)
+        return curve if %i[linear sqrt square ease_out].include?(curve)
 
         raise ArgumentError, "unsupported mapping curve: #{value.inspect}"
       end

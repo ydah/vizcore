@@ -14,6 +14,7 @@ module Vizcore::DSL
     ?min: Float,
     ?max: Float,
     ?curve: Symbol,
+    ?deadzone: Float,
     ?attack: Float,
     ?release: Float
   }
@@ -75,7 +76,7 @@ module Vizcore::DSL
       ?max: Numeric? max,
       ?step: Numeric? step
     ) -> Hash[Symbol, untyped]
-    def map: (?Hash[untyped, untyped] | Symbol | String definition, **untyped options) -> void
+    def map: (?Hash[untyped, untyped] | Symbol | String definition, **untyped options) ?{ () -> void } -> void
     def react_to: (Hash[Symbol, untyped] | Symbol | String source_value) { () -> void } -> void
     def amplitude: () -> source
     def frequency_band: (Symbol | String name) -> source
@@ -99,6 +100,19 @@ module Vizcore::DSL
     def evaluate: () { () -> void } -> Array[mapping]
     def change: (Symbol | String target, **untyped options) -> mapping
     def trigger: (Symbol | String target, **untyped options) -> mapping
+  end
+
+  class MappingTransformBuilder
+    def initialize: (?Hash[untyped, untyped] initial) -> void
+    def evaluate: () ?{ () -> void } -> MappingTransformBuilder
+    def gain: (Numeric value) -> Numeric
+    def range: (Range[Numeric] | [Numeric, Numeric] value) -> (Range[Numeric] | [Numeric, Numeric])
+    def min: (Numeric value) -> Numeric
+    def max: (Numeric value) -> Numeric
+    def curve: (Symbol | String value) -> (Symbol | String)
+    def deadzone: (Numeric value) -> Numeric
+    def smooth: (?attack: Numeric? attack, ?release: Numeric? release) -> Hash[Symbol, untyped]
+    def to_h: () -> Hash[Symbol, untyped]
   end
 
   class MappingResolver

@@ -89,6 +89,7 @@ module Vizcore
         numeric = numeric_value(value, fallback: fallback)
         return nil if numeric.nil?
 
+        numeric = 0.0 if transform.key?(:deadzone) && numeric.abs < Float(transform[:deadzone])
         numeric *= Float(transform[:gain]) if transform.key?(:gain)
         numeric = apply_curve(numeric, transform[:curve]) if transform[:curve]
         numeric = [numeric, Float(transform[:min])].max if transform.key?(:min)
@@ -112,6 +113,9 @@ module Vizcore
           Math.sqrt([value, 0.0].max)
         when :square
           value * value
+        when :ease_out
+          clamped = [[value, 0.0].max, 1.0].min
+          1.0 - ((1.0 - clamped) * (1.0 - clamped))
         end
       end
 

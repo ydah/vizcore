@@ -119,6 +119,29 @@ RSpec.describe Vizcore::DSL::MappingResolver do
       expect(resolved[0][:params][:wobble]).to eq(0.5)
     end
 
+    it "applies mapping deadzone and ease_out curve" do
+      resolver = described_class.new
+      scene_layers = [
+        {
+          name: :liquid,
+          params: {},
+          mappings: [
+            {
+              source: { kind: :amplitude },
+              target: :wobble,
+              transform: { deadzone: 0.05, curve: :ease_out }
+            }
+          ]
+        }
+      ]
+
+      quiet = resolver.resolve_layers(scene_layers: scene_layers, audio: { amplitude: 0.04, bands: {} })
+      active = resolver.resolve_layers(scene_layers: scene_layers, audio: { amplitude: 0.5, bands: {} })
+
+      expect(quiet[0][:params][:wobble]).to eq(0.0)
+      expect(active[0][:params][:wobble]).to eq(0.75)
+    end
+
     it "converts boolean sources when applying transforms" do
       resolver = described_class.new
       scene_layers = [
