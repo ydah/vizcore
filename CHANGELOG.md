@@ -6,6 +6,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+- Add `on_beat` and `on_bar` transition DSL helpers.
 - Add block-style `map` transform DSL with `deadzone` and `ease_out` curve support.
 - Add gemspec coverage for packaged examples, browser assets, docs, and RBS files.
 - Add deterministic `Vizcore::Audio::FixtureInput` for repeatable audio tests.

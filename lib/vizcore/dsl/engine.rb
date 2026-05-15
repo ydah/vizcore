@@ -216,6 +216,31 @@ module Vizcore
           @trigger = block
         end
 
+        # Trigger after a scene-local beat count reaches the given value.
+        #
+        # @param count [Integer]
+        # @return [void]
+        def on_beat(count)
+          beat_target = Integer(count)
+          raise ArgumentError, "on_beat count must be positive" unless beat_target.positive?
+
+          @trigger = proc { beat_count >= beat_target }
+        end
+
+        # Trigger after a scene-local bar count reaches the given value.
+        #
+        # @param count [Integer]
+        # @param beats_per_bar [Integer]
+        # @return [void]
+        def on_bar(count, beats_per_bar: 4)
+          bar_target = Integer(count)
+          beats = Integer(beats_per_bar)
+          raise ArgumentError, "on_bar count must be positive" unless bar_target.positive?
+          raise ArgumentError, "beats_per_bar must be positive" unless beats.positive?
+
+          on_beat(bar_target * beats)
+        end
+
         # @return [Hash] serialized transition extras
         def to_h
           output = {}

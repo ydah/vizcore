@@ -2,6 +2,7 @@
 
 require "tmpdir"
 require "vizcore/dsl/engine"
+require "vizcore/dsl/transition_controller"
 
 RSpec.describe Vizcore::DSL::Engine do
   describe ".define" do
@@ -214,6 +215,32 @@ RSpec.describe Vizcore::DSL::Engine do
           }
         ]
       )
+    end
+
+    it "builds beat and bar transition triggers" do
+      definition = described_class.define do
+        scene(:intro) { layer(:a) { type :geometry } }
+        scene(:build) { layer(:b) { type :geometry } }
+        scene(:drop) { layer(:c) { type :geometry } }
+
+        transition from: :intro, to: :build do
+          on_beat 8
+        end
+
+        transition from: :build, to: :drop do
+          on_bar 4
+        end
+      end
+
+      controller = Vizcore::DSL::TransitionController.new(
+        scenes: definition[:scenes],
+        transitions: definition[:transitions]
+      )
+
+      expect(controller.next_transition(scene_name: :intro, audio: { beat_count: 7 })).to be_nil
+      expect(controller.next_transition(scene_name: :intro, audio: { beat_count: 8 })).to include(to: :build)
+      expect(controller.next_transition(scene_name: :build, audio: { beat_count: 15 })).to be_nil
+      expect(controller.next_transition(scene_name: :build, audio: { beat_count: 16 })).to include(to: :drop)
     end
 
     it "rejects react_to without a reaction body" do

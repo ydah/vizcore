@@ -51,6 +51,15 @@ module Vizcore::DSL
     def to_h: () -> Hash[Symbol, untyped]
   end
 
+  class Engine::TransitionBuilder
+    def initialize: () -> void
+    def effect: (Symbol | String name, **untyped options) -> void
+    def trigger: () { () -> bool } -> void
+    def on_beat: (Integer count) -> void
+    def on_bar: (Integer count, ?beats_per_bar: Integer beats_per_bar) -> void
+    def to_h: () -> Hash[Symbol, untyped]
+  end
+
   class SceneBuilder
     def initialize: (name: Symbol | String name) -> void
     def evaluate: () ?{ () -> void } -> SceneBuilder

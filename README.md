@@ -71,7 +71,7 @@ Vizcore.define do
   end
 
   transition from: :intro, to: :drop do
-    trigger { beat_count >= 64 }
+    on_bar 16
     effect :crossfade, duration: 1.4
   end
 end
@@ -125,6 +125,16 @@ end
 ```
 
 `react_to` is additive syntax; it serializes to the same mapping model as `map`.
+
+Transitions can use explicit trigger blocks, or beat/bar helpers when that reads
+closer to the structure of a track:
+
+```ruby
+transition from: :build, to: :drop do
+  on_bar 8
+  effect :flash, duration: 0.35
+end
+```
 
 Layers can choose their compositing mode with `blend`. Supported modes are `:alpha` / `:normal`, `:add`, `:multiply`, `:screen`, and `:difference`:
 
