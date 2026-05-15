@@ -1,5 +1,6 @@
 import { getBuiltinShader } from "../shaders/builtins.js";
 import { getPostEffectShader } from "../shaders/post-effects.js";
+import { SHADER_ERROR_EVENT, buildShaderErrorDetail } from "../shader-error-overlay.js";
 import { buildRadialBlobLines, buildWireframeLines, estimateDeformFromSpectrum } from "../visuals/geometry.js";
 import { ParticleSystem } from "../visuals/particle-system.js";
 import { TextRenderer } from "../visuals/text-renderer.js";
@@ -199,6 +200,7 @@ export class LayerManager {
       program = this.shaderManager.getProgram(cacheKey, FULLSCREEN_VERTEX_SHADER, fragmentShader);
     } catch (error) {
       if (customSource) {
+        this.reportShaderError(layer, error, "custom-shader");
         console.warn("Failed to compile custom GLSL, falling back to builtin shader", error);
         try {
           program = this.shaderManager.getProgram(
@@ -207,9 +209,11 @@ export class LayerManager {
             getBuiltinShader(shaderName)
           );
         } catch (builtinError) {
+          this.reportShaderError(layer, builtinError, "builtin-shader-fallback");
           this.reportLayerError(layer, builtinError, "builtin-shader-fallback");
         }
       } else {
+        this.reportShaderError(layer, error, "builtin-shader");
         this.reportLayerError(layer, error, "builtin-shader");
       }
 
@@ -491,6 +495,18 @@ export class LayerManager {
     }
     this.layerErrorKeys.add(key);
     console.warn(`Layer render failed (${phase}) [${name}]`, error);
+  }
+
+  reportShaderError(layer, error, phase) {
+    const detail = buildShaderErrorDetail({ layer, error, phase });
+    const key = `shader:${detail.phase}:${detail.name}:${detail.shader}:${detail.message}`;
+    if (this.layerErrorKeys.has(key)) {
+      return;
+    }
+    this.layerErrorKeys.add(key);
+    if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+      window.dispatchEvent(new CustomEvent(SHADER_ERROR_EVENT, { detail }));
+    }
   }
 }
 

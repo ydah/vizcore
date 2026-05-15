@@ -209,6 +209,60 @@
       opacity: 0.9;
     }
 
+    .shader-error {
+      position: absolute;
+      right: 1rem;
+      top: 1rem;
+      width: min(26rem, calc(100vw - 2rem));
+      max-height: calc(100vh - 2rem);
+      overflow: auto;
+      padding: 0.75rem;
+      border: 1px solid rgba(248, 113, 113, 0.45);
+      border-radius: 0.5rem;
+      background: rgba(20, 6, 10, 0.86);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+      color: #fee2e2;
+      backdrop-filter: blur(8px);
+    }
+
+    .shader-error[hidden] {
+      display: none;
+    }
+
+    .shader-error__header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 0.45rem;
+    }
+
+    .shader-error h2 {
+      margin: 0;
+      overflow-wrap: anywhere;
+      color: #fecaca;
+      font-size: 0.88rem;
+      letter-spacing: 0;
+    }
+
+    .shader-error button {
+      min-width: 4rem;
+      border: 1px solid rgba(254, 202, 202, 0.4);
+      border-radius: 0.45rem;
+      padding: 0.32rem 0.52rem;
+      background: rgba(127, 29, 29, 0.5);
+      color: #fff1f2;
+      cursor: pointer;
+    }
+
+    .shader-error pre {
+      margin: 0;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      color: #fed7aa;
+      font: 0.76rem/1.45 "SFMono-Regular", Consolas, monospace;
+    }
+
     .reactivity-controls label {
       display: grid;
       grid-template-columns: minmax(5.5rem, 0.8fr) minmax(8rem, 1.2fr);
@@ -237,6 +291,12 @@
       .audio-inspector__header,
       .audio-meter {
         grid-template-columns: 2.75rem minmax(5rem, 1fr) 2.9rem;
+      }
+
+      .shader-error {
+        left: 1rem;
+        top: auto;
+        bottom: 1rem;
       }
     }
   </style>
@@ -297,6 +357,13 @@
       </div>
       <div id="scene-switcher" class="scene-switcher" hidden aria-label="Scene switcher"></div>
       <button id="audio-toggle" type="button" hidden>Play Audio</button>
+    </section>
+    <section id="shader-error-overlay" class="shader-error" aria-live="assertive" hidden>
+      <div class="shader-error__header">
+        <h2 id="shader-error-title">Shader Error</h2>
+        <button id="shader-error-close" type="button">Close</button>
+      </div>
+      <pre id="shader-error-message"></pre>
     </section>
   </div>
 

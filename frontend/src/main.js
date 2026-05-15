@@ -1,5 +1,6 @@
 import { BAND_KEYS, DEFAULT_FFT_BINS, buildAudioInspectorState, formatMeterValue } from "./audio-inspector.js";
 import { Engine } from "./renderer/engine.js";
+import { SHADER_ERROR_EVENT, formatShaderErrorMessage, formatShaderErrorTitle } from "./shader-error-overlay.js";
 import { WebSocketClient } from "./websocket-client.js";
 
 const canvas = document.querySelector("#vizcore-canvas");
@@ -33,6 +34,10 @@ const smoothingControl = document.querySelector("#smoothing-control");
 const beatHoldControl = document.querySelector("#beat-hold-control");
 const wobbleControl = document.querySelector("#wobble-control");
 const reactivityStatusElement = document.querySelector("#reactivity-status");
+const shaderErrorOverlay = document.querySelector("#shader-error-overlay");
+const shaderErrorTitleElement = document.querySelector("#shader-error-title");
+const shaderErrorMessageElement = document.querySelector("#shader-error-message");
+const shaderErrorCloseButton = document.querySelector("#shader-error-close");
 
 const visualSettings = {
   visualGain: 2.5,
@@ -50,6 +55,7 @@ bindVisualControl(smoothingControl, "smoothing");
 bindVisualControl(beatHoldControl, "beatHoldMs");
 bindVisualControl(wobbleControl, "wobbleAmount");
 renderReactivityStatus();
+bindShaderErrorOverlay();
 const fftBars = initializeFftPreview(fftPreviewElement);
 engine.start();
 
@@ -355,6 +361,29 @@ function renderReactivityStatus() {
     `Beat Hold: ${Math.round(visualSettings.beatHoldMs)}ms`,
     `Wobble: ${visualSettings.wobbleAmount.toFixed(2)}x`,
   ].join(" | ");
+}
+
+function bindShaderErrorOverlay() {
+  window.addEventListener(SHADER_ERROR_EVENT, (event) => {
+    renderShaderError(event.detail);
+  });
+  if (shaderErrorCloseButton) {
+    shaderErrorCloseButton.addEventListener("click", () => {
+      if (shaderErrorOverlay) {
+        shaderErrorOverlay.hidden = true;
+      }
+    });
+  }
+}
+
+function renderShaderError(detail) {
+  if (!shaderErrorOverlay || !shaderErrorTitleElement || !shaderErrorMessageElement) {
+    return;
+  }
+
+  shaderErrorTitleElement.textContent = formatShaderErrorTitle(detail);
+  shaderErrorMessageElement.textContent = formatShaderErrorMessage(detail);
+  shaderErrorOverlay.hidden = false;
 }
 
 function initializeFftPreview(container) {
