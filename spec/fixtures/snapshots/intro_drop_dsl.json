@@ -1,0 +1,106 @@
+{
+  "analysis": {},
+  "audio": [],
+  "globals": {},
+  "midi": [],
+  "midi_maps": [],
+  "scenes": [
+    {
+      "layers": [
+        {
+          "name": "background",
+          "params": {
+            "opacity": 0.82
+          },
+          "shader": "neon_grid",
+          "type": "shader"
+        },
+        {
+          "mappings": [
+            {
+              "source": {
+                "kind": "amplitude"
+              },
+              "target": "rotation_speed"
+            },
+            {
+              "source": {
+                "kind": "fft_spectrum"
+              },
+              "target": "deform"
+            },
+            {
+              "source": {
+                "band": "high",
+                "kind": "frequency_band"
+              },
+              "target": "color_shift"
+            }
+          ],
+          "name": "wireframe",
+          "params": {},
+          "type": "wireframe_cube"
+        }
+      ],
+      "name": "intro"
+    },
+    {
+      "layers": [
+        {
+          "mappings": [
+            {
+              "source": {
+                "kind": "amplitude"
+              },
+              "target": "speed"
+            },
+            {
+              "source": {
+                "band": "low",
+                "kind": "frequency_band"
+              },
+              "target": "size"
+            }
+          ],
+          "name": "particles",
+          "params": {
+            "count": 3600
+          },
+          "type": "particle_field"
+        },
+        {
+          "mappings": [
+            {
+              "source": {
+                "kind": "beat"
+              },
+              "target": "flash"
+            }
+          ],
+          "name": "title",
+          "params": {
+            "content": "DROP",
+            "font_size": 96
+          },
+          "type": "text"
+        }
+      ],
+      "name": "drop"
+    }
+  ],
+  "styles": [],
+  "themes": [],
+  "transitions": [
+    {
+      "effect": {
+        "name": "crossfade",
+        "options": {
+          "duration": 1.4
+        }
+      },
+      "from": "intro",
+      "to": "drop",
+      "trigger": "<proc>"
+    }
+  ]
+}
