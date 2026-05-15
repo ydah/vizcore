@@ -6,6 +6,7 @@ import {
   isEditableShortcutTarget,
   liveControlStatusText,
   shortcutActionForKey,
+  shortcutSceneIndexForKey,
   toggleLiveControl,
 } from "../src/live-controls.js";
 
@@ -41,6 +42,14 @@ test("shortcutActionForKey maps live shortcuts outside editable fields", () => {
   assert.equal(shortcutActionForKey({ key: "F", target: { tagName: "DIV" } }), "freeze");
   assert.equal(shortcutActionForKey({ key: "x", target: { tagName: "DIV" } }), null);
   assert.equal(shortcutActionForKey({ key: "b", target: { tagName: "INPUT" } }), null);
+});
+
+test("shortcutSceneIndexForKey maps number keys to available scene indexes", () => {
+  assert.equal(shortcutSceneIndexForKey({ key: "1", target: { tagName: "DIV" } }, 3), 0);
+  assert.equal(shortcutSceneIndexForKey({ key: "3", target: { tagName: "DIV" } }, 3), 2);
+  assert.equal(shortcutSceneIndexForKey({ key: "4", target: { tagName: "DIV" } }, 3), null);
+  assert.equal(shortcutSceneIndexForKey({ key: "0", target: { tagName: "DIV" } }, 9), null);
+  assert.equal(shortcutSceneIndexForKey({ key: "1", target: { tagName: "INPUT" } }, 3), null);
 });
 
 test("isEditableShortcutTarget detects editable controls", () => {

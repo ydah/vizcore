@@ -33,6 +33,19 @@ export const shortcutActionForKey = (event) => {
   return null;
 };
 
+export const shortcutSceneIndexForKey = (event, sceneCount) => {
+  if (isEditableShortcutTarget(event?.target)) {
+    return null;
+  }
+
+  const index = Number.parseInt(String(event?.key || ""), 10) - 1;
+  if (!Number.isInteger(index) || index < 0 || index >= 9 || index >= sceneCount) {
+    return null;
+  }
+
+  return index;
+};
+
 export const isEditableShortcutTarget = (target) => {
   if (!target) {
     return false;

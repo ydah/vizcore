@@ -3,6 +3,7 @@ import {
   createLiveControlState,
   liveControlStatusText,
   shortcutActionForKey,
+  shortcutSceneIndexForKey,
   toggleLiveControl,
 } from "./live-controls.js";
 import {
@@ -276,19 +277,24 @@ function renderSceneButtons() {
     button.textContent = sceneName;
     button.classList.toggle("is-active", sceneName === currentSceneName);
     button.onclick = () => {
-      if (sceneName === currentSceneName) {
-        return;
-      }
-      pendingSceneName = sceneName;
-      pendingSceneRequestedAt = performance.now();
-      currentSceneName = sceneName;
-      sceneStatusElement.textContent = `Scene: ${sceneName}`;
-      renderSceneButtons();
-      client.send("switch_scene", { scene: sceneName });
+      requestSceneSwitch(sceneName);
     };
     return button;
   });
   sceneSwitcherElement.replaceChildren(...buttons);
+}
+
+function requestSceneSwitch(sceneName) {
+  if (!sceneName || sceneName === currentSceneName) {
+    return;
+  }
+
+  pendingSceneName = sceneName;
+  pendingSceneRequestedAt = performance.now();
+  currentSceneName = sceneName;
+  sceneStatusElement.textContent = `Scene: ${sceneName}`;
+  renderSceneButtons();
+  client.send("switch_scene", { scene: sceneName });
 }
 
 function startPerformanceMonitorLoop() {
@@ -343,12 +349,19 @@ function bindLiveControls() {
   bindLiveControlButton(freezeButton, "freeze");
   window.addEventListener("keydown", (event) => {
     const action = shortcutActionForKey(event);
-    if (!action) {
+    if (action) {
+      event.preventDefault();
+      applyLiveControls(toggleLiveControl(liveControls, action));
+      return;
+    }
+
+    const sceneIndex = shortcutSceneIndexForKey(event, availableSceneNames.length);
+    if (sceneIndex === null) {
       return;
     }
 
     event.preventDefault();
-    applyLiveControls(toggleLiveControl(liveControls, action));
+    requestSceneSwitch(availableSceneNames[sceneIndex]);
   });
 }
 
