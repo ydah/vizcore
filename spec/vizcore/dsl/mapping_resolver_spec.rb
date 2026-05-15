@@ -66,6 +66,24 @@ RSpec.describe Vizcore::DSL::MappingResolver do
       expect(layer[:glsl_source]).to eq("void main() { }")
     end
 
+    it "preserves shader parameter schema metadata" do
+      resolver = described_class.new
+      scene_layers = [
+        {
+          name: :liquid,
+          type: :shader,
+          params: { wobble: 0.3 },
+          param_schema: [{ name: :wobble, default: 0.3, min: 0.0, max: 2.0, step: 0.05 }]
+        }
+      ]
+
+      resolved = resolver.resolve_layers(scene_layers: scene_layers, audio: { bands: {} })
+
+      expect(resolved.fetch(0)[:param_schema]).to eq(
+        [{ name: :wobble, default: 0.3, min: 0.0, max: 2.0, step: 0.05 }]
+      )
+    end
+
     it "ignores unknown mapping source kinds" do
       resolver = described_class.new
       scene_layers = [

@@ -135,6 +135,7 @@ map treble, to: :sparkle # same as frequency_band(:high)
 layer :wave_shader do
   type :shader
   glsl "shaders/custom_wave.frag"
+  param :intensity, default: 0.6, range: 0.0..2.0, step: 0.05
   map amplitude => :param_intensity
   map frequency_band(:low) => :param_bass
   map beat? => :param_flash
@@ -159,6 +160,8 @@ to print the generated uniform reference. Common uniforms include:
 - `u_param_<name>`
 
 For backward compatibility, a DSL target like `:param_intensity` is also exposed as `u_param_intensity`.
+Use `param :name, default:, range:, step:` to attach numeric metadata for shader
+params that can be surfaced by tooling.
 
 ### MIDI Scene Switching
 

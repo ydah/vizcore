@@ -26,7 +26,8 @@ RSpec.describe Vizcore::Renderer::SceneSerializer do
             shader: :gradient_pulse,
             glsl: "shaders/custom_wave.frag",
             glsl_source: "void main() { }",
-            params: { intensity: 0.5 }
+            params: { intensity: 0.5 },
+            param_schema: [{ name: :intensity, default: 0.5, min: 0.0, max: 2.0, step: 0.1 }]
           }
         ],
         metrics: {
@@ -56,7 +57,16 @@ RSpec.describe Vizcore::Renderer::SceneSerializer do
             shader: "gradient_pulse",
             glsl: "shaders/custom_wave.frag",
             glsl_source: "void main() { }",
-            params: { intensity: 0.5 }
+            params: { intensity: 0.5 },
+            param_schema: [
+              {
+                name: "intensity",
+                default: 0.5,
+                min: 0.0,
+                max: 2.0,
+                step: 0.1
+              }
+            ]
           }
         ]
       )

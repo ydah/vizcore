@@ -155,6 +155,31 @@ RSpec.describe Vizcore::DSL::Engine do
       expect(params[:blend]).to eq(:screen)
     end
 
+    it "declares numeric shader parameter metadata" do
+      definition = described_class.define do
+        scene :custom do
+          layer :liquid do
+            shader "shaders/liquid.frag"
+            param :wobble, default: 0.3, range: 0.0..2.0, step: 0.05
+          end
+        end
+      end
+
+      layer = definition[:scenes].first[:layers].first
+      expect(layer[:params]).to include(wobble: 0.3)
+      expect(layer[:param_schema]).to eq(
+        [
+          {
+            name: :wobble,
+            default: 0.3,
+            min: 0.0,
+            max: 2.0,
+            step: 0.05
+          }
+        ]
+      )
+    end
+
     it "rejects react_to without a reaction body" do
       expect do
         described_class.define do

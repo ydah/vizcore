@@ -57,7 +57,21 @@ module Vizcore
         output[:shader] = values[:shader].to_s if values[:shader]
         output[:glsl] = values[:glsl].to_s if values[:glsl]
         output[:glsl_source] = values[:glsl_source].to_s if values[:glsl_source]
+        output[:param_schema] = serialize_param_schema(values[:param_schema]) if values[:param_schema]
         output
+      end
+
+      def serialize_param_schema(schema)
+        Array(schema).map do |entry|
+          values = symbolize_hash(entry)
+          {
+            name: values.fetch(:name).to_s,
+            default: round_float(values[:default]),
+            min: round_float(values[:min]),
+            max: round_float(values[:max]),
+            step: round_float(values[:step])
+          }.compact
+        end
       end
 
       def serialize_metrics(metrics)

@@ -13,6 +13,7 @@ module Vizcore
         @shader = nil
         @glsl = nil
         @params = {}
+        @param_schema = {}
         @mappings = []
       end
 
@@ -73,6 +74,32 @@ module Vizcore
       # @return [Symbol]
       def blend(value)
         @params[:blend] = value.to_sym
+      end
+
+      # Declare numeric metadata for a shader/layer parameter.
+      #
+      # @param name [Symbol, String] parameter name exposed as `u_param_<name>` for shaders
+      # @param default [Numeric, nil] default value stored in layer params
+      # @param range [Range, Array, nil] allowed numeric range
+      # @param min [Numeric, nil] allowed minimum when `range` is not used
+      # @param max [Numeric, nil] allowed maximum when `range` is not used
+      # @param step [Numeric, nil] preferred UI step
+      # @return [Hash]
+      def param(name, default: nil, range: nil, min: nil, max: nil, step: nil)
+        key = normalize_param_name(name)
+        range_min, range_max = normalize_range(range, context: "param")
+        min = range_min if min.nil?
+        max = range_max if max.nil?
+
+        metadata = { name: key }
+        metadata[:default] = normalize_param_number(default, :default) unless default.nil?
+        metadata[:min] = normalize_param_number(min, :min) unless min.nil?
+        metadata[:max] = normalize_param_number(max, :max) unless max.nil?
+        metadata[:step] = normalize_param_number(step, :step) unless step.nil?
+        validate_param_range!(metadata)
+
+        @params[key] = metadata[:default] if metadata.key?(:default)
+        @param_schema[key] = metadata
       end
 
       # Map analysis source(s) to layer parameter target(s).
@@ -203,6 +230,7 @@ module Vizcore
         }
         layer[:shader] = @shader if @shader
         layer[:glsl] = @glsl if @glsl
+        layer[:param_schema] = @param_schema.values.map(&:dup) unless @param_schema.empty?
         layer[:mappings] = @mappings.map { |mapping| mapping.dup } unless @mappings.empty?
         layer
       end
@@ -279,8 +307,28 @@ module Vizcore
         output
       end
 
+      def normalize_param_name(name)
+        key = name.to_s.strip
+        raise ArgumentError, "param name is required" if key.empty?
+
+        key.to_sym
+      end
+
+      def normalize_param_number(value, name)
+        Float(value)
+      rescue ArgumentError, TypeError
+        raise ArgumentError, "param #{name} must be numeric"
+      end
+
+      def validate_param_range!(metadata)
+        return unless metadata.key?(:min) && metadata.key?(:max)
+        return if metadata[:min] <= metadata[:max]
+
+        raise ArgumentError, "param min must be less than or equal to max"
+      end
+
       def normalize_transform(gain: nil, range: nil, min: nil, max: nil, curve: nil, attack: nil, release: nil)
-        range_min, range_max = normalize_range(range)
+        range_min, range_max = normalize_range(range, context: "mapping")
         min = range_min if min.nil?
         max = range_max if max.nil?
 
@@ -294,7 +342,7 @@ module Vizcore
         output
       end
 
-      def normalize_range(value)
+      def normalize_range(value, context:)
         return [nil, nil] if value.nil?
 
         if value.is_a?(Range)
@@ -305,7 +353,7 @@ module Vizcore
           return value
         end
 
-        raise ArgumentError, "mapping range must be a Range or two-element Array"
+        raise ArgumentError, "#{context} range must be a Range or two-element Array"
       end
 
       def normalize_float(value, name)

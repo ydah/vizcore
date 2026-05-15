@@ -6,6 +6,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+- Add shader parameter schema metadata through the Ruby `param` layer DSL.
 - Add `vizcore shader new NAME` for generating custom GLSL starter shaders.
 - Add `vizcore shader-docs` for generated custom GLSL uniform reference output.
 - Add browser latency probes for RTT and Ruby/browser clock-offset measurement.
