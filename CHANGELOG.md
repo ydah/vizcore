@@ -6,6 +6,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+- Add `vizcore shader new NAME` for generating custom GLSL starter shaders.
 - Add `vizcore shader-docs` for generated custom GLSL uniform reference output.
 - Add browser latency probes for RTT and Ruby/browser clock-offset measurement.
 - Drop stale realtime `audio_frame` sends when a browser WebSocket connection is backpressured.

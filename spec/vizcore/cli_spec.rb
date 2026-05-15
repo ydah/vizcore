@@ -123,6 +123,20 @@ RSpec.describe Vizcore::CLI do
       end.to output(/# Vizcore Shader Uniforms.*`u_amplitude`.*`u_param_<name>`/m).to_stdout
     end
 
+    it "creates a custom shader template" do
+      Dir.mktmpdir("vizcore-cli-shader") do |dir|
+        Dir.chdir(dir) do
+          expect do
+            described_class.start(["shader", "new", "liquid-wave"])
+          end.to output(%r{Shader template written: shaders/liquid-wave\.frag}).to_stdout
+
+          shader = Pathname("shaders/liquid-wave.frag")
+          expect(shader).to exist
+          expect(shader.read).to include("#version 300 es", "uniform float u_amplitude;", "out vec4 outColor;")
+        end
+      end
+    end
+
     it "writes a PNG scene snapshot" do
       Dir.mktmpdir("vizcore-cli-snapshot") do |dir|
         out = File.join(dir, "snapshot.png")

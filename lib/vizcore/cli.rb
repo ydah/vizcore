@@ -7,6 +7,7 @@ require_relative "../vizcore"
 require_relative "audio"
 require_relative "cli/doctor"
 require_relative "cli/scene_diagnostics"
+require_relative "cli/shader_template"
 require_relative "cli/shader_uniform_docs"
 require_relative "config"
 require_relative "server"
@@ -256,6 +257,25 @@ module Vizcore
       Vizcore::CLISupport::ShaderUniformDocs.new.lines.each { |line| say(line) }
     end
 
+    desc "shader COMMAND [NAME]", "Manage custom GLSL shader helpers"
+    option :out, type: :string, desc: "Output path for `shader new`"
+    # Run custom shader helper commands.
+    #
+    # @param command [String]
+    # @param name [String, nil]
+    # @raise [Thor::Error] when the subcommand or arguments are invalid
+    # @return [void]
+    def shader(command = nil, name = nil)
+      case command.to_s
+      when "new"
+        create_shader_template(name)
+      else
+        raise Thor::Error, "Unknown shader command: #{command || '(nil)'}. Use `vizcore shader new NAME`."
+      end
+    rescue ArgumentError => e
+      raise Thor::Error, e.message
+    end
+
     desc "snapshot SCENE_FILE", "Render one scene frame to a PNG snapshot"
     option :audio_source, type: :string, default: "dummy", desc: "Audio source: dummy, file, mic"
     option :audio_file, type: :string, desc: "Path to audio file used when --audio-source file"
@@ -355,6 +375,14 @@ module Vizcore
       return if config.audio_file&.file?
 
       raise ArgumentError, "Audio file not found: #{config.audio_file || '(nil)'}"
+    end
+
+    def create_shader_template(name)
+      raise ArgumentError, "shader name is required" if name.to_s.strip.empty?
+
+      destination = options[:out] || Vizcore::CLISupport::ShaderTemplate.default_path(name)
+      path = Vizcore::CLISupport::ShaderTemplate.new.write(destination)
+      say("Shader template written: #{path}")
     end
 
     def write_template(template_name, destination, project_name:)
