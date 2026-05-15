@@ -130,8 +130,11 @@ module Vizcore::DSL
     def onset: () -> source
              | (Symbol | String band) -> source
     def kick: () -> source
+            | (untyped value) -> untyped
     def snare: () -> source
+             | (untyped value) -> untyped
     def hihat: () -> source
+             | (untyped value) -> untyped
     def beat?: () -> source
     def beat: () -> source
     def beat_confidence: () -> source

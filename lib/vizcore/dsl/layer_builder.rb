@@ -7,6 +7,8 @@ module Vizcore
   module DSL
     # Builder for one render layer in a scene.
     class LayerBuilder
+      NO_ARGUMENT = Object.new.freeze
+
       # @param name [Symbol, String] layer identifier
       # @param styles [Hash] reusable layer parameter styles
       # @param defaults [Hash] default params applied before layer-specific values
@@ -261,17 +263,23 @@ module Vizcore
       end
 
       # @return [Hash] source descriptor for low-band percussive confidence
-      def kick
+      def kick(value = NO_ARGUMENT)
+        return @params[:kick] = value unless value.equal?(NO_ARGUMENT)
+
         source(:kick)
       end
 
       # @return [Hash] source descriptor for mid-band percussive confidence
-      def snare
+      def snare(value = NO_ARGUMENT)
+        return @params[:snare] = value unless value.equal?(NO_ARGUMENT)
+
         source(:snare)
       end
 
       # @return [Hash] source descriptor for high-band percussive confidence
-      def hihat
+      def hihat(value = NO_ARGUMENT)
+        return @params[:hihat] = value unless value.equal?(NO_ARGUMENT)
+
         source(:hihat)
       end
 
