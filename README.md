@@ -111,6 +111,16 @@ end
 
 `react_to` is additive syntax; it serializes to the same mapping model as `map`.
 
+Layers can choose their compositing mode with `blend`. Supported modes are `:alpha` / `:normal`, `:add`, `:multiply`, `:screen`, and `:difference`:
+
+```ruby
+layer :sparks do
+  type :particle_field
+  blend :screen
+  map treble, to: :sparkle
+end
+```
+
 Frequency bands can be written with musical aliases when that reads better in a scene:
 
 ```ruby

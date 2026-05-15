@@ -124,6 +124,20 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "stores explicit layer blend modes" do
+      definition = described_class.define do
+        scene :blend_modes do
+          layer :sparks do
+            type :particle_field
+            blend :screen
+          end
+        end
+      end
+
+      params = definition[:scenes].first[:layers].first[:params]
+      expect(params[:blend]).to eq(:screen)
+    end
+
     it "rejects react_to without a reaction body" do
       expect do
         described_class.define do

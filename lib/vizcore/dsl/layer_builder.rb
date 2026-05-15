@@ -63,6 +63,12 @@ module Vizcore
         @params[:font_size] = Integer(value)
       end
 
+      # @param value [Symbol, String] layer compositing mode
+      # @return [Symbol]
+      def blend(value)
+        @params[:blend] = value.to_sym
+      end
+
       # Map analysis source(s) to layer parameter target(s).
       #
       # @param definition [Hash, Symbol, String] mapping pairs or a single source

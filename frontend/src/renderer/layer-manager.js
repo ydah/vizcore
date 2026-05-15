@@ -91,6 +91,16 @@ export const normalizeSpectrum = (value, size = 32) => {
   return output;
 };
 
+export const normalizeBlendMode = (mode) => {
+  const value = String(mode || "alpha").toLowerCase();
+  if (value === "normal" || value === "alpha") return "alpha";
+  if (value === "add" || value === "additive") return "add";
+  if (value === "multiply") return "multiply";
+  if (value === "screen") return "screen";
+  if (value === "difference") return "difference";
+  return "alpha";
+};
+
 export class LayerManager {
   constructor(gl, shaderManager) {
     this.gl = gl;
@@ -447,11 +457,25 @@ export class LayerManager {
   }
 
   setBlendMode(mode) {
-    if (mode === "add" || mode === "additive") {
-      this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE);
-      return;
+    const blendMode = normalizeBlendMode(mode);
+    this.gl.blendEquation(this.gl.FUNC_ADD);
+
+    switch (blendMode) {
+      case "add":
+        this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE);
+        return;
+      case "multiply":
+        this.gl.blendFunc(this.gl.DST_COLOR, this.gl.ONE_MINUS_SRC_ALPHA);
+        return;
+      case "screen":
+        this.gl.blendFunc(this.gl.ONE, this.gl.ONE_MINUS_SRC_COLOR);
+        return;
+      case "difference":
+        this.gl.blendFunc(this.gl.ONE_MINUS_DST_COLOR, this.gl.ONE_MINUS_SRC_COLOR);
+        return;
+      default:
+        this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
     }
-    this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
   }
 
   setUniform1f(program, uniformName, value) {

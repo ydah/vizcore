@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   coerceUniformNumber,
+  normalizeBlendMode,
   normalizeSpectrum,
   shaderParamUniformNames,
 } from "../src/renderer/layer-manager.js";
@@ -40,4 +41,13 @@ test("normalizeSpectrum returns a clamped Float32Array with fixed length", () =>
   assert.equal(spectrum[3], 0);
   assert.equal(spectrum[4], 0);
   assert.equal(spectrum[5], 0);
+});
+
+test("normalizeBlendMode resolves supported compositing aliases", () => {
+  assert.equal(normalizeBlendMode("normal"), "alpha");
+  assert.equal(normalizeBlendMode("additive"), "add");
+  assert.equal(normalizeBlendMode("multiply"), "multiply");
+  assert.equal(normalizeBlendMode("screen"), "screen");
+  assert.equal(normalizeBlendMode("difference"), "difference");
+  assert.equal(normalizeBlendMode("unknown"), "alpha");
 });

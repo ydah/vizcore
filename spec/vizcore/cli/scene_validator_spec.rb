@@ -62,6 +62,24 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
     end
   end
 
+  it "reports unsupported blend modes" do
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :broken_blend do
+          layer :sparks do
+            type :particle_field
+            blend :overlay
+          end
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+
+      expect(result).not_to be_valid
+      expect(result.errors.map(&:message).join("\n")).to include("unsupported blend mode: overlay")
+    end
+  end
+
   it "formats scene structure for inspection" do
     with_scene_file(<<~RUBY) do |scene_path|
       Vizcore.define do

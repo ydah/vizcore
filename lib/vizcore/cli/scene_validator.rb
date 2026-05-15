@@ -22,6 +22,9 @@ module Vizcore
       ].freeze
 
       FREQUENCY_BANDS = %i[sub low mid high].freeze
+      SUPPORTED_BLEND_MODES = %i[
+        alpha normal add additive multiply screen difference
+      ].freeze
 
       Issue = Struct.new(:severity, :message, keyword_init: true) do
         def error?
@@ -112,7 +115,16 @@ module Vizcore
 
         glsl_source = layer[:glsl_source]
         issues << warn("scene #{scene_name} layer #{layer_name} has an empty GLSL file") if layer[:glsl] && glsl_source.to_s.empty?
+        validate_blend_mode(layer, scene_name, layer_name, issues)
         validate_mappings(Array(layer[:mappings]), scene_name, layer_name, issues)
+      end
+
+      def validate_blend_mode(layer, scene_name, layer_name, issues)
+        blend = layer.dig(:params, :blend)
+        return unless blend
+        return if SUPPORTED_BLEND_MODES.include?(blend.to_sym)
+
+        issues << error("scene #{scene_name} layer #{layer_name} uses unsupported blend mode: #{blend}")
       end
 
       def validate_mappings(mappings, scene_name, layer_name, issues)
