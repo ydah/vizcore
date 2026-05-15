@@ -335,6 +335,28 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "stores asset file params for image layers" do
+      definition = described_class.define do
+        scene :photo_scene do
+          layer :photo do
+            type :image
+            file "assets/noise.png"
+            fit :cover
+            scale 1.1
+            map amplitude, to: :opacity
+          end
+        end
+      end
+
+      layer = definition[:scenes].first[:layers].first
+      expect(layer[:type]).to eq(:image)
+      expect(layer[:params]).to include(file: "assets/noise.png", fit: :cover, scale: 1.1)
+      expect(layer[:mappings]).to include(
+        source: { kind: :amplitude },
+        target: :opacity
+      )
+    end
+
     it "builds scenes from inherited layers" do
       definition = described_class.define do
         scene :base do

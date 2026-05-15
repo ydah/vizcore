@@ -93,6 +93,19 @@ module Vizcore
         ),
         mappable_params: %i[scale rotation opacity],
         description: "Inline SVG asset rendered as a textured visual layer."
+      ),
+      Capability.new(
+        type: :image,
+        aliases: %i[image_layer photo],
+        params: COMMON_PARAMS.merge(
+          file: "String",
+          src: "String",
+          scale: "Float",
+          rotation: "Float",
+          fit: "Symbol"
+        ),
+        mappable_params: %i[scale rotation opacity],
+        description: "Inline PNG/JPEG/GIF/WebP image asset rendered as a textured visual layer."
       )
     ].freeze
 

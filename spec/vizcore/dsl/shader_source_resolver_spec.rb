@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "base64"
 require "tmpdir"
 require "fileutils"
 require "vizcore/dsl/shader_source_resolver"
@@ -96,6 +97,56 @@ RSpec.describe Vizcore::DSL::ShaderSourceResolver do
       expect do
         described_class.new.resolve(definition: definition, scene_file: scene_path)
       end.to raise_error(ArgumentError, /SVG file not found/)
+    end
+  end
+
+  it "embeds image files into layer params relative to scene file" do
+    Dir.mktmpdir("vizcore-image-resolver") do |dir|
+      scene_path = File.join(dir, "scene.rb")
+      image_path = File.join(dir, "assets", "noise.png")
+      FileUtils.mkdir_p(File.dirname(image_path))
+      File.write(scene_path, "Vizcore.define {}")
+      File.binwrite(image_path, Base64.decode64("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADggGAdi8ccQAAAABJRU5ErkJggg=="))
+
+      definition = {
+        scenes: [
+          {
+            name: :intro,
+            layers: [
+              { name: :photo, type: :image, params: { file: "assets/noise.png" } }
+            ]
+          }
+        ]
+      }
+
+      resolved = described_class.new.resolve(definition: definition, scene_file: scene_path)
+      params = resolved.dig(:scenes, 0, :layers, 0, :params)
+
+      expect(params[:file]).to eq("assets/noise.png")
+      expect(params[:src]).to start_with("data:image/png;base64,")
+    end
+  end
+
+  it "raises when image extension is unsupported" do
+    Dir.mktmpdir("vizcore-image-resolver") do |dir|
+      scene_path = File.join(dir, "scene.rb")
+      image_path = File.join(dir, "assets", "noise.txt")
+      FileUtils.mkdir_p(File.dirname(image_path))
+      File.write(scene_path, "Vizcore.define {}")
+      File.write(image_path, "not an image")
+
+      definition = {
+        scenes: [
+          {
+            name: :intro,
+            layers: [{ name: :photo, type: :image, params: { file: "assets/noise.txt" } }]
+          }
+        ]
+      }
+
+      expect do
+        described_class.new.resolve(definition: definition, scene_file: scene_path)
+      end.to raise_error(ArgumentError, /Unsupported Image file extension/)
     end
   end
 end

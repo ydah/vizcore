@@ -246,8 +246,8 @@ export class LayerManager {
       this.renderTextLayer(layer, audio, time, paletteIndex);
       return;
     }
-    if (isSvgLayer(layer)) {
-      this.renderSvgLayer(layer, audio);
+    if (isImageLayer(layer)) {
+      this.renderImageLayer(layer, audio);
       return;
     }
     if (isShaderLayer(layer)) {
@@ -422,7 +422,7 @@ export class LayerManager {
     });
   }
 
-  renderSvgLayer(layer, audio) {
+  renderImageLayer(layer, audio) {
     const params = layer?.params || {};
     this.imageRenderer.render({
       src: params.src || params.file,
@@ -653,6 +653,13 @@ const isSvgLayer = (layer) => {
   const type = String(layer?.type || "").toLowerCase();
   return type === "svg" || type === "svg_layer";
 };
+
+const isRasterImageLayer = (layer) => {
+  const type = String(layer?.type || "").toLowerCase();
+  return type === "image" || type === "image_layer" || type === "photo";
+};
+
+const isImageLayer = (layer) => isSvgLayer(layer) || isRasterImageLayer(layer);
 
 const defaultLayer = (audio) => ({
   name: "wireframe_cube",

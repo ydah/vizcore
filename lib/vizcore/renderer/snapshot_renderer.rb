@@ -48,8 +48,8 @@ module Vizcore
           render_particle_layer(canvas, layer, audio, color)
         when "text"
           render_text_layer(canvas, layer, audio, color)
-        when "svg", "svg_layer"
-          render_svg_layer(canvas, layer, audio, color)
+        when "svg", "svg_layer", "image", "image_layer", "photo"
+          render_image_layer(canvas, layer, audio, color)
         else
           render_geometry_layer(canvas, audio, color, index)
         end
@@ -91,9 +91,9 @@ module Vizcore
         )
       end
 
-      def render_svg_layer(canvas, layer, audio, color)
+      def render_image_layer(canvas, layer, audio, color)
         params = Hash(layer[:params] || layer["params"] || {})
-        label = params[:file] || params["file"] || layer[:name] || layer["name"] || "svg"
+        label = params[:file] || params["file"] || layer[:name] || layer["name"] || "image"
         scale = Float(params[:scale] || params["scale"] || 1).clamp(0.1, 4.0)
         pulse = clamp(audio[:beat_pulse])
         size = [width, height].min * (0.18 + pulse * 0.06) * scale

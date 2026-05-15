@@ -7,6 +7,15 @@ module Vizcore
   module DSL
     # Replaces external layer source paths with browser-ready inline payloads.
     class ShaderSourceResolver
+      MEDIA_MIME_TYPES = {
+        ".gif" => "image/gif",
+        ".jpg" => "image/jpeg",
+        ".jpeg" => "image/jpeg",
+        ".png" => "image/png",
+        ".svg" => "image/svg+xml",
+        ".webp" => "image/webp"
+      }.freeze
+
       # @param definition [Hash] DSL definition payload
       # @param scene_file [String, Pathname] source scene file
       # @raise [ArgumentError] when a referenced source file is missing
@@ -31,7 +40,7 @@ module Vizcore
         layer_hash = symbolize_hash(layer)
         shader_path = layer_hash[:glsl]
         layer_hash = resolve_shader_layer(layer_hash, base_dir: base_dir) if shader_path
-        layer_hash = resolve_svg_layer(layer_hash, base_dir: base_dir) if svg_layer?(layer_hash)
+        layer_hash = resolve_media_layer(layer_hash, base_dir: base_dir) if media_layer?(layer_hash)
         layer_hash
       end
 
@@ -45,23 +54,38 @@ module Vizcore
         layer_hash
       end
 
-      def resolve_svg_layer(layer_hash, base_dir:)
+      def resolve_media_layer(layer_hash, base_dir:)
         params = symbolize_hash(layer_hash[:params] || {})
-        svg_path = params[:file]
-        return layer_hash unless svg_path
+        media_path = params[:file]
+        return layer_hash unless media_path
 
-        full_path = resolve_path(base_dir: base_dir, relative_path: svg_path)
-        raise ArgumentError, "SVG file not found: #{svg_path}" unless full_path.file?
-        raise ArgumentError, "Unsupported SVG file extension: #{svg_path}" unless full_path.extname.downcase == ".svg"
+        full_path = resolve_path(base_dir: base_dir, relative_path: media_path)
+        raise ArgumentError, "#{media_layer_label(layer_hash)} file not found: #{media_path}" unless full_path.file?
 
-        params[:file] = svg_path.to_s
-        params[:src] = "data:image/svg+xml;base64,#{Base64.strict_encode64(full_path.binread)}"
+        mime_type = MEDIA_MIME_TYPES[full_path.extname.downcase]
+        raise ArgumentError, "Unsupported #{media_layer_label(layer_hash)} file extension: #{media_path}" unless mime_type
+        raise ArgumentError, "Unsupported SVG file extension: #{media_path}" if svg_layer?(layer_hash) && mime_type != "image/svg+xml"
+
+        params[:file] = media_path.to_s
+        params[:src] = "data:#{mime_type};base64,#{Base64.strict_encode64(full_path.binread)}"
         layer_hash[:params] = params
         layer_hash
       end
 
       def svg_layer?(layer_hash)
         %i[svg svg_layer].include?(layer_hash[:type]&.to_sym)
+      end
+
+      def image_layer?(layer_hash)
+        %i[image image_layer photo].include?(layer_hash[:type]&.to_sym)
+      end
+
+      def media_layer?(layer_hash)
+        svg_layer?(layer_hash) || image_layer?(layer_hash)
+      end
+
+      def media_layer_label(layer_hash)
+        svg_layer?(layer_hash) ? "SVG" : "Image"
       end
 
       def resolve_path(base_dir:, relative_path: nil, shader_path: nil)

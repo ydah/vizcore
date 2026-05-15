@@ -35,6 +35,7 @@ module Vizcore
         Entry.new(syntax: "shader :neon_grid / shader \"shaders/liquid.frag\"", description: "Use a built-in or custom fragment shader."),
         Entry.new(syntax: "glsl \"shaders/liquid.frag\"", description: "Load a custom fragment shader file."),
         Entry.new(syntax: "type :svg / file \"assets/logo.svg\"", description: "Render an SVG asset resolved relative to the scene file."),
+        Entry.new(syntax: "type :image / file \"assets/noise.png\"", description: "Render a PNG/JPEG/GIF/WebP asset resolved relative to the scene file."),
         Entry.new(syntax: "font \"Inter\" / letter_spacing 4", description: "Set text presentation params."),
         Entry.new(syntax: "palette \"#ff0055\", \"#00ffff\"", description: "Set ordered colors for supported layer renderers."),
         Entry.new(syntax: "blend :add / effect :bloom / vj_effect :mirror", description: "Set compositing and browser effects."),

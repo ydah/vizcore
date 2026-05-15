@@ -81,6 +81,14 @@ Vizcore.define do
       scale 0.9
       map bass, to: :scale, range: 0.8..1.15
     end
+
+    layer :photo do
+      type :image
+      file "assets/noise.png"
+      fit :cover
+      blend :screen
+      map amplitude, to: :opacity, range: 0.25..0.85
+    end
   end
 
   transition from: :intro, to: :drop do
