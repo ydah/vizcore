@@ -22,7 +22,8 @@ module Vizcore
       effect_intensity: "Float",
       vj_effect: "Symbol",
       palette: "Array<String>",
-      color: "String"
+      color: "String",
+      group: "Symbol"
     }.freeze
 
     CAPABILITIES = [

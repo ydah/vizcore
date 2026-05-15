@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "layer_builder"
+require_relative "layer_group_builder"
 
 module Vizcore
   module DSL
@@ -37,6 +38,17 @@ module Vizcore
         builder = LayerBuilder.new(name: name, styles: @styles, defaults: @theme_params)
         builder.evaluate(&block)
         @layers << builder.to_h
+      end
+
+      # Define a related group of layers with shared params.
+      #
+      # @param name [Symbol, String] group identifier
+      # @yield Layer group definition block
+      # @return [void]
+      def group(name, &block)
+        builder = LayerGroupBuilder.new(name: name, styles: @styles, defaults: @theme_params)
+        builder.evaluate(&block)
+        @layers.concat(builder.to_a)
       end
 
       # Apply a named theme as default params for all layers in this scene.

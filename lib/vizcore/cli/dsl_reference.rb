@@ -26,6 +26,7 @@ module Vizcore
 
       SCENE = [
         Entry.new(syntax: "use_theme :name", description: "Apply scene-wide layer defaults."),
+        Entry.new(syntax: "group :foreground { layer :name { ... } }", description: "Apply shared params to a related layer group."),
         Entry.new(syntax: "layer :name { ... }", description: "Append a render layer to the scene.")
       ].freeze
 

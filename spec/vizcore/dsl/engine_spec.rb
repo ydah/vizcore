@@ -208,6 +208,58 @@ RSpec.describe Vizcore::DSL::Engine do
       expect(sparks_params).to include(color: "#e11d48", palette: %w[#e11d48 #f59e0b #38bdf8], glow_strength: 0.5, blend: :screen)
     end
 
+    it "builds layer groups with shared params" do
+      definition = described_class.define do
+        style :glow do
+          glow_strength 0.7
+        end
+
+        theme :night do
+          palette "#111111", "#eeeeee"
+          opacity 0.8
+          blend :screen
+        end
+
+        scene :drop do
+          use_theme :night
+
+          group :foreground do
+            use_style :glow
+            blend :add
+            opacity 0.9
+
+            layer :particles do
+              type :particle_field
+              count 900
+            end
+
+            layer :title do
+              type :text
+              blend :screen
+            end
+          end
+        end
+      end
+
+      particles, title = definition[:scenes].first[:layers]
+
+      expect(particles[:params]).to include(
+        group: :foreground,
+        palette: %w[#111111 #eeeeee],
+        glow_strength: 0.7,
+        opacity: 0.9,
+        blend: :add,
+        count: 900
+      )
+      expect(title[:params]).to include(
+        group: :foreground,
+        palette: %w[#111111 #eeeeee],
+        glow_strength: 0.7,
+        opacity: 0.9,
+        blend: :screen
+      )
+    end
+
     it "stores layer-specific palettes" do
       definition = described_class.define do
         scene :palette_show do

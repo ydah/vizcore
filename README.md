@@ -270,6 +270,22 @@ scene :drop do
 end
 ```
 
+Layer groups apply shared params to a subset of adjacent layers while keeping the
+runtime payload as normal ordered layers:
+
+```ruby
+scene :drop do
+  group :foreground do
+    use_style :neon
+    blend :add
+    opacity 0.9
+
+    layer(:particles) { type :particle_field }
+    layer(:title) { type :text }
+  end
+end
+```
+
 Scenes can inherit shared layers from an earlier scene:
 
 ```ruby
