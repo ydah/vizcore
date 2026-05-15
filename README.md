@@ -32,6 +32,7 @@ sudo apt install -y libfftw3-dev   # optional: faster FFT
 
 ```bash
 vizcore doctor
+vizcore demo
 vizcore start examples/basic.rb
 ```
 
@@ -152,6 +153,7 @@ end
 
 ```bash
 vizcore start SCENE_FILE [--host 127.0.0.1] [--port 4567] [--audio-source mic|file|dummy] [--audio-file PATH] [--audio-device INDEX_OR_NAME] [--noise-gate RMS]
+vizcore demo [--host 127.0.0.1] [--port 4567]
 vizcore doctor
 vizcore validate SCENE_FILE
 vizcore inspect SCENE_FILE
@@ -187,7 +189,9 @@ vizcore start scene.rb --audio-source file --audio-file set.mp3
 
 When using file source, the HUD exposes **Play Audio** / **Pause Audio** controls and shows BPM, Beat, and Beat Count.
 
-The browser HUD also includes an Audio Inspector with amplitude, sub/low/mid/high meters, FFT preview bars, and Visual Gain, Bass Boost, Smoothing, Beat Hold, and Wobble controls for adapting visual response to different tracks and input levels.
+The browser HUD also includes an Audio Inspector with amplitude, sub/low/mid/high meters, FFT preview bars, shader compile error overlay, and Visual Gain, Bass Boost, Smoothing, Beat Hold, and Wobble controls for adapting visual response to different tracks and input levels.
+
+`vizcore demo` starts a bundled scene with bundled audio, so it is the quickest way to verify a fresh installation.
 
 ## Requirements
 
