@@ -113,6 +113,27 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "builds scenes from inherited layers" do
+      definition = described_class.define do
+        scene :base do
+          layer :background do
+            shader :neon_grid
+          end
+        end
+
+        scene :drop, extends: :base do
+          layer :particles do
+            type :particle_field
+          end
+        end
+      end
+
+      drop_layers = definition[:scenes].last[:layers]
+      expect(drop_layers.map { |layer| layer[:name] }).to eq(%i[background particles])
+      expect(drop_layers.first).to include(type: :shader, shader: :neon_grid)
+      expect(drop_layers.last).to include(type: :particle_field)
+    end
+
     it "builds mapping transforms from block syntax" do
       definition = described_class.define do
         scene :reactive do
@@ -331,6 +352,14 @@ RSpec.describe Vizcore::DSL::Engine do
           end
         end
       end.to raise_error(ArgumentError, /unknown style: missing/)
+    end
+
+    it "rejects unknown base scenes" do
+      expect do
+        described_class.define do
+          scene :drop, extends: :missing
+        end
+      end.to raise_error(ArgumentError, /unknown base scene: missing/)
     end
   end
 

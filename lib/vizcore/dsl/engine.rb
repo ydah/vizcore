@@ -76,6 +76,7 @@ module Vizcore
         @global_params = {}
         @section_tail = nil
         @styles = {}
+        @scene_registry = {}
       end
 
       # Evaluate DSL methods on this engine instance.
@@ -119,12 +120,15 @@ module Vizcore
       # Define a scene and its layers.
       #
       # @param name [Symbol, String] scene identifier
+      # @param extends [Symbol, String, nil] optional base scene to copy layers from
       # @yield Scene definition block
       # @return [void]
-      def scene(name, &block)
-        builder = SceneBuilder.new(name: name, styles: @styles)
+      def scene(name, extends: nil, &block)
+        builder = SceneBuilder.new(name: name, styles: @styles, layers: inherited_layers(extends))
         builder.evaluate(&block)
-        @scenes << builder.to_h
+        scene_definition = builder.to_h
+        @scenes << scene_definition
+        @scene_registry[scene_definition[:name]] = deep_dup(scene_definition)
       end
 
       # Define a beat-counted song section as a scene and auto-transition to the
@@ -226,6 +230,16 @@ module Vizcore
           to: to,
           trigger: proc { beat_count >= beats }
         }
+      end
+
+      def inherited_layers(scene_name)
+        return [] if scene_name.nil?
+
+        normalized = scene_name.to_sym
+        base_scene = @scene_registry[normalized]
+        raise ArgumentError, "unknown base scene: #{normalized}" unless base_scene
+
+        deep_dup(base_scene.fetch(:layers))
       end
 
       def deep_dup(value)

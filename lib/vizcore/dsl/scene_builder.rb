@@ -8,10 +8,11 @@ module Vizcore
     class SceneBuilder
       # @param name [Symbol, String] scene identifier
       # @param styles [Hash] reusable layer parameter styles
-      def initialize(name:, styles: {})
+      # @param layers [Array<Hash>] initial layer definitions
+      def initialize(name:, styles: {}, layers: [])
         @name = name.to_sym
         @styles = styles
-        @layers = []
+        @layers = layers.map { |layer| deep_dup(layer) }
       end
 
       # Evaluate a scene block.
@@ -38,8 +39,23 @@ module Vizcore
       def to_h
         {
           name: @name,
-          layers: @layers.map { |layer| layer.dup }
+          layers: @layers.map { |layer| deep_dup(layer) }
         }
+      end
+
+      private
+
+      def deep_dup(value)
+        case value
+        when Hash
+          value.each_with_object({}) do |(key, entry), output|
+            output[key] = deep_dup(entry)
+          end
+        when Array
+          value.map { |entry| deep_dup(entry) }
+        else
+          value
+        end
       end
     end
   end

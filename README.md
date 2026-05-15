@@ -181,6 +181,18 @@ scene :drop do
 end
 ```
 
+Scenes can inherit shared layers from an earlier scene:
+
+```ruby
+scene :base do
+  layer(:background) { shader :neon_grid }
+end
+
+scene :drop, extends: :base do
+  layer(:particles) { type :particle_field }
+end
+```
+
 Frequency bands can be written with musical aliases when that reads better in a scene:
 
 ```ruby
