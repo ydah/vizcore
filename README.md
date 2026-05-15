@@ -371,6 +371,7 @@ vizcore validate SCENE_FILE
 vizcore inspect SCENE_FILE
 vizcore snapshot SCENE_FILE [--audio-source dummy|file|mic] [--audio-file PATH] [--out screenshot.png]
 vizcore render SCENE_FILE [--audio-source dummy|file|mic] [--audio-file PATH] [--out frames|movie.mp4] [--frames 60] [--fps 30]
+vizcore record-features AUDIO_FILE [--out features.json] [--frames 300] [--fps 30]
 vizcore gallery [--host 127.0.0.1] [--port 4568]
 vizcore layers
 vizcore dsl-docs
@@ -418,6 +419,8 @@ The browser HUD also includes an Audio Inspector with amplitude, sub/low/mid/hig
 Use `vizcore snapshot scene.rb --audio-source dummy --out screenshot.png` to create a software-rendered PNG preview for README, social cards, or quick visual checks without starting the browser.
 
 Use `vizcore render scene.rb --audio-source file --audio-file track.wav --out frames --frames 120 --fps 30` to write a software-rendered PNG image sequence, or `--out movie.mp4` to encode the frames to MP4 with `ffmpeg`.
+
+Use `vizcore record-features track.wav --out features.json --frames 300 --fps 30` to capture the same audio analysis values as JSON for debugging mappings or comparing tracks.
 
 ## Requirements
 

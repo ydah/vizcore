@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "json"
 require "pathname"
 require "tmpdir"
 require "vizcore/cli"
@@ -266,6 +267,34 @@ RSpec.describe Vizcore::CLI do
             ]
           )
         end.to output(/Video written: #{Regexp.escape(Pathname.new(out).expand_path.to_s)}/).to_stdout
+      end
+    end
+
+    it "records audio features to JSON" do
+      Dir.mktmpdir("vizcore-cli-features") do |dir|
+        audio_file = Vizcore.root.join("spec", "fixtures", "audio", "kick_120bpm.wav")
+        out = File.join(dir, "features.json")
+
+        expect do
+          described_class.start(
+            [
+              "record-features",
+              audio_file.to_s,
+              "--out",
+              out,
+              "--frames",
+              "2",
+              "--fps",
+              "30",
+              "--noise-gate",
+              "0"
+            ]
+          )
+        end.to output(/Features written: #{Regexp.escape(out)}/).to_stdout
+
+        payload = JSON.parse(File.read(out))
+        expect(payload.fetch("features").length).to eq(2)
+        expect(payload.dig("metadata", "fps")).to eq(30.0)
       end
     end
 

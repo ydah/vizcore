@@ -4,6 +4,7 @@ require "fileutils"
 require "pathname"
 require "thor"
 require_relative "../vizcore"
+require_relative "analysis"
 require_relative "audio"
 require_relative "cli/doctor"
 require_relative "cli/dsl_reference"
@@ -386,6 +387,38 @@ module Vizcore
       raise Thor::Error, e.message
     end
 
+    map "record-features" => :record_features
+    desc "record-features AUDIO_FILE", "Record audio analysis features to JSON"
+    option :out, type: :string, default: "features.json", desc: "Output JSON path"
+    option :frames, type: :numeric, default: Vizcore::Analysis::FeatureRecorder::DEFAULT_FRAME_COUNT, desc: "Number of analysis frames to record"
+    option :fps, type: :numeric, default: Vizcore::Analysis::FeatureRecorder::DEFAULT_FRAME_RATE, desc: "Analysis frame rate"
+    option :noise_gate, type: :numeric, default: Config::DEFAULT_NOISE_GATE, desc: "RMS level below which audio is treated as silence"
+    option :audio_normalize, type: :boolean, default: false, desc: "Apply adaptive feature normalization"
+    option :bpm, type: :numeric, desc: "Fixed BPM value used with --bpm-lock"
+    option :bpm_lock, type: :boolean, default: false, desc: "Lock analysis BPM output to --bpm"
+    # Analyze an audio file and persist feature frames as JSON.
+    #
+    # @param audio_file [String] path to WAV/MP3/FLAC audio file
+    # @raise [Thor::Error] when audio loading or JSON writing fails
+    # @return [void]
+    def record_features(audio_file)
+      result = Vizcore::Analysis::FeatureRecorder.new(
+        audio_file: audio_file,
+        frames: options.fetch(:frames),
+        fps: options.fetch(:fps),
+        noise_gate: options.fetch(:noise_gate),
+        audio_normalize: feature_audio_normalize_setting,
+        bpm: options[:bpm],
+        bpm_lock: options.fetch(:bpm_lock)
+      ).write(out: options.fetch(:out))
+      say(
+        "Features written: #{result[:path]} " \
+        "(frames=#{result[:frames]}, fps=#{result[:fps]}, sample_rate=#{result[:sample_rate]})"
+      )
+    rescue StandardError => e
+      raise Thor::Error, e.message
+    end
+
     private
 
     def status_label(status)
@@ -466,6 +499,12 @@ module Vizcore
     def render_video_message(result)
       "Video written: #{result[:path]} " \
         "(scene=#{result[:scene]}, frames=#{result[:frames]}, fps=#{result[:fps]}, #{result[:width]}x#{result[:height]})"
+    end
+
+    def feature_audio_normalize_setting
+      return nil unless options.fetch(:audio_normalize)
+
+      { mode: :adaptive }
     end
 
     def print_audio_devices

@@ -33,6 +33,26 @@ module Vizcore::CLISupport
   end
 end
 
+module Vizcore::Analysis
+  class FeatureRecorder
+    VERSION: String
+    DEFAULT_FRAME_COUNT: Integer
+    DEFAULT_FRAME_RATE: Float
+
+    def initialize: (
+      audio_file: String | Pathname audio_file,
+      ?frames: Integer frames,
+      ?fps: Numeric fps,
+      ?noise_gate: Numeric noise_gate,
+      ?audio_normalize: Hash[Symbol, untyped]? audio_normalize,
+      ?bpm: Numeric? bpm,
+      ?bpm_lock: bool bpm_lock
+    ) -> void
+
+    def write: (out: String | Pathname) -> Hash[Symbol, untyped]
+  end
+end
+
 module Vizcore::DSL
   type source = { kind: Symbol, ?band: Symbol }
   type transform = {
