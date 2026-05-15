@@ -1,0 +1,241 @@
+# frozen_string_literal: true
+
+require_relative "png_writer"
+
+module Vizcore
+  module Renderer
+    # Renders a deterministic software preview PNG from a scene frame.
+    class SnapshotRenderer
+      DEFAULT_WIDTH = 1280
+      DEFAULT_HEIGHT = 720
+      PALETTE = [
+        [56, 189, 248],
+        [225, 29, 72],
+        [101, 255, 176],
+        [244, 114, 182],
+        [250, 204, 21]
+      ].freeze
+
+      def initialize(width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT)
+        @width = normalize_dimension(width)
+        @height = normalize_dimension(height)
+      end
+
+      attr_reader :width, :height
+
+      # @param scene [Hash]
+      # @param audio [Hash]
+      # @return [String] PNG bytes
+      def render(scene:, audio:)
+        canvas = Canvas.new(width: width, height: height)
+        canvas.fill_gradient(background_top(audio), background_bottom(audio))
+        layers = Array(scene[:layers] || scene["layers"])
+        layers = [default_layer] if layers.empty?
+        layers.each_with_index { |layer, index| render_layer(canvas, layer, audio, index) }
+        PngWriter.encode(width: width, height: height, rgba: canvas.bytes)
+      end
+
+      private
+
+      def render_layer(canvas, layer, audio, index)
+        type = (layer[:type] || layer["type"] || "geometry").to_s
+        color = layer_color(layer, audio, index)
+
+        case type
+        when "shader"
+          render_shader_layer(canvas, audio, color, index)
+        when "particle_field"
+          render_particle_layer(canvas, layer, audio, color)
+        when "text"
+          render_text_layer(canvas, layer, audio, color)
+        else
+          render_geometry_layer(canvas, audio, color, index)
+        end
+      end
+
+      def render_shader_layer(canvas, audio, color, index)
+        amplitude = clamp(audio[:amplitude])
+        y_base = height * (0.35 + index * 0.12)
+        5.times do |wave_index|
+          alpha = 0.16 + amplitude * 0.18
+          offset = wave_index * height * 0.055
+          canvas.draw_wave(y_base + offset, amplitude: amplitude, color: color, alpha: alpha)
+        end
+      end
+
+      def render_particle_layer(canvas, layer, audio, color)
+        amplitude = clamp(audio[:amplitude])
+        count = [[Integer(layer.dig(:params, :count) || layer.dig("params", "count") || 420), 80].max, 900].min
+        count.times do |index|
+          x = (Math.sin(index * 12.9898) * 43_758.5453).abs % width
+          y = (Math.sin(index * 78.233) * 12_345.6789).abs % height
+          radius = 1 + (index % 3) + (amplitude * 2).round
+          canvas.fill_circle(x, y, radius, color, alpha: 0.35 + amplitude * 0.45)
+        end
+      rescue ArgumentError, TypeError
+        nil
+      end
+
+      def render_text_layer(canvas, layer, audio, color)
+        content = layer.dig(:params, :content) || layer.dig("params", "content") || layer[:name] || layer["name"] || "Vizcore"
+        canvas.draw_label(content.to_s, x: width * 0.5, y: height * 0.72, color: color, alpha: 0.62 + clamp(audio[:beat_pulse]) * 0.28)
+      end
+
+      def render_geometry_layer(canvas, audio, color, index)
+        amplitude = clamp(audio[:amplitude])
+        size = [width, height].min * (0.22 + amplitude * 0.18)
+        cx = width * (0.5 + (index - 1) * 0.08)
+        cy = height * 0.48
+        offset = size * 0.24
+        canvas.draw_rect_outline(cx - size / 2, cy - size / 2, size, size, color, alpha: 0.78)
+        canvas.draw_rect_outline(cx - size / 2 + offset, cy - size / 2 - offset, size, size, color, alpha: 0.46)
+        4.times do |corner|
+          x1 = cx - size / 2 + (corner.even? ? 0 : size)
+          y1 = cy - size / 2 + (corner < 2 ? 0 : size)
+          canvas.draw_line(x1, y1, x1 + offset, y1 - offset, color, alpha: 0.55)
+        end
+      end
+
+      def background_top(audio)
+        amplitude = clamp(audio[:amplitude])
+        high = clamp(audio.dig(:bands, :high))
+        [4 + (amplitude * 22).round, 10 + (high * 38).round, 24 + (amplitude * 34).round]
+      end
+
+      def background_bottom(audio)
+        low = clamp(audio.dig(:bands, :low))
+        [1 + (low * 30).round, 4 + (low * 18).round, 12 + (low * 44).round]
+      end
+
+      def layer_color(layer, audio, index)
+        base = PALETTE[index % PALETTE.length]
+        beat = clamp(audio[:beat_pulse])
+        name_factor = (layer[:shader] || layer["shader"] || layer[:name] || layer["name"]).to_s.bytes.sum % 38
+        base.map { |value| [[value + name_factor + (beat * 30).round, 255].min, 0].max }
+      end
+
+      def default_layer
+        { type: "geometry", name: "snapshot" }
+      end
+
+      def normalize_dimension(value)
+        Integer(value).clamp(64, 4096)
+      rescue ArgumentError, TypeError
+        DEFAULT_WIDTH
+      end
+
+      def clamp(value)
+        Float(value || 0).clamp(0.0, 1.0)
+      rescue ArgumentError, TypeError
+        0.0
+      end
+
+      # Tiny RGBA canvas with alpha blending and a few primitive drawing helpers.
+      class Canvas
+        def initialize(width:, height:)
+          @width = width
+          @height = height
+          @bytes = String.new(capacity: width * height * 4, encoding: Encoding::BINARY)
+          @bytes << ([0, 0, 0, 255].pack("C4") * (width * height))
+        end
+
+        attr_reader :width, :height, :bytes
+
+        def fill_gradient(top, bottom)
+          height.times do |y|
+            t = y.to_f / [height - 1, 1].max
+            color = 3.times.map { |index| interpolate(top[index], bottom[index], t).round }
+            width.times { |x| set_pixel(x, y, color, 255) }
+          end
+        end
+
+        def draw_wave(y_base, amplitude:, color:, alpha:)
+          previous = nil
+          width.times do |x|
+            phase = (x.to_f / width) * Math::PI * 4.0
+            y = y_base + Math.sin(phase) * height * (0.06 + amplitude * 0.08)
+            draw_line(previous[0], previous[1], x, y, color, alpha: alpha) if previous
+            previous = [x, y]
+          end
+        end
+
+        def draw_rect_outline(x, y, rect_width, rect_height, color, alpha:)
+          draw_line(x, y, x + rect_width, y, color, alpha: alpha)
+          draw_line(x + rect_width, y, x + rect_width, y + rect_height, color, alpha: alpha)
+          draw_line(x + rect_width, y + rect_height, x, y + rect_height, color, alpha: alpha)
+          draw_line(x, y + rect_height, x, y, color, alpha: alpha)
+        end
+
+        def draw_line(x1, y1, x2, y2, color, alpha:)
+          x1 = x1.round
+          y1 = y1.round
+          x2 = x2.round
+          y2 = y2.round
+          steps = [(x2 - x1).abs, (y2 - y1).abs].max
+          return blend_pixel(x1, y1, color, alpha) if steps.zero?
+
+          steps.times do |step|
+            t = step.to_f / steps
+            blend_pixel(interpolate(x1, x2, t).round, interpolate(y1, y2, t).round, color, alpha)
+          end
+        end
+
+        def fill_circle(cx, cy, radius, color, alpha:)
+          cx = cx.round
+          cy = cy.round
+          radius = radius.round
+          (cy - radius).upto(cy + radius) do |y|
+            (cx - radius).upto(cx + radius) do |x|
+              next if ((x - cx)**2) + ((y - cy)**2) > radius**2
+
+              blend_pixel(x, y, color, alpha)
+            end
+          end
+        end
+
+        def draw_label(text, x:, y:, color:, alpha:)
+          chars = text.each_byte.first(24)
+          char_width = 14
+          total_width = chars.length * char_width
+          start_x = x.round - total_width / 2
+          chars.each_with_index do |byte, index|
+            height_factor = 0.35 + (byte % 9) * 0.07
+            fill_bar(start_x + index * char_width, y.round, 9, (42 * height_factor).round, color, alpha)
+          end
+        end
+
+        private
+
+        def fill_bar(x, baseline, bar_width, bar_height, color, alpha)
+          (baseline - bar_height).upto(baseline) do |y|
+            x.upto(x + bar_width) { |px| blend_pixel(px, y, color, alpha) }
+          end
+        end
+
+        def blend_pixel(x, y, color, alpha)
+          return if x.negative? || y.negative? || x >= width || y >= height
+
+          offset = ((y * width) + x) * 4
+          amount = Float(alpha).clamp(0.0, 1.0)
+          3.times do |index|
+            current = bytes.getbyte(offset + index)
+            bytes.setbyte(offset + index, interpolate(current, color[index], amount).round)
+          end
+          bytes.setbyte(offset + 3, 255)
+        end
+
+        def set_pixel(x, y, color, alpha)
+          offset = ((y * width) + x) * 4
+          bytes.setbyte(offset, color[0])
+          bytes.setbyte(offset + 1, color[1])
+          bytes.setbyte(offset + 2, color[2])
+          bytes.setbyte(offset + 3, alpha)
+        end
+
+        def interpolate(from, to, amount)
+          from + (to - from) * amount
+        end
+      end
+    end
+  end
+end

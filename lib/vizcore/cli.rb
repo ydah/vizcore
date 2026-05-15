@@ -231,6 +231,39 @@ module Vizcore
       say("Scene valid: #{scene_file}")
     end
 
+    desc "snapshot SCENE_FILE", "Render one scene frame to a PNG snapshot"
+    option :audio_source, type: :string, default: "dummy", desc: "Audio source: dummy, file, mic"
+    option :audio_file, type: :string, desc: "Path to audio file used when --audio-source file"
+    option :audio_device, type: :string, desc: "Audio input device index or name used when --audio-source mic"
+    option :noise_gate, type: :numeric, default: Config::DEFAULT_NOISE_GATE, desc: "RMS level below which audio is treated as silence"
+    option :out, type: :string, default: "snapshot.png", desc: "Output PNG path"
+    option :width, type: :numeric, default: Vizcore::Renderer::SnapshotRenderer::DEFAULT_WIDTH, desc: "Snapshot width"
+    option :height, type: :numeric, default: Vizcore::Renderer::SnapshotRenderer::DEFAULT_HEIGHT, desc: "Snapshot height"
+    # Load a scene DSL file and write a software-rendered PNG preview.
+    #
+    # @param scene_file [String] path to a Ruby scene DSL file
+    # @raise [Thor::Error] when scene loading or snapshot writing fails
+    # @return [void]
+    def snapshot(scene_file)
+      config = Config.new(
+        scene_file: scene_file,
+        audio_source: options.fetch(:audio_source),
+        audio_file: options[:audio_file],
+        audio_device: options[:audio_device],
+        noise_gate: options.fetch(:noise_gate)
+      )
+      validate_snapshot_config!(config)
+
+      result = Vizcore::Renderer::Snapshot.new(
+        config: config,
+        width: options.fetch(:width),
+        height: options.fetch(:height)
+      ).write(out: options.fetch(:out))
+      say("Snapshot written: #{result[:path]} (scene=#{result[:scene]}, #{result[:width]}x#{result[:height]})")
+    rescue StandardError => e
+      raise Thor::Error, e.message
+    end
+
     private
 
     def status_label(status)
@@ -249,6 +282,14 @@ module Vizcore
         label = issue.error? ? "[error]" : "[warn]"
         say("#{label} #{issue.message}")
       end
+    end
+
+    def validate_snapshot_config!(config)
+      raise ArgumentError, "Scene file not found: #{config.scene_file || '(nil)'}" unless config.scene_exists?
+      return unless config.audio_source == :file
+      return if config.audio_file&.file?
+
+      raise ArgumentError, "Audio file not found: #{config.audio_file || '(nil)'}"
     end
 
     def write_template(template_name, destination, project_name:)

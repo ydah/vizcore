@@ -117,6 +117,31 @@ RSpec.describe Vizcore::CLI do
       end
     end
 
+    it "writes a PNG scene snapshot" do
+      Dir.mktmpdir("vizcore-cli-snapshot") do |dir|
+        out = File.join(dir, "snapshot.png")
+
+        expect do
+          described_class.start(
+            [
+              "snapshot",
+              "examples/basic.rb",
+              "--audio-source",
+              "dummy",
+              "--out",
+              out,
+              "--width",
+              "320",
+              "--height",
+              "180"
+            ]
+          )
+        end.to output(/Snapshot written: #{Regexp.escape(out)}/).to_stdout
+
+        expect(File.binread(out, 8)).to eq(Vizcore::Renderer::PngWriter::SIGNATURE)
+      end
+    end
+
     it "passes audio options to config" do
       described_class.start(
         [
