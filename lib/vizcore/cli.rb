@@ -145,6 +145,19 @@ module Vizcore
       raise Thor::Error, e.message
     end
 
+    desc "gallery", "Start the bundled example gallery"
+    option :host, type: :string, default: Config::DEFAULT_HOST, desc: "Bind host"
+    option :port, type: :numeric, default: Vizcore::Server::GalleryRunner::DEFAULT_PORT, desc: "Bind port"
+    # Start a browser gallery for bundled example scenes.
+    #
+    # @return [void]
+    def gallery
+      Vizcore::Server::GalleryRunner.new(
+        host: options.fetch(:host),
+        port: options.fetch(:port)
+      ).run
+    end
+
     desc "new NAME", "Create a starter project scaffold"
     option :template,
            type: :string,

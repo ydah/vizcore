@@ -215,5 +215,18 @@ RSpec.describe Vizcore::CLI do
       end
       expect(runner).to have_received(:run)
     end
+
+    it "starts the bundled example gallery" do
+      gallery_runner = instance_double(Vizcore::Server::GalleryRunner, run: nil)
+      allow(Vizcore::Server::GalleryRunner).to receive(:new).and_return(gallery_runner)
+
+      described_class.start(["gallery", "--port", "4571"])
+
+      expect(Vizcore::Server::GalleryRunner).to have_received(:new).with(
+        host: "127.0.0.1",
+        port: 4571
+      )
+      expect(gallery_runner).to have_received(:run)
+    end
   end
 end

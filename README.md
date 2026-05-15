@@ -189,6 +189,7 @@ vizcore validate SCENE_FILE
 vizcore inspect SCENE_FILE
 vizcore snapshot SCENE_FILE [--audio-source dummy|file|mic] [--audio-file PATH] [--out screenshot.png]
 vizcore render SCENE_FILE [--audio-source dummy|file|mic] [--audio-file PATH] [--out frames] [--frames 60] [--fps 30]
+vizcore gallery [--host 127.0.0.1] [--port 4568]
 vizcore new PROJECT_NAME [--template standard|minimal|shader|midi|live-set|rubykaigi]
 vizcore devices [audio|midi]
 ```
@@ -239,6 +240,8 @@ Use `vizcore render scene.rb --audio-source file --audio-file track.wav --out fr
 - `fftw3` (optional) — Vizcore falls back to pure-Ruby FFT automatically when unavailable
 
 ## Examples
+
+Run `vizcore gallery` to open a browser gallery of bundled examples with scene counts, layer counts, audio-source hints, and launch commands.
 
 | File | Description |
 |------|-------------|

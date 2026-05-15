@@ -7,6 +7,9 @@ module Vizcore
 end
 
 require_relative "server/frame_broadcaster"
+require_relative "server/gallery_page"
+require_relative "server/gallery_app"
+require_relative "server/gallery_runner"
 require_relative "server/rack_app"
 require_relative "server/scene_dependency_watcher"
 require_relative "server/runner"
