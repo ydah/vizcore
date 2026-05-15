@@ -65,7 +65,12 @@ Vizcore.define do
     layer :title do
       type :text
       content "DROP"
+      font "Inter Black"
       font_size 96
+      align :center
+      fill "#ffffff"
+      stroke width: 2, color: "#111111"
+      shadow color: "rgba(0, 0, 0, 0.45)", blur: 18
       map beat? => :flash
     end
   end

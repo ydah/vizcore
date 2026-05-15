@@ -55,7 +55,7 @@ export class TextRenderer {
     this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
   }
 
-  render({ content, fontSize, audio, time, color, glowStrength }) {
+  render({ content, fontSize, audio, time, color, fontFamily, align, strokeWidth, strokeColor, shadowColor, shadowBlur, glowStrength }) {
     const text = String(content || "").trim();
     if (!text) {
       return;
@@ -74,6 +74,12 @@ export class TextRenderer {
       fontSize: dynamicSize,
       time,
       color,
+      fontFamily,
+      align,
+      strokeWidth,
+      strokeColor,
+      shadowColor,
+      shadowBlur,
       amplitude: amp,
       glowStrength: Number(glowStrength ?? 0.15)
     });
@@ -81,7 +87,7 @@ export class TextRenderer {
     this.drawQuad({ intensity: 0.85 + amp * 0.15 });
   }
 
-  drawTextToCanvas({ text, fontSize, time, color, amplitude, glowStrength }) {
+  drawTextToCanvas({ text, fontSize, time, color, fontFamily, align, strokeWidth, strokeColor, shadowColor, shadowBlur, amplitude, glowStrength }) {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -91,14 +97,25 @@ export class TextRenderer {
     const safeColor = typeof color === "string" && color.trim() ? color : "#e5f3ff";
     const glow = clamp(Number(glowStrength || 0), 0, 1) * (1.5 + amplitude * 5.0);
     const xShift = Math.sin(time * 2.0) * (2 + amplitude * 4);
+    const textAlign = normalizeTextAlign(align);
+    const stroke = clamp(Number(strokeWidth || 0), 0, 24);
+    const shadow = shadowBlur === undefined ? glow : clamp(Number(shadowBlur || 0), 0, 80);
 
-    ctx.textAlign = "center";
+    ctx.textAlign = textAlign;
     ctx.textBaseline = "middle";
-    ctx.font = `700 ${fontSize}px "IBM Plex Sans", "Noto Sans JP", sans-serif`;
-    ctx.shadowColor = "rgba(110, 208, 255, 0.35)";
-    ctx.shadowBlur = glow;
+    ctx.font = `700 ${fontSize}px ${normalizeFontFamily(fontFamily)}`;
+    ctx.shadowColor = normalizeTextColor(shadowColor, "rgba(110, 208, 255, 0.35)");
+    ctx.shadowBlur = shadow;
     ctx.fillStyle = safeColor;
-    ctx.fillText(text, this.canvas.width / 2 + xShift, this.canvas.height / 2);
+    const x = resolveTextX(this.canvas.width, textAlign) + xShift;
+    const y = this.canvas.height / 2;
+    if (stroke > 0) {
+      ctx.lineJoin = "round";
+      ctx.lineWidth = stroke;
+      ctx.strokeStyle = normalizeTextColor(strokeColor, safeColor);
+      ctx.strokeText(text, x, y);
+    }
+    ctx.fillText(text, x, y);
   }
 
   syncCanvasSize() {
@@ -141,3 +158,31 @@ export class TextRenderer {
 }
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+export const normalizeTextAlign = (value) => {
+  const align = String(value || "center").trim().toLowerCase();
+  if (align === "left" || align === "right" || align === "center") {
+    return align;
+  }
+  return "center";
+};
+
+export const resolveTextX = (width, align) => {
+  const canvasWidth = Number(width) || 0;
+  if (align === "left") return canvasWidth * 0.12;
+  if (align === "right") return canvasWidth * 0.88;
+  return canvasWidth * 0.5;
+};
+
+export const normalizeFontFamily = (value) => {
+  const family = String(value || "").trim();
+  if (!family) return "\"IBM Plex Sans\", \"Noto Sans JP\", sans-serif";
+  if (family.includes(",")) return `${family}, "IBM Plex Sans", "Noto Sans JP", sans-serif`;
+
+  return `"${family.replaceAll("\"", "")}", "IBM Plex Sans", "Noto Sans JP", sans-serif`;
+};
+
+const normalizeTextColor = (value, fallback) => {
+  const color = String(value || "").trim();
+  return color || fallback;
+};

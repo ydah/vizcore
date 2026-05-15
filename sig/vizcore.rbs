@@ -97,6 +97,11 @@ module Vizcore::DSL
     def count: (Integer value) -> Integer
     def content: (String value) -> String
     def font_size: (Integer value) -> Integer
+    def align: (Symbol | String value) -> Symbol
+    def font: (String value) -> String
+    def fill: (String value) -> String
+    def stroke: (?width: Numeric? width, ?color: String? color) -> Hash[Symbol, untyped]
+    def shadow: (?color: String? color, ?blur: Numeric? blur) -> Hash[Symbol, untyped]
     def blend: (Symbol | String value) -> Symbol
     def use_style: (Symbol | String name) -> Hash[Symbol, untyped]
     def param: (

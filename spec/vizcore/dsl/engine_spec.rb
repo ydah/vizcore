@@ -159,6 +159,34 @@ RSpec.describe Vizcore::DSL::Engine do
       expect(sparks_params).to include(color: "#e11d48", glow_strength: 0.5, blend: :screen)
     end
 
+    it "stores text presentation params" do
+      definition = described_class.define do
+        scene :titles do
+          layer :headline do
+            type :text
+            content "DROP"
+            font "Inter Black"
+            align :center
+            fill "#ffffff"
+            stroke width: 2, color: "#111111"
+            shadow color: "rgba(0, 0, 0, 0.45)", blur: 18
+          end
+        end
+      end
+
+      params = definition[:scenes].first[:layers].first[:params]
+      expect(params).to include(
+        content: "DROP",
+        font: "Inter Black",
+        align: :center,
+        color: "#ffffff",
+        stroke_width: 2.0,
+        stroke_color: "#111111",
+        shadow_color: "rgba(0, 0, 0, 0.45)",
+        shadow_blur: 18.0
+      )
+    end
+
     it "builds scenes from inherited layers" do
       definition = described_class.define do
         scene :base do

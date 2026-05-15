@@ -74,6 +74,45 @@ module Vizcore
         @params[:font_size] = Integer(value)
       end
 
+      # @param value [Symbol, String] text alignment (`left`, `center`, `right`)
+      # @return [Symbol]
+      def align(value)
+        alignment = value.to_sym
+        raise ArgumentError, "unsupported text align: #{value.inspect}" unless %i[left center right].include?(alignment)
+
+        @params[:align] = alignment
+      end
+
+      # @param value [String] text font family
+      # @return [String]
+      def font(value)
+        @params[:font] = value.to_s
+      end
+
+      # @param value [String] text fill color
+      # @return [String]
+      def fill(value)
+        @params[:color] = value.to_s
+      end
+
+      # @param width [Numeric, nil] text stroke width in pixels
+      # @param color [String, nil] text stroke color
+      # @return [Hash]
+      def stroke(width: nil, color: nil)
+        @params[:stroke_width] = normalize_non_negative_param_number(width, :stroke_width) unless width.nil?
+        @params[:stroke_color] = color.to_s unless color.nil?
+        @params
+      end
+
+      # @param color [String, nil] text shadow color
+      # @param blur [Numeric, nil] text shadow blur in pixels
+      # @return [Hash]
+      def shadow(color: nil, blur: nil)
+        @params[:shadow_color] = color.to_s unless color.nil?
+        @params[:shadow_blur] = normalize_non_negative_param_number(blur, :shadow_blur) unless blur.nil?
+        @params
+      end
+
       # @param value [Symbol, String] layer compositing mode
       # @return [Symbol]
       def blend(value)
@@ -408,6 +447,15 @@ module Vizcore
         raise ArgumentError, "mapping #{name} must be non-negative" if numeric.negative?
 
         numeric
+      end
+
+      def normalize_non_negative_param_number(value, name)
+        numeric = Float(value)
+        raise ArgumentError, "#{name} must be non-negative" if numeric.negative?
+
+        numeric
+      rescue ArgumentError, TypeError
+        raise ArgumentError, "#{name} must be numeric"
       end
 
       def normalize_curve(value)

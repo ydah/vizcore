@@ -13,6 +13,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 - Add `scene ... extends:` for sharing base scene layers.
 - Add `beat_confidence` analysis output and DSL mapping source.
 - Validate unsupported layer `effect` and `vj_effect` names in `vizcore validate`.
+- Add text layer `font`, `align`, `fill`, `stroke`, and `shadow` styling.
 - Add block-style `map` transform DSL with `deadzone` and `ease_out` curve support.
 - Add gemspec coverage for packaged examples, browser assets, docs, and RBS files.
 - Add deterministic `Vizcore::Audio::FixtureInput` for repeatable audio tests.

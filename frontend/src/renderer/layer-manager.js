@@ -327,6 +327,12 @@ export class LayerManager {
       content: params.content || "VIZCORE",
       fontSize: Number(params.font_size || 120),
       color: params.color || "#e5f3ff",
+      fontFamily: params.font || params.font_family,
+      align: params.align,
+      strokeWidth: params.stroke_width,
+      strokeColor: params.stroke_color,
+      shadowColor: params.shadow_color,
+      shadowBlur: params.shadow_blur,
       glowStrength: Number(params.glow_strength ?? 0.15),
       audio,
       time
