@@ -29,6 +29,11 @@ RSpec.describe "example scenes" do
     "examples/file_audio_demo.rb" => { expected_scene: "groove" },
     "examples/complex_audio_showcase.rb" => { expected_scene: "build" },
     "examples/rhythm_geometry.rb" => { expected_scene: "rhythm_geometry" },
+    "examples/ruby_crystal_show.rb" => { expected_scene: "ruby_crystal" },
+    "examples/live_coding_minimal.rb" => { expected_scene: "main" },
+    "examples/club_intro_drop.rb" => { expected_scene: "intro" },
+    "examples/shader_playground.rb" => { expected_scene: "shader_playground" },
+    "examples/audio_inspector.rb" => { expected_scene: "audio_inspector" },
     "examples/midi_scene_switch.rb" => { expected_scene: "warmup" },
     "examples/custom_shader.rb" => { expected_scene: "shader_art", expect_glsl_source: true },
     "examples/unyo_liquid.rb" => { expected_scene: "unyo" }

@@ -17,6 +17,11 @@ module Vizcore
         "file_audio_demo.rb" => "File-audio walkthrough with layered visuals.",
         "complex_audio_showcase.rb" => "Dense multi-scene showcase for audio-reactive layers.",
         "rhythm_geometry.rb" => "Morphing geometric pattern driven by rhythm and bands.",
+        "ruby_crystal_show.rb" => "Ruby-themed crystal, particles, and text showcase.",
+        "live_coding_minimal.rb" => "Tiny live-coding scene with a pulsing blob.",
+        "club_intro_drop.rb" => "Intro, build, and drop flow for rhythmic file input.",
+        "shader_playground.rb" => "Focused liquid shader scene with mapped params.",
+        "audio_inspector.rb" => "Audio feature visualization scene with bars and blob.",
         "midi_scene_switch.rb" => "MIDI note and CC driven scene switching.",
         "custom_shader.rb" => "Custom GLSL fragment shader example.",
         "unyo_liquid.rb" => "Organic liquid wobble scene with FFT blobs and particles."
@@ -25,6 +30,9 @@ module Vizcore
         file_audio_demo.rb
         complex_audio_showcase.rb
         rhythm_geometry.rb
+        ruby_crystal_show.rb
+        club_intro_drop.rb
+        audio_inspector.rb
       ].freeze
       ORDER = DESCRIPTIONS.keys.freeze
 

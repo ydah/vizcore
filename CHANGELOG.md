@@ -6,6 +6,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+- Add ruby crystal, live-coding, club intro/drop, shader playground, and audio inspector examples.
 - Add concept, architecture, DSL guide, cookbook, one-line walkthrough, and troubleshooting docs.
 - Add initial RBS signatures for the public Ruby DSL.
 - Add shader parameter schema metadata through the Ruby `param` layer DSL.

@@ -260,6 +260,11 @@ Run `vizcore gallery` to open a browser gallery of bundled examples with scene c
 | `examples/file_audio_demo.rb` | File audio source walkthrough |
 | `examples/complex_audio_showcase.rb` | Dense multi-layer showcase |
 | `examples/rhythm_geometry.rb` | Single large morphing geometric pattern scene with drum-reactive motion |
+| `examples/ruby_crystal_show.rb` | Ruby-themed crystal, particles, and title visual |
+| `examples/live_coding_minimal.rb` | Tiny scene for live-coding demos |
+| `examples/club_intro_drop.rb` | Intro, build, and drop flow for rhythmic file input |
+| `examples/shader_playground.rb` | Focused shader scene with declared params |
+| `examples/audio_inspector.rb` | Audio bars and blob for analysis visualization |
 | `examples/midi_scene_switch.rb` | MIDI-driven scene switching |
 | `examples/custom_shader.rb` | Custom GLSL shader with audio mapping |
 | `examples/unyo_liquid.rb` | Organic liquid wobble scene with FFT blob and particles |
