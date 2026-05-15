@@ -6,6 +6,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+- Add hot reload for referenced custom GLSL shader files.
 - Add explicit `vizcore start --reload` / `--no-reload` control for scene hot reload.
 - Add `vizcore render` for writing a software-rendered PNG image sequence.
 - Add `vizcore snapshot` for writing a software-rendered PNG preview of a scene.

@@ -74,6 +74,23 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "treats shader path strings as custom GLSL shaders" do
+      definition = described_class.define do
+        scene :custom do
+          layer :liquid do
+            shader "shaders/liquid.frag", reload: true
+          end
+        end
+      end
+
+      layer = definition[:scenes].first[:layers].first
+
+      expect(layer[:type]).to eq(:shader)
+      expect(layer[:glsl]).to eq("shaders/liquid.frag")
+      expect(layer[:shader]).to be_nil
+      expect(layer[:params]).to include(shader_reload: true)
+    end
+
     it "supports musical frequency band aliases in layer mappings" do
       definition = described_class.define do
         scene :aliases do

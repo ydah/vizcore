@@ -24,14 +24,17 @@ RSpec.describe Vizcore::Server::Runner do
       )
     end
     let(:input_manager) { instance_double(Vizcore::Audio::InputManager) }
-    let(:watcher) { instance_double(Vizcore::DSL::FileWatcher, start: nil, stop: nil) }
+    let(:watcher) { instance_double(Vizcore::Server::SceneDependencyWatcher, start: nil, stop: nil) }
+
+    before do
+      allow(Vizcore::Server::SceneDependencyWatcher).to receive(:new).and_return(watcher)
+    end
 
     it "configures puma thread options and shuts down cleanly" do
       allow(Vizcore::Server::RackApp).to receive(:new).and_return(rack_app)
       allow(Puma::Server).to receive(:new).and_return(puma_server)
       allow(Vizcore::Audio::InputManager).to receive(:new).and_return(input_manager)
       allow(Vizcore::Server::FrameBroadcaster).to receive(:new).and_return(broadcaster)
-      allow(Vizcore::DSL::Engine).to receive(:watch_file).and_return(watcher)
 
       runner = described_class.new(config, output: output)
       allow(runner).to receive(:wait_for_interrupt)
@@ -58,7 +61,10 @@ RSpec.describe Vizcore::Server::Runner do
           error_reporter: an_instance_of(Proc)
         )
       )
-      expect(Vizcore::DSL::Engine).to have_received(:watch_file).with(scene_file.to_s)
+      expect(Vizcore::Server::SceneDependencyWatcher).to have_received(:new).with(
+        scene_file: scene_file.to_s,
+        definition: hash_including(scenes: [hash_including(name: :basic)])
+      )
       expect(watcher).to have_received(:start)
       expect(watcher).to have_received(:stop)
       expect(puma_server).to have_received(:add_tcp_listener).with("127.0.0.1", 4567)
@@ -74,14 +80,13 @@ RSpec.describe Vizcore::Server::Runner do
       allow(Puma::Server).to receive(:new).and_return(puma_server)
       allow(Vizcore::Audio::InputManager).to receive(:new).and_return(input_manager)
       allow(Vizcore::Server::FrameBroadcaster).to receive(:new).and_return(broadcaster)
-      allow(Vizcore::DSL::Engine).to receive(:watch_file).and_return(watcher)
 
       runner = described_class.new(no_reload_config, output: output)
       allow(runner).to receive(:wait_for_interrupt)
 
       runner.run
 
-      expect(Vizcore::DSL::Engine).not_to have_received(:watch_file)
+      expect(Vizcore::Server::SceneDependencyWatcher).not_to have_received(:new)
       expect(output.string).to include("Hot reload: disabled")
     end
 
@@ -98,7 +103,6 @@ RSpec.describe Vizcore::Server::Runner do
       allow(Puma::Server).to receive(:new).and_return(puma_server)
       allow(Vizcore::Audio::InputManager).to receive(:new).and_return(input_manager)
       allow(Vizcore::Server::FrameBroadcaster).to receive(:new).and_return(broadcaster)
-      allow(Vizcore::DSL::Engine).to receive(:watch_file).and_return(watcher)
 
       runner = described_class.new(file_config, output: output)
       allow(runner).to receive(:wait_for_interrupt)
@@ -126,7 +130,6 @@ RSpec.describe Vizcore::Server::Runner do
       allow(Puma::Server).to receive(:new).and_return(puma_server)
       allow(Vizcore::Audio::InputManager).to receive(:new).and_return(input_manager)
       allow(Vizcore::Server::FrameBroadcaster).to receive(:new).and_return(broadcaster)
-      allow(Vizcore::DSL::Engine).to receive(:watch_file).and_return(watcher)
 
       runner = described_class.new(projector_config, output: output)
       allow(runner).to receive(:wait_for_interrupt)
@@ -145,7 +148,9 @@ RSpec.describe Vizcore::Server::Runner do
       allow(Vizcore::Audio::InputManager).to receive(:new).and_return(input_manager)
       allow(Vizcore::Server::FrameBroadcaster).to receive(:new).and_return(broadcaster)
       allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
-      allow(Vizcore::DSL::Engine).to receive(:watch_file) do |_, &block|
+      allow(Vizcore::Server::SceneDependencyWatcher).to receive(:new) do |scene_file:, definition:, &block|
+        expect(scene_file).to eq(config.scene_file.to_s)
+        expect(definition).to include(:scenes)
         callback = block
         watcher
       end
@@ -286,7 +291,6 @@ RSpec.describe Vizcore::Server::Runner do
       allow(Vizcore::Audio::InputManager).to receive(:new).and_return(input_manager)
       allow(Vizcore::Server::FrameBroadcaster).to receive(:new).and_return(broadcaster)
       allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
-      allow(Vizcore::DSL::Engine).to receive(:watch_file).and_return(watcher)
       allow(Vizcore::Audio::MidiInput).to receive(:new).and_return(midi_input)
       allow(midi_input).to receive(:start) do |&block|
         midi_callback = block

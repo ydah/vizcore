@@ -31,10 +31,16 @@ module Vizcore
         @type = value.to_sym
       end
 
-      # @param value [Symbol, String] built-in shader key
+      # @param value [Symbol, String] built-in shader key or custom GLSL path
+      # @param reload [Boolean, nil] accepted for custom shader path compatibility
       # @return [Symbol]
-      def shader(value)
-        @shader = value.to_sym
+      def shader(value, reload: nil)
+        if shader_path?(value)
+          @glsl = value.to_s
+          @params[:shader_reload] = !!reload unless reload.nil?
+        else
+          @shader = value.to_sym
+        end
         @type ||= :shader
       end
 
@@ -223,6 +229,13 @@ module Vizcore
         return :shader if @shader || @glsl
 
         :geometry
+      end
+
+      def shader_path?(value)
+        return false if value.is_a?(Symbol)
+
+        path = value.to_s
+        %w[.frag .glsl].include?(File.extname(path).downcase) || path.include?("/")
       end
 
       def normalize_source(source_value)

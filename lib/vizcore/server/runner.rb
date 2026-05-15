@@ -6,6 +6,7 @@ require_relative "../dsl"
 require_relative "../errors"
 require_relative "frame_broadcaster"
 require_relative "rack_app"
+require_relative "scene_dependency_watcher"
 require_relative "websocket_handler"
 
 module Vizcore
@@ -66,7 +67,7 @@ module Vizcore
         register_client_message_handler(broadcaster)
         midi_runtime = start_midi_runtime(definition, broadcaster)
         watcher = if @config.reload?
-                    start_scene_watcher(broadcaster) do |updated_definition|
+                    start_scene_watcher(broadcaster, definition: definition) do |updated_definition|
                       midi_runtime = refresh_midi_runtime(midi_runtime, updated_definition, broadcaster)
                     end
                   end
@@ -129,8 +130,8 @@ module Vizcore
         sleep(0.1) until stop_requested
       end
 
-      def start_scene_watcher(broadcaster, &on_reload)
-        watcher = Vizcore::DSL::Engine.watch_file(@config.scene_file.to_s) do |definition, _changed_path|
+      def start_scene_watcher(broadcaster, definition:, &on_reload)
+        watcher = Vizcore::Server::SceneDependencyWatcher.new(scene_file: @config.scene_file.to_s, definition: definition) do |definition, _changed_path|
           definition = resolve_shader_sources(definition)
           replace_scene_catalog(definition[:scenes])
           scene = first_scene(definition) || fallback_scene

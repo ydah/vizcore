@@ -141,6 +141,8 @@ layer :wave_shader do
 end
 ```
 
+Path-style shader declarations are also accepted, so `shader "shaders/liquid.frag", reload: true` is equivalent to `glsl "shaders/liquid.frag"` for custom fragment shaders. When hot reload is enabled, Vizcore watches referenced GLSL files and pushes updated shader source to connected browsers.
+
 Custom fragment shaders must be GLSL ES 3.00 and can use these audio uniforms:
 
 - `u_amplitude`
