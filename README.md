@@ -74,6 +74,13 @@ Vizcore.define do
       shadow color: "rgba(0, 0, 0, 0.45)", blur: 18
       map beat? => :flash
     end
+
+    layer :logo do
+      type :svg
+      file "assets/logo.svg"
+      scale 0.9
+      map bass, to: :scale, range: 0.8..1.15
+    end
   end
 
   transition from: :intro, to: :drop do

@@ -164,6 +164,7 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
           layer(:blob) { type :radial_blob }
           layer(:points) { type :particles }
           layer(:title) { type :text_layer }
+          layer(:logo) { type :svg_layer }
         end
       end
     RUBY

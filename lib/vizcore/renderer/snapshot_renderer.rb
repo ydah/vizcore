@@ -48,6 +48,8 @@ module Vizcore
           render_particle_layer(canvas, layer, audio, color)
         when "text"
           render_text_layer(canvas, layer, audio, color)
+        when "svg", "svg_layer"
+          render_svg_layer(canvas, layer, audio, color)
         else
           render_geometry_layer(canvas, audio, color, index)
         end
@@ -87,6 +89,20 @@ module Vizcore
           alpha: 0.62 + clamp(audio[:beat_pulse]) * 0.28,
           letter_spacing: normalize_letter_spacing(params)
         )
+      end
+
+      def render_svg_layer(canvas, layer, audio, color)
+        params = Hash(layer[:params] || layer["params"] || {})
+        label = params[:file] || params["file"] || layer[:name] || layer["name"] || "svg"
+        scale = Float(params[:scale] || params["scale"] || 1).clamp(0.1, 4.0)
+        pulse = clamp(audio[:beat_pulse])
+        size = [width, height].min * (0.18 + pulse * 0.06) * scale
+        x = width * 0.5
+        y = height * 0.5
+        canvas.draw_rect_outline(x - size / 2, y - size / 2, size, size, color, alpha: 0.72)
+        canvas.draw_label(File.basename(label.to_s), x: x, y: y + size * 0.62, color: color, alpha: 0.66)
+      rescue ArgumentError, TypeError
+        nil
       end
 
       def render_geometry_layer(canvas, audio, color, index)

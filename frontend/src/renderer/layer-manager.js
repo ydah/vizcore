@@ -2,6 +2,7 @@ import { getBuiltinShader } from "../shaders/builtins.js";
 import { getPostEffectShader } from "../shaders/post-effects.js";
 import { SHADER_ERROR_EVENT, buildShaderErrorDetail } from "../shader-error-overlay.js";
 import { buildRadialBlobLines, buildWireframeLines, estimateDeformFromSpectrum } from "../visuals/geometry.js";
+import { ImageRenderer } from "../visuals/image-renderer.js";
 import { ParticleSystem } from "../visuals/particle-system.js";
 import { TextRenderer } from "../visuals/text-renderer.js";
 import { getVJEffectShader } from "../visuals/vj-effects.js";
@@ -189,6 +190,7 @@ export class LayerManager {
 
     this.particleSystem = new ParticleSystem(this.gl, this.shaderManager);
     this.textRenderer = new TextRenderer(this.gl, this.shaderManager);
+    this.imageRenderer = new ImageRenderer(this.gl, this.shaderManager);
 
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.fullscreenBuffer);
     this.gl.bufferData(this.gl.ARRAY_BUFFER, FULLSCREEN_VERTICES, this.gl.STATIC_DRAW);
@@ -242,6 +244,10 @@ export class LayerManager {
     }
     if (isTextLayer(layer)) {
       this.renderTextLayer(layer, audio, time, paletteIndex);
+      return;
+    }
+    if (isSvgLayer(layer)) {
+      this.renderSvgLayer(layer, audio);
       return;
     }
     if (isShaderLayer(layer)) {
@@ -413,6 +419,17 @@ export class LayerManager {
       glowStrength: Number(params.glow_strength ?? 0.15),
       audio,
       time
+    });
+  }
+
+  renderSvgLayer(layer, audio) {
+    const params = layer?.params || {};
+    this.imageRenderer.render({
+      src: params.src || params.file,
+      fit: params.fit,
+      scale: params.scale,
+      rotation: params.rotation,
+      audio
     });
   }
 
@@ -630,6 +647,11 @@ const isParticleLayer = (layer) => {
 const isTextLayer = (layer) => {
   const type = String(layer?.type || "").toLowerCase();
   return type === "text" || type === "text_layer";
+};
+
+const isSvgLayer = (layer) => {
+  const type = String(layer?.type || "").toLowerCase();
+  return type === "svg" || type === "svg_layer";
 };
 
 const defaultLayer = (audio) => ({

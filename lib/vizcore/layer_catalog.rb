@@ -80,6 +80,19 @@ module Vizcore
         ),
         mappable_params: %i[font_size letter_spacing glow_strength],
         description: "Canvas text rendered into the WebGL scene."
+      ),
+      Capability.new(
+        type: :svg,
+        aliases: %i[svg_layer],
+        params: COMMON_PARAMS.merge(
+          file: "String",
+          src: "String",
+          scale: "Float",
+          rotation: "Float",
+          fit: "Symbol"
+        ),
+        mappable_params: %i[scale rotation opacity],
+        description: "Inline SVG asset rendered as a textured visual layer."
       )
     ].freeze
 

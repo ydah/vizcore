@@ -58,6 +58,12 @@ module Vizcore
         @type ||= :shader
       end
 
+      # @param path [String, Pathname] asset file path used by media-like layers
+      # @return [String]
+      def file(path)
+        @params[:file] = path.to_s
+      end
+
       # @param value [Integer] particle count or similar numeric parameter
       # @return [Integer]
       def count(value)

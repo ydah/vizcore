@@ -314,6 +314,27 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "stores asset file params for svg layers" do
+      definition = described_class.define do
+        scene :logo_scene do
+          layer :logo do
+            type :svg
+            file "assets/logo.svg"
+            scale 1.2
+            map bass, to: :scale
+          end
+        end
+      end
+
+      layer = definition[:scenes].first[:layers].first
+      expect(layer[:type]).to eq(:svg)
+      expect(layer[:params]).to include(file: "assets/logo.svg", scale: 1.2)
+      expect(layer[:mappings]).to include(
+        source: { kind: :frequency_band, band: :low },
+        target: :scale
+      )
+    end
+
     it "builds scenes from inherited layers" do
       definition = described_class.define do
         scene :base do

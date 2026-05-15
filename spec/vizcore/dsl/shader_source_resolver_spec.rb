@@ -51,4 +51,51 @@ RSpec.describe Vizcore::DSL::ShaderSourceResolver do
       end.to raise_error(ArgumentError, /GLSL file not found/)
     end
   end
+
+  it "embeds svg files into layer params relative to scene file" do
+    Dir.mktmpdir("vizcore-svg-resolver") do |dir|
+      scene_path = File.join(dir, "scene.rb")
+      svg_path = File.join(dir, "assets", "logo.svg")
+      FileUtils.mkdir_p(File.dirname(svg_path))
+      File.write(scene_path, "Vizcore.define {}")
+      File.write(svg_path, "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>")
+
+      definition = {
+        scenes: [
+          {
+            name: :intro,
+            layers: [
+              { name: :logo, type: :svg, params: { file: "assets/logo.svg" } }
+            ]
+          }
+        ]
+      }
+
+      resolved = described_class.new.resolve(definition: definition, scene_file: scene_path)
+      params = resolved.dig(:scenes, 0, :layers, 0, :params)
+
+      expect(params[:file]).to eq("assets/logo.svg")
+      expect(params[:src]).to start_with("data:image/svg+xml;base64,")
+    end
+  end
+
+  it "raises when svg path is missing" do
+    Dir.mktmpdir("vizcore-svg-resolver") do |dir|
+      scene_path = File.join(dir, "scene.rb")
+      File.write(scene_path, "Vizcore.define {}")
+
+      definition = {
+        scenes: [
+          {
+            name: :intro,
+            layers: [{ name: :logo, type: :svg, params: { file: "missing.svg" } }]
+          }
+        ]
+      }
+
+      expect do
+        described_class.new.resolve(definition: definition, scene_file: scene_path)
+      end.to raise_error(ArgumentError, /SVG file not found/)
+    end
+  end
 end

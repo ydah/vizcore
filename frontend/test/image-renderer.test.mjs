@@ -1,0 +1,44 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  normalizeImageFit,
+  normalizeRotation,
+  normalizeScale,
+  resolveImageRect,
+  resolveMediaSource,
+} from "../src/visuals/image-renderer.js";
+
+test("resolveMediaSource trims empty sources", () => {
+  assert.equal(resolveMediaSource(" data:image/svg+xml;base64,abc "), "data:image/svg+xml;base64,abc");
+  assert.equal(resolveMediaSource(" "), null);
+});
+
+test("normalizeImageFit accepts contain cover and stretch", () => {
+  assert.equal(normalizeImageFit("cover"), "cover");
+  assert.equal(normalizeImageFit("stretch"), "stretch");
+  assert.equal(normalizeImageFit("unknown"), "contain");
+});
+
+test("normalizers clamp image scale and rotation", () => {
+  assert.equal(normalizeScale("2.5"), 2.5);
+  assert.equal(normalizeScale(-1), 0.01);
+  assert.equal(normalizeScale(99), 8);
+  assert.equal(normalizeRotation("0.25"), 0.25);
+  assert.equal(normalizeRotation("bad"), 0);
+});
+
+test("resolveImageRect preserves aspect ratio for contain and cover", () => {
+  assert.deepEqual(
+    resolveImageRect({ canvasWidth: 800, canvasHeight: 400, imageWidth: 200, imageHeight: 100, fit: "contain" }),
+    { width: 800, height: 400 }
+  );
+  assert.deepEqual(
+    resolveImageRect({ canvasWidth: 800, canvasHeight: 400, imageWidth: 100, imageHeight: 200, fit: "cover" }),
+    { width: 800, height: 1600 }
+  );
+  assert.deepEqual(
+    resolveImageRect({ canvasWidth: 800, canvasHeight: 400, imageWidth: 100, imageHeight: 200, fit: "stretch", scale: 0.5 }),
+    { width: 400, height: 200 }
+  );
+});
