@@ -18,6 +18,8 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
         scene :drop do
           layer :particles do
             type :particle_field
+            effect :bloom
+            vj_effect :mirror
             map beat_confidence => :sync_strength
             map beat_pulse => :size
           end
@@ -78,6 +80,27 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
 
       expect(result).not_to be_valid
       expect(result.errors.map(&:message).join("\n")).to include("unsupported blend mode: overlay")
+    end
+  end
+
+  it "reports unsupported layer effects" do
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :broken_effect do
+          layer :visual do
+            type :shader
+            effect :unknown_post
+            vj_effect :unknown_vj
+          end
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+      messages = result.errors.map(&:message).join("\n")
+
+      expect(result).not_to be_valid
+      expect(messages).to include("unsupported effect: unknown_post")
+      expect(messages).to include("unsupported vj_effect: unknown_vj")
     end
   end
 
