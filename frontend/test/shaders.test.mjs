@@ -49,10 +49,32 @@ test("getBuiltinShader resolves added visual preset shaders", () => {
   assert.match(getBuiltinShader("waveform_ribbon"), /u_global_color/);
 });
 
+test("all builtin shader fixtures satisfy the WebGL2 fragment contract", () => {
+  for (const [name, shader] of Object.entries(BUILTIN_FRAGMENT_SHADERS)) {
+    assert.match(shader, /#version 300 es/, `${name} declares GLSL ES 3.00`);
+    assert.match(shader, /precision mediump float;/, `${name} declares float precision`);
+    assert.match(shader, /out vec4 outColor;/, `${name} declares fragment output`);
+    assert.match(shader, /void main\(\)/, `${name} declares main`);
+    assert.doesNotMatch(shader, /gl_FragColor/, `${name} avoids WebGL1 fragment output`);
+  }
+});
+
 test("getPostEffectShader resolves known effects and returns null for unknown", () => {
   assert.equal(getPostEffectShader("bloom"), POST_EFFECT_SHADERS.bloom);
   assert.equal(getPostEffectShader("chromatic"), POST_EFFECT_SHADERS.chromatic);
   assert.equal(getPostEffectShader("motion_blur"), POST_EFFECT_SHADERS.motion_blur);
   assert.equal(getPostEffectShader("crt"), POST_EFFECT_SHADERS.crt);
   assert.equal(getPostEffectShader("unknown"), null);
+});
+
+test("all post-effect shader fixtures satisfy the WebGL2 fragment contract", () => {
+  for (const [name, shader] of Object.entries(POST_EFFECT_SHADERS)) {
+    assert.match(shader, /#version 300 es/, `${name} declares GLSL ES 3.00`);
+    assert.match(shader, /precision mediump float;/, `${name} declares float precision`);
+    assert.match(shader, /in vec2 v_uv;/, `${name} accepts fullscreen UV input`);
+    assert.match(shader, /uniform sampler2D u_texture;/, `${name} samples the layer texture`);
+    assert.match(shader, /out vec4 outColor;/, `${name} declares fragment output`);
+    assert.match(shader, /void main\(\)/, `${name} declares main`);
+    assert.doesNotMatch(shader, /gl_FragColor/, `${name} avoids WebGL1 fragment output`);
+  }
 });
