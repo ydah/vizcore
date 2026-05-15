@@ -229,6 +229,46 @@ RSpec.describe Vizcore::CLI do
       end
     end
 
+    it "prints MP4 render output metadata" do
+      Dir.mktmpdir("vizcore-cli-render-mp4") do |dir|
+        out = File.join(dir, "movie.mp4")
+        sequence = instance_double(
+          Vizcore::Renderer::RenderSequence,
+          write: {
+            path: Pathname.new(out).expand_path,
+            format: :mp4,
+            scene: "basic",
+            frames: 2,
+            fps: 15.0,
+            width: 160,
+            height: 90
+          }
+        )
+        allow(Vizcore::Renderer::RenderSequence).to receive(:new).and_return(sequence)
+
+        expect do
+          described_class.start(
+            [
+              "render",
+              "examples/basic.rb",
+              "--audio-source",
+              "dummy",
+              "--out",
+              out,
+              "--frames",
+              "2",
+              "--fps",
+              "15",
+              "--width",
+              "160",
+              "--height",
+              "90"
+            ]
+          )
+        end.to output(/Video written: #{Regexp.escape(Pathname.new(out).expand_path.to_s)}/).to_stdout
+      end
+    end
+
     it "passes audio options to config" do
       described_class.start(
         [

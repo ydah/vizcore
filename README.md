@@ -18,7 +18,7 @@ bundle add vizcore
 
 macOS:
 ```bash
-brew install portaudio ffmpeg   # ffmpeg only needed for MP3/FLAC input
+brew install portaudio ffmpeg   # ffmpeg is needed for MP3/FLAC input and MP4 render output
 brew install fftw               # optional: faster FFT
 ```
 
@@ -370,7 +370,7 @@ vizcore doctor
 vizcore validate SCENE_FILE
 vizcore inspect SCENE_FILE
 vizcore snapshot SCENE_FILE [--audio-source dummy|file|mic] [--audio-file PATH] [--out screenshot.png]
-vizcore render SCENE_FILE [--audio-source dummy|file|mic] [--audio-file PATH] [--out frames] [--frames 60] [--fps 30]
+vizcore render SCENE_FILE [--audio-source dummy|file|mic] [--audio-file PATH] [--out frames|movie.mp4] [--frames 60] [--fps 30]
 vizcore gallery [--host 127.0.0.1] [--port 4568]
 vizcore layers
 vizcore dsl-docs
@@ -417,13 +417,13 @@ The browser HUD also includes an Audio Inspector with amplitude, sub/low/mid/hig
 
 Use `vizcore snapshot scene.rb --audio-source dummy --out screenshot.png` to create a software-rendered PNG preview for README, social cards, or quick visual checks without starting the browser.
 
-Use `vizcore render scene.rb --audio-source file --audio-file track.wav --out frames --frames 120 --fps 30` to write a software-rendered PNG image sequence. Direct MP4 output is not implemented yet; encode the generated frames with `ffmpeg` when you need a video file.
+Use `vizcore render scene.rb --audio-source file --audio-file track.wav --out frames --frames 120 --fps 30` to write a software-rendered PNG image sequence, or `--out movie.mp4` to encode the frames to MP4 with `ffmpeg`.
 
 ## Requirements
 
 - Ruby `>= 3.2`
 - `portaudio` for microphone input
-- `ffmpeg` on `PATH` when using `.mp3` or `.flac` file input
+- `ffmpeg` on `PATH` when using `.mp3` / `.flac` file input or `.mp4` render output
 - `fftw3` (optional) — Vizcore falls back to pure-Ruby FFT automatically when unavailable
 
 ## Examples
