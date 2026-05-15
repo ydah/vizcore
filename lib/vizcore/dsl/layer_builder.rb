@@ -9,13 +9,14 @@ module Vizcore
     class LayerBuilder
       # @param name [Symbol, String] layer identifier
       # @param styles [Hash] reusable layer parameter styles
-      def initialize(name:, styles: {})
+      # @param defaults [Hash] default params applied before layer-specific values
+      def initialize(name:, styles: {}, defaults: {})
         @name = name.to_sym
         @styles = styles
         @type = nil
         @shader = nil
         @glsl = nil
-        @params = {}
+        @params = deep_dup(defaults)
         @param_schema = {}
         @mappings = []
       end

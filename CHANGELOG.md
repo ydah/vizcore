@@ -9,6 +9,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 - Add `on_beat` and `on_bar` transition DSL helpers.
 - Add `section` DSL for bar-counted scene sequencing.
 - Add reusable layer `style` / `use_style` DSL.
+- Add scene-wide `theme` / `use_theme` DSL.
 - Add `scene ... extends:` for sharing base scene layers.
 - Add `beat_confidence` analysis output and DSL mapping source.
 - Add block-style `map` transform DSL with `deadzone` and `ease_out` curve support.

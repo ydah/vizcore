@@ -5,8 +5,10 @@ module Vizcore
     # Collects reusable layer parameter presets for the `style` DSL.
     class StyleBuilder
       # @param name [Symbol, String] style identifier
-      def initialize(name:)
+      # @param kind [String] user-facing DSL kind for error messages
+      def initialize(name:, kind: "style")
         @name = name.to_sym
+        @kind = kind
         @params = {}
       end
 
@@ -16,7 +18,7 @@ module Vizcore
       # @return [Vizcore::DSL::StyleBuilder]
       def evaluate(&block)
         instance_eval(&block) if block
-        raise ArgumentError, "style #{@name} requires at least one parameter" if @params.empty?
+        raise ArgumentError, "#{@kind} #{@name} requires at least one parameter" if @params.empty?
 
         self
       end

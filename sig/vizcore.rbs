@@ -35,8 +35,9 @@ module Vizcore::DSL
     ?param_schema: Array[param_schema_entry],
     ?mappings: Array[mapping]
   }
-  type scene = { name: Symbol, layers: Array[layer] }
+  type scene = { name: Symbol, layers: Array[layer], ?theme: Symbol }
   type style = { name: Symbol, params: Hash[Symbol, untyped] }
+  type theme = { name: Symbol, params: Hash[Symbol, untyped] }
 
   class Engine
     def self.define: () { () -> void } -> Hash[Symbol, untyped]
@@ -45,6 +46,7 @@ module Vizcore::DSL
 
     def audio: (Symbol | String name, **untyped options) -> Array[Hash[Symbol, untyped]]
     def style: (Symbol | String name) { () -> void } -> void
+    def theme: (Symbol | String name) { () -> void } -> void
     def midi: (Symbol | String name, **untyped options) -> Array[Hash[Symbol, untyped]]
     def scene: (Symbol | String name, ?extends: Symbol | String? extends) { () -> void } -> void
     def section: (Symbol | String name, bars: Integer bars, ?beats_per_bar: Integer beats_per_bar) { () -> void } -> void
@@ -67,21 +69,27 @@ module Vizcore::DSL
     def initialize: (
       name: Symbol | String name,
       ?styles: Hash[Symbol, Hash[Symbol, untyped]] styles,
+      ?themes: Hash[Symbol, Hash[Symbol, untyped]] themes,
       ?layers: Array[layer] layers
     ) -> void
     def evaluate: () ?{ () -> void } -> SceneBuilder
     def layer: (Symbol | String name) ?{ () -> void } -> void
+    def use_theme: (Symbol | String name) -> Hash[Symbol, untyped]
     def to_h: () -> scene
   end
 
   class StyleBuilder
-    def initialize: (name: Symbol | String name) -> void
+    def initialize: (name: Symbol | String name, ?kind: String kind) -> void
     def evaluate: () ?{ () -> void } -> StyleBuilder
     def to_h: () -> style
   end
 
   class LayerBuilder
-    def initialize: (name: Symbol | String name, ?styles: Hash[Symbol, Hash[Symbol, untyped]] styles) -> void
+    def initialize: (
+      name: Symbol | String name,
+      ?styles: Hash[Symbol, Hash[Symbol, untyped]] styles,
+      ?defaults: Hash[Symbol, untyped] defaults
+    ) -> void
     def evaluate: () ?{ () -> void } -> LayerBuilder
     def type: (Symbol | String value) -> Symbol
     def shader: (Symbol | String value, ?reload: bool? reload) -> Symbol

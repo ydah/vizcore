@@ -115,6 +115,50 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "applies scene themes as layer defaults" do
+      definition = described_class.define do
+        theme :ruby_night do
+          color "#e11d48"
+          glow_strength 0.5
+          blend :screen
+        end
+
+        scene :drop do
+          use_theme :ruby_night
+
+          layer :title do
+            type :text
+            color "#ffffff"
+          end
+
+          layer :sparks do
+            type :particle_field
+          end
+        end
+      end
+
+      expect(definition[:themes]).to eq(
+        [
+          {
+            name: :ruby_night,
+            params: {
+              color: "#e11d48",
+              glow_strength: 0.5,
+              blend: :screen
+            }
+          }
+        ]
+      )
+
+      scene = definition[:scenes].first
+      expect(scene[:theme]).to eq(:ruby_night)
+
+      title_params = scene[:layers][0][:params]
+      sparks_params = scene[:layers][1][:params]
+      expect(title_params).to include(color: "#ffffff", glow_strength: 0.5, blend: :screen)
+      expect(sparks_params).to include(color: "#e11d48", glow_strength: 0.5, blend: :screen)
+    end
+
     it "builds scenes from inherited layers" do
       definition = described_class.define do
         scene :base do
@@ -354,6 +398,16 @@ RSpec.describe Vizcore::DSL::Engine do
           end
         end
       end.to raise_error(ArgumentError, /unknown style: missing/)
+    end
+
+    it "rejects unknown scene themes" do
+      expect do
+        described_class.define do
+          scene :invalid do
+            use_theme :missing
+          end
+        end
+      end.to raise_error(ArgumentError, /unknown theme: missing/)
     end
 
     it "rejects unknown base scenes" do

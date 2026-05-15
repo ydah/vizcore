@@ -181,6 +181,25 @@ scene :drop do
 end
 ```
 
+Themes provide scene-wide layer defaults:
+
+```ruby
+theme :ruby_night do
+  color "#e11d48"
+  glow_strength 0.5
+  blend :screen
+end
+
+scene :drop do
+  use_theme :ruby_night
+
+  layer :title do
+    type :text
+    content "DROP"
+  end
+end
+```
+
 Scenes can inherit shared layers from an earlier scene:
 
 ```ruby

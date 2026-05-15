@@ -76,6 +76,7 @@ module Vizcore
         @global_params = {}
         @section_tail = nil
         @styles = {}
+        @themes = {}
         @scene_registry = {}
       end
 
@@ -108,6 +109,17 @@ module Vizcore
         @styles[style_definition[:name]] = deep_dup(style_definition[:params])
       end
 
+      # Register a reusable scene-wide layer parameter theme.
+      #
+      # @param name [Symbol, String] theme identifier
+      # @yield Theme parameter block
+      # @return [void]
+      def theme(name, &block)
+        builder = StyleBuilder.new(name: name, kind: "theme")
+        theme_definition = builder.evaluate(&block).to_h
+        @themes[theme_definition[:name]] = deep_dup(theme_definition[:params])
+      end
+
       # Register a MIDI input definition.
       #
       # @param name [Symbol, String] input name
@@ -124,7 +136,7 @@ module Vizcore
       # @yield Scene definition block
       # @return [void]
       def scene(name, extends: nil, &block)
-        builder = SceneBuilder.new(name: name, styles: @styles, layers: inherited_layers(extends))
+        builder = SceneBuilder.new(name: name, styles: @styles, themes: @themes, layers: inherited_layers(extends))
         builder.evaluate(&block)
         scene_definition = builder.to_h
         @scenes << scene_definition
@@ -203,7 +215,8 @@ module Vizcore
           transitions: @transitions.map { |transition| deep_dup(transition) },
           midi_maps: @midi_mappings.map { |mapping| deep_dup(mapping) },
           globals: deep_dup(@global_params),
-          styles: @styles.map { |name, params| { name: name, params: deep_dup(params) } }
+          styles: @styles.map { |name, params| { name: name, params: deep_dup(params) } },
+          themes: @themes.map { |name, params| { name: name, params: deep_dup(params) } }
         }
       end
 
