@@ -19,6 +19,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 - Add `beat_confidence` analysis output and DSL mapping source.
 - Add `motion_blur` and `crt` browser post effects for layers.
 - Add `ruby_crystal`, `starfield`, and `waveform_ribbon` built-in shader presets.
+- Add browser HUD sliders for declared shader parameter schemas.
 - Validate unsupported layer `effect` and `vj_effect` names in `vizcore validate`.
 - Add text layer `font`, `align`, `fill`, `stroke`, and `shadow` styling.
 - Add browser HUD save/load for visual reactivity controls.

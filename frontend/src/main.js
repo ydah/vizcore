@@ -19,6 +19,10 @@ import {
 import { applyProjectorMode, resolveProjectorMode } from "./projector-mode.js";
 import { Engine } from "./renderer/engine.js";
 import { SHADER_COMPILE_EVENT } from "./renderer/shader-manager.js";
+import {
+  pruneShaderParamOverrides,
+  shaderParamControlEntries
+} from "./shader-param-controls.js";
 import { SHADER_ERROR_EVENT, formatShaderErrorMessage, formatShaderErrorTitle } from "./shader-error-overlay.js";
 import {
   loadVisualSettingsPreset,
@@ -63,6 +67,7 @@ const wobbleControl = document.querySelector("#wobble-control");
 const reactivitySaveButton = document.querySelector("#reactivity-save");
 const reactivityLoadButton = document.querySelector("#reactivity-load");
 const reactivityStatusElement = document.querySelector("#reactivity-status");
+const shaderParamControlsElement = document.querySelector("#shader-param-controls");
 const shaderErrorOverlay = document.querySelector("#shader-error-overlay");
 const shaderErrorTitleElement = document.querySelector("#shader-error-title");
 const shaderErrorMessageElement = document.querySelector("#shader-error-message");
@@ -106,6 +111,8 @@ let availableSceneNames = [];
 let pendingSceneName = null;
 let pendingSceneRequestedAt = 0;
 let tapTempoKey = null;
+let shaderParamOverrides = {};
+let shaderParamControlsSignature = "";
 
 const websocketUrl = buildWebSocketUrl();
 const client = new WebSocketClient(websocketUrl, {
@@ -128,6 +135,10 @@ const client = new WebSocketClient(websocketUrl, {
     }
     const sceneChanged = sceneName !== currentSceneName;
     currentSceneName = sceneName;
+    if (sceneChanged) {
+      shaderParamControlsSignature = "";
+    }
+    updateShaderParamControls(frame?.scene?.layers);
     const amplitude = Number(frame?.audio?.amplitude || 0).toFixed(4);
     const bpm = Number(frame?.audio?.bpm || 0);
     const beat = !!frame?.audio?.beat;
@@ -163,6 +174,8 @@ const client = new WebSocketClient(websocketUrl, {
       currentSceneName = String(sceneName);
       sceneStatusElement.textContent = `Scene: ${currentSceneName}`;
       renderSceneButtons();
+      shaderParamControlsSignature = "";
+      updateShaderParamControls(payload?.scene?.layers);
     }
     if (Object.prototype.hasOwnProperty.call(payload || {}, "tap_tempo_key")) {
       updateTapTempoKey(payload?.tap_tempo_key);
@@ -293,6 +306,79 @@ function renderSceneButtons() {
     return button;
   });
   sceneSwitcherElement.replaceChildren(...buttons);
+}
+
+function updateShaderParamControls(layers) {
+  if (!shaderParamControlsElement) {
+    return;
+  }
+
+  const entries = shaderParamControlEntries(layers, shaderParamOverrides);
+  const signature = shaderParamControlsSignatureFor(entries);
+  if (signature === shaderParamControlsSignature) {
+    return;
+  }
+
+  shaderParamControlsSignature = signature;
+  shaderParamOverrides = pruneShaderParamOverrides(shaderParamOverrides, entries);
+  engine.setShaderParamOverrides(shaderParamOverrides);
+  renderShaderParamControls(entries);
+}
+
+function shaderParamControlsSignatureFor(entries) {
+  return entries.map((entry) => (
+    `${entry.key}:${entry.min}:${entry.max}:${entry.step}`
+  )).join("|");
+}
+
+function renderShaderParamControls(entries) {
+  if (!shaderParamControlsElement) {
+    return;
+  }
+
+  if (!entries.length) {
+    shaderParamControlsElement.hidden = true;
+    shaderParamControlsElement.replaceChildren();
+    return;
+  }
+
+  const title = document.createElement("p");
+  title.className = "shader-param-controls__title";
+  title.textContent = "Shader Params";
+  const controls = entries.map((entry) => createShaderParamControl(entry));
+  shaderParamControlsElement.replaceChildren(title, ...controls);
+  shaderParamControlsElement.hidden = false;
+}
+
+function createShaderParamControl(entry) {
+  const label = document.createElement("label");
+  const name = document.createElement("span");
+  const input = document.createElement("input");
+  const value = document.createElement("output");
+  name.textContent = entry.label;
+  input.type = "range";
+  input.min = String(entry.min);
+  input.max = String(entry.max);
+  input.step = String(entry.step);
+  input.value = String(entry.value);
+  value.value = formatShaderParamValue(entry.value);
+  input.addEventListener("input", () => {
+    const numeric = Number(input.value);
+    shaderParamOverrides[entry.layerKey] ||= {};
+    shaderParamOverrides[entry.layerKey][entry.paramName] = numeric;
+    engine.setShaderParamOverrides(shaderParamOverrides);
+    value.value = formatShaderParamValue(numeric);
+  });
+  label.append(name, input, value);
+  return label;
+}
+
+function formatShaderParamValue(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return "--";
+  }
+  return Math.abs(numeric) >= 10 ? numeric.toFixed(1) : numeric.toFixed(2);
 }
 
 function requestSceneSwitch(sceneName) {

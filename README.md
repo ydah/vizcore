@@ -307,6 +307,8 @@ to print the generated uniform reference. Common uniforms include:
 For backward compatibility, a DSL target like `:param_intensity` is also exposed as `u_param_intensity`.
 Use `param :name, default:, range:, step:` to attach numeric metadata for shader
 params that can be surfaced by tooling.
+The browser HUD turns this metadata into per-layer shader parameter sliders, so
+declared params can be adjusted during a live run without editing the scene file.
 
 ### MIDI Scene Switching
 

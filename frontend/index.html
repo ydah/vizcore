@@ -337,9 +337,10 @@
       display: none;
     }
 
-    .reactivity-controls label {
+    .reactivity-controls label,
+    .shader-param-controls label {
       display: grid;
-      grid-template-columns: minmax(5.5rem, 0.8fr) minmax(8rem, 1.2fr);
+      grid-template-columns: minmax(5.5rem, 0.8fr) minmax(8rem, 1.2fr) minmax(2.8rem, 0.35fr);
       align-items: center;
       gap: 0.5rem;
       margin-top: 0.3rem;
@@ -347,13 +348,43 @@
       color: #c9d9ee;
     }
 
-    .reactivity-controls input[type="range"] {
+    .reactivity-controls label {
+      grid-template-columns: minmax(5.5rem, 0.8fr) minmax(8rem, 1.2fr);
+    }
+
+    .reactivity-controls input[type="range"],
+    .shader-param-controls input[type="range"] {
       width: 100%;
     }
 
-    .reactivity-controls p {
+    .reactivity-controls p,
+    .shader-param-controls p {
       margin-top: 0.45rem;
       line-height: 1.35;
+    }
+
+    .shader-param-controls {
+      margin-top: 0.55rem;
+      padding-top: 0.55rem;
+      border-top: 1px solid rgba(153, 195, 255, 0.16);
+    }
+
+    .shader-param-controls[hidden] {
+      display: none;
+    }
+
+    .shader-param-controls__title {
+      color: #d9e8ff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .shader-param-controls output {
+      color: #a8d8ff;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
     }
 
     @media (max-width: 520px) {
@@ -439,6 +470,7 @@
         </div>
         <p id="reactivity-status">Visual Gain: 2.5x | Bass: 1.4x | Smooth: 0.25 | Beat Hold: 180ms | Wobble: 1.00x</p>
       </div>
+      <div id="shader-param-controls" class="shader-param-controls" hidden aria-label="Shader parameter controls"></div>
       <div id="scene-switcher" class="scene-switcher" hidden aria-label="Scene switcher"></div>
       <button id="audio-toggle" type="button" hidden>Play Audio</button>
     </section>
