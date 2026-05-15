@@ -7,8 +7,10 @@ module Vizcore
     # Collects layer definitions inside a single scene block.
     class SceneBuilder
       # @param name [Symbol, String] scene identifier
-      def initialize(name:)
+      # @param styles [Hash] reusable layer parameter styles
+      def initialize(name:, styles: {})
         @name = name.to_sym
+        @styles = styles
         @layers = []
       end
 
@@ -27,7 +29,7 @@ module Vizcore
       # @yield Layer definition block
       # @return [void]
       def layer(name, &block)
-        builder = LayerBuilder.new(name: name)
+        builder = LayerBuilder.new(name: name, styles: @styles)
         builder.evaluate(&block)
         @layers << builder.to_h
       end

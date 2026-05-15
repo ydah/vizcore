@@ -163,6 +163,24 @@ layer :sparks do
 end
 ```
 
+Reusable layer styles keep repeated visual params in one place:
+
+```ruby
+style :neon do
+  color "#00ffff"
+  glow_strength 0.45
+  blend :add
+end
+
+scene :drop do
+  layer :title do
+    type :text
+    use_style :neon
+    content "DROP"
+  end
+end
+```
+
 Frequency bands can be written with musical aliases when that reads better in a scene:
 
 ```ruby

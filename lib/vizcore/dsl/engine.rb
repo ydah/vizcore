@@ -3,6 +3,7 @@
 require "pathname"
 require_relative "file_watcher"
 require_relative "scene_builder"
+require_relative "style_builder"
 
 module Vizcore
   module DSL
@@ -74,6 +75,7 @@ module Vizcore
         @midi_mappings = []
         @global_params = {}
         @section_tail = nil
+        @styles = {}
       end
 
       # Evaluate DSL methods on this engine instance.
@@ -94,6 +96,17 @@ module Vizcore
         @audio_inputs << { name: name.to_sym, options: symbolize_keys(options) }
       end
 
+      # Register a reusable layer parameter style.
+      #
+      # @param name [Symbol, String] style identifier
+      # @yield Style parameter block
+      # @return [void]
+      def style(name, &block)
+        builder = StyleBuilder.new(name: name)
+        style_definition = builder.evaluate(&block).to_h
+        @styles[style_definition[:name]] = deep_dup(style_definition[:params])
+      end
+
       # Register a MIDI input definition.
       #
       # @param name [Symbol, String] input name
@@ -109,7 +122,7 @@ module Vizcore
       # @yield Scene definition block
       # @return [void]
       def scene(name, &block)
-        builder = SceneBuilder.new(name: name)
+        builder = SceneBuilder.new(name: name, styles: @styles)
         builder.evaluate(&block)
         @scenes << builder.to_h
       end
@@ -185,7 +198,8 @@ module Vizcore
           scenes: @scenes.map { |scene| deep_dup(scene) },
           transitions: @transitions.map { |transition| deep_dup(transition) },
           midi_maps: @midi_mappings.map { |mapping| deep_dup(mapping) },
-          globals: deep_dup(@global_params)
+          globals: deep_dup(@global_params),
+          styles: @styles.map { |name, params| { name: name, params: deep_dup(params) } }
         }
       end
 

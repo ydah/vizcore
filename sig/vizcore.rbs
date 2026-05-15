@@ -36,6 +36,7 @@ module Vizcore::DSL
     ?mappings: Array[mapping]
   }
   type scene = { name: Symbol, layers: Array[layer] }
+  type style = { name: Symbol, params: Hash[Symbol, untyped] }
 
   class Engine
     def self.define: () { () -> void } -> Hash[Symbol, untyped]
@@ -43,6 +44,7 @@ module Vizcore::DSL
     def self.watch_file: (String | Pathname path, ?poll_interval: Float poll_interval, ?listener_factory: untyped listener_factory) { (Hash[Symbol, untyped], Pathname) -> void } -> FileWatcher
 
     def audio: (Symbol | String name, **untyped options) -> Array[Hash[Symbol, untyped]]
+    def style: (Symbol | String name) { () -> void } -> void
     def midi: (Symbol | String name, **untyped options) -> Array[Hash[Symbol, untyped]]
     def scene: (Symbol | String name) { () -> void } -> void
     def section: (Symbol | String name, bars: Integer bars, ?beats_per_bar: Integer beats_per_bar) { () -> void } -> void
@@ -62,14 +64,20 @@ module Vizcore::DSL
   end
 
   class SceneBuilder
-    def initialize: (name: Symbol | String name) -> void
+    def initialize: (name: Symbol | String name, ?styles: Hash[Symbol, Hash[Symbol, untyped]] styles) -> void
     def evaluate: () ?{ () -> void } -> SceneBuilder
     def layer: (Symbol | String name) ?{ () -> void } -> void
     def to_h: () -> scene
   end
 
-  class LayerBuilder
+  class StyleBuilder
     def initialize: (name: Symbol | String name) -> void
+    def evaluate: () ?{ () -> void } -> StyleBuilder
+    def to_h: () -> style
+  end
+
+  class LayerBuilder
+    def initialize: (name: Symbol | String name, ?styles: Hash[Symbol, Hash[Symbol, untyped]] styles) -> void
     def evaluate: () ?{ () -> void } -> LayerBuilder
     def type: (Symbol | String value) -> Symbol
     def shader: (Symbol | String value, ?reload: bool? reload) -> Symbol
@@ -78,6 +86,7 @@ module Vizcore::DSL
     def content: (String value) -> String
     def font_size: (Integer value) -> Integer
     def blend: (Symbol | String value) -> Symbol
+    def use_style: (Symbol | String name) -> Hash[Symbol, untyped]
     def param: (
       Symbol | String name,
       ?default: Numeric? default,

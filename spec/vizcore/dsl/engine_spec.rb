@@ -75,6 +75,44 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "applies named styles to layer params" do
+      definition = described_class.define do
+        style :neon do
+          color "#00ffff"
+          glow_strength 0.45
+          blend :add
+        end
+
+        scene :styled do
+          layer :title do
+            type :text
+            use_style :neon
+            color "#ffffff"
+          end
+        end
+      end
+
+      expect(definition[:styles]).to eq(
+        [
+          {
+            name: :neon,
+            params: {
+              color: "#00ffff",
+              glow_strength: 0.45,
+              blend: :add
+            }
+          }
+        ]
+      )
+
+      params = definition[:scenes].first[:layers].first[:params]
+      expect(params).to include(
+        color: "#ffffff",
+        glow_strength: 0.45,
+        blend: :add
+      )
+    end
+
     it "builds mapping transforms from block syntax" do
       definition = described_class.define do
         scene :reactive do
@@ -281,6 +319,18 @@ RSpec.describe Vizcore::DSL::Engine do
           end
         end
       end.to raise_error(ArgumentError, /react_to requires a block/)
+    end
+
+    it "rejects unknown layer styles" do
+      expect do
+        described_class.define do
+          scene :invalid do
+            layer :title do
+              use_style :missing
+            end
+          end
+        end
+      end.to raise_error(ArgumentError, /unknown style: missing/)
     end
   end
 

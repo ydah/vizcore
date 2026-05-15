@@ -8,8 +8,10 @@ module Vizcore
     # Builder for one render layer in a scene.
     class LayerBuilder
       # @param name [Symbol, String] layer identifier
-      def initialize(name:)
+      # @param styles [Hash] reusable layer parameter styles
+      def initialize(name:, styles: {})
         @name = name.to_sym
+        @styles = styles
         @type = nil
         @shader = nil
         @glsl = nil
@@ -75,6 +77,17 @@ module Vizcore
       # @return [Symbol]
       def blend(value)
         @params[:blend] = value.to_sym
+      end
+
+      # Apply a named style by merging its params into this layer.
+      #
+      # @param name [Symbol, String] style identifier
+      # @raise [ArgumentError] when the style is unknown
+      # @return [Hash] applied style params
+      def use_style(name)
+        style_name = name.to_sym
+        style_params = @styles.fetch(style_name) { raise ArgumentError, "unknown style: #{style_name}" }
+        @params.merge!(deep_dup(style_params))
       end
 
       # Declare numeric metadata for a shader/layer parameter.
@@ -309,6 +322,19 @@ module Vizcore
         output = { source: source, target: target.to_sym }
         output[:transform] = transform unless transform.empty?
         output
+      end
+
+      def deep_dup(value)
+        case value
+        when Hash
+          value.each_with_object({}) do |(key, entry), output|
+            output[key] = deep_dup(entry)
+          end
+        when Array
+          value.map { |entry| deep_dup(entry) }
+        else
+          value
+        end
       end
 
       def evaluate_transform_block(initial_options, &block)
