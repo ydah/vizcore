@@ -29,6 +29,13 @@ RSpec.describe Vizcore::Config do
     expect(config.noise_gate).to eq(0.03)
   end
 
+  it "parses projector mode" do
+    config = described_class.new(scene_file: scene_file, projector_mode: true)
+
+    expect(config.projector_mode).to eq(true)
+    expect(config.projector?).to eq(true)
+  end
+
   it "raises for unsupported audio source" do
     expect do
       described_class.new(scene_file: scene_file, audio_source: "invalid")

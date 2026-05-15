@@ -10,6 +10,7 @@ module Vizcore
     # Rack app serving frontend assets, health endpoint, and WebSocket upgrade.
     class RackApp
       AUDIO_FILE_PATH = "/audio-file"
+      PROJECTOR_PATH = "/projector"
       RUNTIME_PATH = "/runtime"
 
       # @param frontend_root [Pathname]
@@ -17,12 +18,21 @@ module Vizcore
       # @param audio_source [Symbol, String, nil]
       # @param audio_file [String, Pathname, nil]
       # @param scene_names [Array<String, Symbol>, nil]
-      def initialize(frontend_root:, websocket_path: "/ws", audio_source: nil, audio_file: nil, scene_names: nil)
+      # @param projector_mode [Boolean]
+      def initialize(
+        frontend_root:,
+        websocket_path: "/ws",
+        audio_source: nil,
+        audio_file: nil,
+        scene_names: nil,
+        projector_mode: false
+      )
         @frontend_root = frontend_root.expand_path
         @websocket_path = websocket_path
         @audio_source = audio_source&.to_sym
         @audio_file = audio_file ? Pathname.new(audio_file).expand_path : nil
         @scene_names = normalize_scene_names(scene_names)
+        @projector_mode = !!projector_mode
       end
 
       # @param env [Hash]
@@ -34,6 +44,8 @@ module Vizcore
         return health_response if request.path_info == "/health"
         return runtime_response if request.path_info == RUNTIME_PATH
         return audio_file_response(request) if request.path_info == AUDIO_FILE_PATH
+        return serve_index(projector_mode: @projector_mode) if request.path_info == "/"
+        return serve_index(projector_mode: true) if request.path_info == PROJECTOR_PATH
 
         serve_static(request.path_info)
       end
@@ -51,7 +63,8 @@ module Vizcore
           audio_source: (@audio_source || :unknown).to_s,
           audio_file_name: nil,
           audio_file_url: nil,
-          scene_names: @scene_names
+          scene_names: @scene_names,
+          projector_mode: @projector_mode
         }
 
         if audio_file_available?
@@ -86,15 +99,31 @@ module Vizcore
       end
 
       def serve_static(path_info)
-        path = path_info == "/" ? "index.html" : path_info.delete_prefix("/")
+        path = path_info.delete_prefix("/")
         full_path = File.expand_path(path, @frontend_root.to_s)
 
         return not_found_response unless full_path.start_with?(@frontend_root.to_s)
         return not_found_response unless File.file?(full_path)
 
         body = File.binread(full_path)
+        static_response(body, content_type: Rack::Mime.mime_type(File.extname(full_path), "text/plain"))
+      end
+
+      def serve_index(projector_mode:)
+        full_path = @frontend_root.join("index.html")
+        return not_found_response unless full_path.file?
+
+        body = File.binread(full_path)
+        body = body.gsub(
+          'data-projector-mode="false"',
+          "data-projector-mode=\"#{projector_mode ? 'true' : 'false'}\""
+        )
+        static_response(body, content_type: "text/html")
+      end
+
+      def static_response(body, content_type:)
         headers = {
-          "content-type" => Rack::Mime.mime_type(File.extname(full_path), "text/plain"),
+          "content-type" => content_type,
           "content-length" => body.bytesize.to_s,
           "cache-control" => "no-store, max-age=0, must-revalidate"
         }

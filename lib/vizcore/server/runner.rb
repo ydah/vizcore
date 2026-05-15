@@ -37,7 +37,8 @@ module Vizcore
           frontend_root: Vizcore.frontend_root,
           audio_source: @config.audio_source,
           audio_file: @config.audio_file,
-          scene_names: scene_names_for(definition)
+          scene_names: scene_names_for(definition),
+          projector_mode: @config.projector_mode
         )
         server = Puma::Server.new(app, nil, min_threads: 0, max_threads: 4)
         server.add_tcp_listener(@config.host, @config.port)
@@ -69,6 +70,7 @@ module Vizcore
         end
 
         @output.puts("Vizcore server listening at http://#{@config.host}:#{@config.port}")
+        @output.puts("Projector output: http://#{@config.host}:#{@config.port}/projector")
         @output.puts("Scene: #{scene[:name]}")
         @output.puts("Audio playback: http://#{@config.host}:#{@config.port}/audio-file") if @config.audio_source == :file
         @output.puts("Press Ctrl+C to stop.")

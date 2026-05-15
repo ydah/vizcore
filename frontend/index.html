@@ -306,6 +306,16 @@
       font: 0.76rem/1.45 "SFMono-Regular", Consolas, monospace;
     }
 
+    body.is-projector {
+      background: #000;
+      cursor: none;
+    }
+
+    body.is-projector .hud,
+    body.is-projector .shader-error {
+      display: none;
+    }
+
     .reactivity-controls label {
       display: grid;
       grid-template-columns: minmax(5.5rem, 0.8fr) minmax(8rem, 1.2fr);
@@ -344,7 +354,7 @@
     }
   </style>
 </head>
-<body>
+<body data-projector-mode="false">
   <div id="app">
     <canvas id="vizcore-canvas"></canvas>
     <section class="hud" aria-live="polite">

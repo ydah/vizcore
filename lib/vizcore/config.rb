@@ -16,7 +16,7 @@ module Vizcore
     # Supported CLI audio source values.
     SUPPORTED_AUDIO_SOURCES = %i[mic file dummy].freeze
 
-    attr_reader :host, :port, :scene_file, :audio_source, :audio_file, :audio_device, :noise_gate
+    attr_reader :host, :port, :scene_file, :audio_source, :audio_file, :audio_device, :noise_gate, :projector_mode
 
     # @param scene_file [String, Pathname] scene DSL file path
     # @param host [String] bind host
@@ -25,7 +25,17 @@ module Vizcore
     # @param audio_file [String, Pathname, nil] file path used with `audio_source=:file`
     # @param audio_device [String, Integer, nil] input device index/name used with `audio_source=:mic`
     # @param noise_gate [Numeric] RMS threshold below which live input is treated as silence
-    def initialize(scene_file:, host: DEFAULT_HOST, port: DEFAULT_PORT, audio_source: DEFAULT_AUDIO_SOURCE, audio_file: nil, audio_device: nil, noise_gate: DEFAULT_NOISE_GATE)
+    # @param projector_mode [Boolean] true when the browser should hide operator UI by default
+    def initialize(
+      scene_file:,
+      host: DEFAULT_HOST,
+      port: DEFAULT_PORT,
+      audio_source: DEFAULT_AUDIO_SOURCE,
+      audio_file: nil,
+      audio_device: nil,
+      noise_gate: DEFAULT_NOISE_GATE,
+      projector_mode: false
+    )
       @scene_file = Pathname.new(scene_file).expand_path if scene_file
       @host = host
       @port = Integer(port)
@@ -33,11 +43,17 @@ module Vizcore
       @audio_file = audio_file ? Pathname.new(audio_file).expand_path : nil
       @audio_device = normalize_audio_device(audio_device)
       @noise_gate = normalize_noise_gate(noise_gate)
+      @projector_mode = !!projector_mode
     end
 
     # @return [Boolean] true when the configured scene file exists.
     def scene_exists?
       scene_file && scene_file.file?
+    end
+
+    # @return [Boolean] true when browser output should start without operator UI.
+    def projector?
+      projector_mode
     end
 
     private

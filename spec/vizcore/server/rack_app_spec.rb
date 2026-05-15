@@ -12,6 +12,7 @@ RSpec.describe Vizcore::Server::RackApp do
     expect(response.status).to eq(200)
     expect(response.headers["content-type"]).to include("text/html")
     expect(response.body).to include("Vizcore Live")
+    expect(response.body).to include('data-projector-mode="false"')
   end
 
   it "returns health status as json" do
@@ -34,6 +35,24 @@ RSpec.describe Vizcore::Server::RackApp do
     expect(response.headers["content-type"]).to include("application/json")
     expect(response.body).to include("\"audio_source\":\"unknown\"")
     expect(response.body).to include("\"scene_names\":[]")
+    expect(response.body).to include("\"projector_mode\":false")
+  end
+
+  it "serves projector output without operator UI by default" do
+    response = Rack::MockRequest.new(app).get("/projector")
+
+    expect(response.status).to eq(200)
+    expect(response.body).to include('data-projector-mode="true"')
+  end
+
+  it "serves the root entrypoint in projector mode when configured" do
+    projector_app = described_class.new(frontend_root: Vizcore.frontend_root, projector_mode: true)
+
+    root = Rack::MockRequest.new(projector_app).get("/")
+    runtime = Rack::MockRequest.new(projector_app).get("/runtime")
+
+    expect(root.body).to include('data-projector-mode="true"')
+    expect(runtime.body).to include("\"projector_mode\":true")
   end
 
   it "returns 404 for audio endpoint when file source is disabled" do

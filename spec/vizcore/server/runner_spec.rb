@@ -42,7 +42,8 @@ RSpec.describe Vizcore::Server::Runner do
         frontend_root: Vizcore.frontend_root,
         audio_source: :mic,
         audio_file: nil,
-        scene_names: ["basic"]
+        scene_names: ["basic"],
+        projector_mode: false
       )
       expect(Puma::Server).to have_received(:new).with(rack_app, nil, min_threads: 0, max_threads: 4)
       expect(Vizcore::Audio::InputManager).to have_received(:new).with(source: :mic, file_path: nil, audio_device: nil)
@@ -91,9 +92,33 @@ RSpec.describe Vizcore::Server::Runner do
         frontend_root: Vizcore.frontend_root,
         audio_source: :file,
         audio_file: file_config.audio_file,
-        scene_names: ["basic"]
+        scene_names: ["basic"],
+        projector_mode: false
       )
       expect(broadcaster).to have_received(:sync_transport).with(playing: false, position_seconds: 0.0)
+    end
+
+    it "passes projector mode to RackApp" do
+      projector_config = Vizcore::Config.new(
+        scene_file: scene_file.to_s,
+        host: "127.0.0.1",
+        port: 4567,
+        projector_mode: true
+      )
+      allow(Vizcore::Server::RackApp).to receive(:new).and_return(rack_app)
+      allow(Puma::Server).to receive(:new).and_return(puma_server)
+      allow(Vizcore::Audio::InputManager).to receive(:new).and_return(input_manager)
+      allow(Vizcore::Server::FrameBroadcaster).to receive(:new).and_return(broadcaster)
+      allow(Vizcore::DSL::Engine).to receive(:watch_file).and_return(watcher)
+
+      runner = described_class.new(projector_config, output: output)
+      allow(runner).to receive(:wait_for_interrupt)
+
+      runner.run
+
+      expect(Vizcore::Server::RackApp).to have_received(:new).with(
+        hash_including(projector_mode: true)
+      )
     end
 
     it "hot-reloads scene changes and broadcasts config updates" do

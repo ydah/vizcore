@@ -94,7 +94,8 @@ RSpec.describe Vizcore::CLI do
           "--audio-device",
           "5",
           "--noise-gate",
-          "0.03"
+          "0.03",
+          "--projector"
         ]
       )
 
@@ -103,12 +104,13 @@ RSpec.describe Vizcore::CLI do
         expect(config.audio_file.to_s).to end_with("spec/fixtures/audio/pulse16_mono.wav")
         expect(config.audio_device).to eq("5")
         expect(config.noise_gate).to eq(0.03)
+        expect(config.projector_mode).to eq(true)
       end
       expect(runner).to have_received(:run)
     end
 
     it "starts the bundled demo with bundled audio" do
-      described_class.start(["demo", "--port", "4568", "--noise-gate", "0.02"])
+      described_class.start(["demo", "--port", "4568", "--noise-gate", "0.02", "--projector"])
 
       expect(Vizcore::Server::Runner).to have_received(:new) do |config|
         expect(config.scene_file.to_s).to end_with("examples/rhythm_geometry.rb")
@@ -116,6 +118,7 @@ RSpec.describe Vizcore::CLI do
         expect(config.audio_file.to_s).to end_with("examples/assets/complex_demo_loop.wav")
         expect(config.port).to eq(4568)
         expect(config.noise_gate).to eq(0.02)
+        expect(config.projector_mode).to eq(true)
       end
       expect(runner).to have_received(:run)
     end

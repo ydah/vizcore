@@ -13,6 +13,7 @@ import {
   recordShaderCompile,
   recordSocketFrame,
 } from "./performance-monitor.js";
+import { applyProjectorMode, resolveProjectorMode } from "./projector-mode.js";
 import { Engine } from "./renderer/engine.js";
 import { SHADER_COMPILE_EVENT } from "./renderer/shader-manager.js";
 import { SHADER_ERROR_EVENT, formatShaderErrorMessage, formatShaderErrorTitle } from "./shader-error-overlay.js";
@@ -67,6 +68,8 @@ const visualSettings = {
 };
 const liveControls = createLiveControlState();
 const performanceMonitor = createPerformanceMonitorState();
+let projectorMode = resolveProjectorMode({ body: document.body, location: window.location });
+applyProjectorMode(document.body, projectorMode);
 const engine = new Engine(canvas);
 bindShaderCompileMetrics();
 engine.init();
@@ -192,6 +195,14 @@ async function fetchRuntime() {
 }
 
 function applyRuntime(runtime) {
+  projectorMode = resolveProjectorMode({
+    body: document.body,
+    current: projectorMode,
+    location: window.location,
+    runtime,
+  });
+  applyProjectorMode(document.body, projectorMode);
+
   const source = String(runtime?.audio_source || "unknown");
   audioSourceStatusElement.textContent = `Audio Source: ${source}`;
   updateAvailableScenes(runtime?.scene_names);

@@ -6,6 +6,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+- Add projector output mode via `vizcore start --projector`, `vizcore demo --projector`, and `/projector`.
 - Add a browser HUD performance monitor for FPS, frame time, WebSocket latency, dropped-frame estimates, audio processing time, shader compile time, and reconnect count.
 - Add browser HUD Blackout/Freeze emergency controls for live output.
 - Add explicit layer `blend` DSL support and frontend compositing for alpha/add/multiply/screen/difference modes.
