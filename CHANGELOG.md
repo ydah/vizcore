@@ -6,6 +6,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+- Add gemspec coverage for packaged examples, browser assets, docs, and RBS files.
 - Add deterministic `Vizcore::Audio::FixtureInput` for repeatable audio tests.
 - Add ruby crystal, live-coding, club intro/drop, shader playground, and audio inspector examples.
 - Add concept, architecture, DSL guide, cookbook, one-line walkthrough, and troubleshooting docs.
