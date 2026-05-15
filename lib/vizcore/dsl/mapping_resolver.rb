@@ -55,6 +55,8 @@ module Vizcore
           audio.dig(:bands, source[:band]&.to_sym)
         when :fft_spectrum
           audio[:fft]
+        when :onset
+          resolve_onset(source, audio)
         when :beat
           audio[:beat]
         when :beat_confidence
@@ -68,6 +70,13 @@ module Vizcore
         else
           nil
         end
+      end
+
+      def resolve_onset(source, audio)
+        band = source[:band]&.to_sym
+        return audio[:onset] unless band
+
+        audio.dig(:onsets, band)
       end
 
       def apply_transform(value, transform, state_key:)

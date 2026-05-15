@@ -18,6 +18,8 @@ RSpec.describe Vizcore::DSL::MappingResolver do
             { source: { kind: :beat }, target: :flash },
             { source: { kind: :beat_confidence }, target: :sync_strength },
             { source: { kind: :beat_pulse }, target: :pulse },
+            { source: { kind: :onset }, target: :burst },
+            { source: { kind: :onset, band: :high }, target: :spark },
             { source: { kind: :bpm }, target: :tempo }
           ]
         }
@@ -29,6 +31,8 @@ RSpec.describe Vizcore::DSL::MappingResolver do
         beat: true,
         beat_confidence: 0.64,
         beat_pulse: 0.82,
+        onset: 0.31,
+        onsets: { high: 0.44 },
         beat_count: 12,
         bpm: 128.5
       }
@@ -46,6 +50,8 @@ RSpec.describe Vizcore::DSL::MappingResolver do
         flash: true,
         sync_strength: 0.64,
         pulse: 0.82,
+        burst: 0.31,
+        spark: 0.44,
         tempo: 128.5
       )
     end

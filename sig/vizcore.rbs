@@ -124,6 +124,8 @@ module Vizcore::DSL
     def high: () -> source
     def treble: () -> source
     def fft_spectrum: () -> source
+    def onset: () -> source
+             | (Symbol | String band) -> source
     def beat?: () -> source
     def beat: () -> source
     def beat_confidence: () -> source

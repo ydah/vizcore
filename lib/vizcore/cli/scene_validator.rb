@@ -18,7 +18,7 @@ module Vizcore
       ].freeze
 
       MAPPING_SOURCE_KINDS = %i[
-        amplitude frequency_band fft_spectrum beat beat_confidence beat_pulse beat_count bpm
+        amplitude frequency_band fft_spectrum onset beat beat_confidence beat_pulse beat_count bpm
       ].freeze
 
       FREQUENCY_BANDS = %i[sub low mid high].freeze
@@ -165,6 +165,7 @@ module Vizcore
           issues << error("scene #{scene_name} layer #{layer_name} uses unsupported mapping source: #{kind}")
         end
         validate_frequency_band(source, scene_name, layer_name, issues) if kind == :frequency_band
+        validate_onset_band(source, scene_name, layer_name, issues) if kind == :onset
       end
 
       def validate_frequency_band(source, scene_name, layer_name, issues)
@@ -172,6 +173,15 @@ module Vizcore
         return if FREQUENCY_BANDS.include?(band)
 
         issues << error("scene #{scene_name} layer #{layer_name} uses unsupported frequency band: #{band.inspect}")
+      end
+
+      def validate_onset_band(source, scene_name, layer_name, issues)
+        return unless source.key?(:band)
+
+        band = source[:band]&.to_sym
+        return if FREQUENCY_BANDS.include?(band)
+
+        issues << error("scene #{scene_name} layer #{layer_name} uses unsupported onset band: #{band.inspect}")
       end
 
       def validate_transform(transform, scene_name, layer_name, target, issues)

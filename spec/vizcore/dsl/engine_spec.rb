@@ -20,6 +20,8 @@ RSpec.describe Vizcore::DSL::Engine do
             map beat? => :flash
             map beat_confidence => :sync_strength
             map beat_pulse => :wobble
+            map onset => :burst
+            map onset(:high) => :spark
           end
         end
       end
@@ -42,7 +44,9 @@ RSpec.describe Vizcore::DSL::Engine do
         { source: { kind: :frequency_band, band: :low }, target: :intensity },
         { source: { kind: :beat }, target: :flash },
         { source: { kind: :beat_confidence }, target: :sync_strength },
-        { source: { kind: :beat_pulse }, target: :wobble }
+        { source: { kind: :beat_pulse }, target: :wobble },
+        { source: { kind: :onset }, target: :burst },
+        { source: { kind: :onset, band: :high }, target: :spark }
       )
     end
 

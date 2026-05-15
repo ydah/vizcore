@@ -120,7 +120,7 @@ RSpec.describe Vizcore::CLI do
     it "prints generated shader uniform docs" do
       expect do
         described_class.start(["shader-docs"])
-      end.to output(/# Vizcore Shader Uniforms.*`u_amplitude`.*`u_param_<name>`/m).to_stdout
+      end.to output(/# Vizcore Shader Uniforms.*`u_amplitude`.*`u_onset`.*`u_param_<name>`/m).to_stdout
     end
 
     it "creates a custom shader template" do
@@ -132,7 +132,7 @@ RSpec.describe Vizcore::CLI do
 
           shader = Pathname("shaders/liquid-wave.frag")
           expect(shader).to exist
-          expect(shader.read).to include("#version 300 es", "uniform float u_amplitude;", "out vec4 outColor;")
+          expect(shader.read).to include("#version 300 es", "uniform float u_amplitude;", "uniform float u_onset;", "out vec4 outColor;")
         end
       end
     end

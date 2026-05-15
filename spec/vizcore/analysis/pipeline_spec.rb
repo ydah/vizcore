@@ -14,7 +14,7 @@ RSpec.describe Vizcore::Analysis::Pipeline do
 
     result = pipeline.call(samples)
 
-    expect(result).to include(:amplitude, :bands, :fft, :beat, :beat_confidence, :beat_pulse, :beat_count, :bpm, :peak_frequency)
+    expect(result).to include(:amplitude, :bands, :fft, :onset, :onsets, :beat, :beat_confidence, :beat_pulse, :beat_count, :bpm, :peak_frequency)
     expect(result[:bands].keys).to contain_exactly(:sub, :low, :mid, :high)
     expect(result[:fft].length).to eq(32)
     expect(result[:peak_frequency]).to be_within(50.0).of(440.0)
@@ -30,6 +30,8 @@ RSpec.describe Vizcore::Analysis::Pipeline do
     expect(result[:fft]).to eq(Array.new(32, 0.0))
     expect(result[:beat_confidence]).to eq(0.0)
     expect(result[:beat_pulse]).to eq(0.0)
+    expect(result[:onset]).to eq(0.0)
+    expect(result[:onsets]).to eq(sub: 0.0, low: 0.0, mid: 0.0, high: 0.0)
     expect(result[:bpm]).to eq(0.0)
     expect(result[:peak_frequency]).to eq(0.0)
   end
@@ -56,6 +58,7 @@ RSpec.describe Vizcore::Analysis::Pipeline do
     expect(result[:beat]).to eq(false)
     expect(result[:beat_confidence]).to eq(0.0)
     expect(result[:beat_pulse]).to eq(0.0)
+    expect(result[:onset]).to eq(0.0)
     expect(result[:bpm]).to eq(0.0)
     expect(beat_detector).to have_received(:call)
     expect(bpm_estimator).to have_received(:call).with(beat: false)
@@ -99,6 +102,18 @@ RSpec.describe Vizcore::Analysis::Pipeline do
 
     expect(result[:beat]).to eq(false)
     expect(result[:beat_confidence]).to eq(0.5)
+  end
+
+  it "reports positive onset deltas for amplitude and bands" do
+    pipeline = described_class.new(sample_rate: 44_100, fft_size: 1024)
+    quiet = sine_samples(frequency_hz: 180.0, sample_rate: 44_100, count: 1024, amplitude: 0.2)
+    loud = sine_samples(frequency_hz: 180.0, sample_rate: 44_100, count: 1024, amplitude: 0.8)
+
+    pipeline.call(quiet)
+    result = pipeline.call(loud)
+
+    expect(result[:onset]).to be > 0.0
+    expect(result[:onsets].fetch(:low)).to be >= 0.0
   end
 
   it "can adaptively normalize feature levels when enabled" do

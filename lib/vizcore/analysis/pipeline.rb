@@ -32,6 +32,8 @@ module Vizcore
         @beat_pulse = 0.0
         @last_bpm = 0.0
         @silent_frame_count = 0
+        @previous_onset_amplitude = 0.0
+        @previous_onset_bands = {}
       end
 
       # @param settings [Hash, nil]
@@ -65,11 +67,14 @@ module Vizcore
           bands: bands,
           fft: preview_spectrum(fft[:magnitudes])
         )
+        onsets = detect_onsets(amplitude: normalized[:amplitude], bands: normalized[:bands])
 
         {
           amplitude: @smoother.smooth(:amplitude, normalized[:amplitude]),
           bands: @smoother.smooth_hash(normalized[:bands], namespace: :bands),
           fft: @smoother.smooth_array(normalized[:fft], namespace: :fft),
+          onset: onsets[:amplitude],
+          onsets: onsets[:bands],
           beat: beat_detected,
           beat_confidence: confidence,
           beat_pulse: @beat_pulse,
@@ -126,15 +131,40 @@ module Vizcore
         @normalizer.call(amplitude: amplitude, bands: bands, fft: fft)
       end
 
+      def detect_onsets(amplitude:, bands:)
+        current_amplitude = Float(amplitude).clamp(0.0, 1.0)
+        current_bands = Hash(bands).transform_values { |value| Float(value).clamp(0.0, 1.0) }
+
+        amplitude_onset = positive_delta(current_amplitude, @previous_onset_amplitude)
+        band_onsets = current_bands.each_with_object({}) do |(key, value), output|
+          output[key] = positive_delta(value, @previous_onset_bands[key].to_f)
+        end
+
+        @previous_onset_amplitude = current_amplitude
+        @previous_onset_bands = current_bands
+
+        { amplitude: amplitude_onset, bands: band_onsets }
+      rescue ArgumentError, TypeError
+        { amplitude: 0.0, bands: {} }
+      end
+
+      def positive_delta(current, previous)
+        [current - previous, 0.0].max.clamp(0.0, 1.0)
+      end
+
       def silent_frame(reset_tempo:)
         @beat_pulse = 0.0
         reset_tempo_state if reset_tempo
         @smoother.reset if @smoother.respond_to?(:reset)
+        @previous_onset_amplitude = 0.0
+        @previous_onset_bands = {}
 
         {
           amplitude: 0.0,
           bands: { sub: 0.0, low: 0.0, mid: 0.0, high: 0.0 },
           fft: Array.new(32, 0.0),
+          onset: 0.0,
+          onsets: { sub: 0.0, low: 0.0, mid: 0.0, high: 0.0 },
           beat: false,
           beat_confidence: 0.0,
           beat_pulse: 0.0,

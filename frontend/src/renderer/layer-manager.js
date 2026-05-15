@@ -245,6 +245,7 @@ export class LayerManager {
     gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
 
     const bands = audio?.bands || {};
+    const onsets = audio?.onsets || {};
     this.setUniform1f(program, "u_time", time);
     this.setUniform2f(program, "u_resolution", resolution[0], resolution[1]);
     this.setUniform1f(program, "u_amplitude", audio?.amplitude || 0);
@@ -253,6 +254,11 @@ export class LayerManager {
     this.setUniform1f(program, "u_high", bands.high || 0);
     this.setUniform1f(program, "u_beat", audio?.beat ? 1 : 0);
     this.setUniform1f(program, "u_beat_pulse", audio?.beat_pulse || (audio?.beat ? 1 : 0));
+    this.setUniform1f(program, "u_onset", audio?.onset || 0);
+    this.setUniform1f(program, "u_sub_onset", onsets.sub || 0);
+    this.setUniform1f(program, "u_low_onset", onsets.low || 0);
+    this.setUniform1f(program, "u_mid_onset", onsets.mid || 0);
+    this.setUniform1f(program, "u_high_onset", onsets.high || 0);
     this.setUniform1f(program, "u_bpm", audio?.bpm || 0);
     const spectrum = normalizeSpectrum(audio?.fft, 32);
     this.setUniform1fv(program, "u_fft[0]", spectrum);

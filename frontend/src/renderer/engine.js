@@ -30,6 +30,8 @@ export class Engine {
         amplitude: 0,
         bands: { sub: 0, low: 0, mid: 0, high: 0 },
         fft: [],
+        onset: 0,
+        onsets: { sub: 0, low: 0, mid: 0, high: 0 },
         beat: false,
         beat_pulse: 0,
         beat_count: 0,
@@ -186,6 +188,7 @@ export const applyVisualSettings = ({ audio, settings, previous }) => {
   const wobbleAmount = clamp(Number(settings?.wobbleAmount ?? 1), 0, 8);
 
   const rawBands = audio?.bands || {};
+  const rawOnsets = audio?.onsets || {};
   const next = {
     ...audio,
     amplitude: clamp(Number(audio?.amplitude || 0) * visualGain, 0, 1),
@@ -195,6 +198,14 @@ export const applyVisualSettings = ({ audio, settings, previous }) => {
       low: clamp(Number(rawBands.low || 0) * bassBoost, 0, 1),
       mid: clamp(Number(rawBands.mid || 0) * visualGain, 0, 1),
       high: clamp(Number(rawBands.high || 0) * visualGain, 0, 1),
+    },
+    onset: clamp(Number(audio?.onset || 0) * visualGain, 0, 1),
+    onsets: {
+      ...rawOnsets,
+      sub: clamp(Number(rawOnsets.sub || 0) * bassBoost, 0, 1),
+      low: clamp(Number(rawOnsets.low || 0) * bassBoost, 0, 1),
+      mid: clamp(Number(rawOnsets.mid || 0) * visualGain, 0, 1),
+      high: clamp(Number(rawOnsets.high || 0) * visualGain, 0, 1),
     },
     visual_gain: visualGain,
     bass_boost: bassBoost,
@@ -226,13 +237,19 @@ export const applyVisualSettings = ({ audio, settings, previous }) => {
 
 const isSilentAudio = (audio) => {
   const bands = audio?.bands || {};
+  const onsets = audio?.onsets || {};
   return Number(audio?.amplitude || 0) <= 0
+    && Number(audio?.onset || 0) <= 0
     && Number(audio?.beat_pulse || 0) <= 0
     && !audio?.beat
     && Number(bands.sub || 0) <= 0
     && Number(bands.low || 0) <= 0
     && Number(bands.mid || 0) <= 0
-    && Number(bands.high || 0) <= 0;
+    && Number(bands.high || 0) <= 0
+    && Number(onsets.sub || 0) <= 0
+    && Number(onsets.low || 0) <= 0
+    && Number(onsets.mid || 0) <= 0
+    && Number(onsets.high || 0) <= 0;
 };
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);

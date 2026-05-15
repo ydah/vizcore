@@ -26,11 +26,14 @@ module Vizcore
 
       def serialize_audio(audio)
         bands = symbolize_hash(audio[:bands])
+        onsets = { sub: 0.0, low: 0.0, mid: 0.0, high: 0.0 }.merge(symbolize_hash(audio[:onsets]))
 
         {
           amplitude: round_float(audio[:amplitude]),
           bands: bands.transform_values { |value| round_float(value) },
           fft: Array(audio[:fft]).map { |value| round_float(value) },
+          onset: round_float(audio[:onset]),
+          onsets: onsets.transform_values { |value| round_float(value) },
           beat: !!audio[:beat],
           beat_confidence: round_float(audio[:beat_confidence]),
           beat_pulse: round_float(audio[:beat_pulse]),

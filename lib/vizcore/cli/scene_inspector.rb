@@ -72,6 +72,7 @@ module Vizcore
         values = Hash(source || {})
         return "unknown" unless values[:kind]
         return "frequency_band(#{values[:band]})" if values[:kind].to_sym == :frequency_band
+        return "onset(#{values[:band]})" if values[:kind].to_sym == :onset && values[:band]
 
         values[:kind].to_s
       end

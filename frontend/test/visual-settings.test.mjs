@@ -4,7 +4,12 @@ import assert from "node:assert/strict";
 import { applyVisualSettings } from "../src/renderer/engine.js";
 
 test("applyVisualSettings boosts and clamps audio values", () => {
-  const audio = { amplitude: 0.4, bands: { sub: 0.2, low: 0.3, mid: 0.4, high: 0.5 } };
+  const audio = {
+    amplitude: 0.4,
+    bands: { sub: 0.2, low: 0.3, mid: 0.4, high: 0.5 },
+    onset: 0.5,
+    onsets: { sub: 0.1, low: 0.2, mid: 0.3, high: 0.4 },
+  };
   const result = applyVisualSettings({
     audio,
     settings: { visualGain: 3, bassBoost: 4, smoothing: 0, wobbleAmount: 1.5 },
@@ -13,6 +18,9 @@ test("applyVisualSettings boosts and clamps audio values", () => {
   assert.equal(result.amplitude, 1);
   assert.equal(result.bands.low, 1);
   assert.equal(result.bands.mid, 1);
+  assert.equal(result.onset, 1);
+  assert.equal(result.onsets.low, 0.8);
+  assert.equal(result.onsets.high, 1);
   assert.equal(result.visual_gain, 3);
   assert.equal(result.wobble_amount, 1.5);
 });

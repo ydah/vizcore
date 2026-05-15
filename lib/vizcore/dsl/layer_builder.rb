@@ -253,6 +253,13 @@ module Vizcore
         source(:fft_spectrum)
       end
 
+      # @param band [Symbol, String, nil] optional band-specific onset key
+      # @return [Hash] source descriptor for positive audio feature changes
+      def onset(band = nil)
+        options = band.nil? ? {} : { band: band.to_sym }
+        source(:onset, **options)
+      end
+
       # @return [Hash] source descriptor for beat trigger
       def beat?
         source(:beat)

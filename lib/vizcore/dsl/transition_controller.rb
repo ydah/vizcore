@@ -108,6 +108,7 @@ module Vizcore
         def initialize(audio, frame_count:)
           @audio = symbolize_hash(audio)
           @bands = symbolize_hash(@audio[:bands])
+          @onsets = symbolize_hash(@audio[:onsets])
           @frame_count = Integer(frame_count)
         rescue StandardError
           @frame_count = 0
@@ -157,6 +158,14 @@ module Vizcore
         # @return [Array<Float>]
         def fft_spectrum
           Array(@audio[:fft])
+        end
+
+        # @param name [Symbol, String, nil]
+        # @return [Float]
+        def onset(name = nil)
+          return @audio[:onset].to_f if name.nil?
+
+          @onsets[name.to_sym].to_f
         end
 
         # @return [Boolean]

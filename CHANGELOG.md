@@ -12,6 +12,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 - Add scene-wide `theme` / `use_theme` DSL.
 - Add `scene ... extends:` for sharing base scene layers.
 - Add opt-in adaptive `audio_normalize` DSL for repeatable audio feature levels.
+- Add `onset` and band onset analysis sources for mappings, transitions, and shaders.
 - Add `beat_confidence` analysis output and DSL mapping source.
 - Validate unsupported layer `effect` and `vj_effect` names in `vizcore validate`.
 - Add text layer `font`, `align`, `fill`, `stroke`, and `shadow` styling.

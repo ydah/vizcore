@@ -34,7 +34,7 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
       frame = described_class.new(scene_name: "basic").build_frame(1.25)
 
       expect(frame).to include(:timestamp, :audio, :scene, :transition, :metrics)
-      expect(frame[:audio]).to include(:amplitude, :bands, :fft, :beat, :beat_count, :bpm)
+      expect(frame[:audio]).to include(:amplitude, :bands, :fft, :onset, :onsets, :beat, :beat_count, :bpm)
       expect(frame[:scene]).to include(:name, :layers)
       expect(frame[:metrics]).to include(
         :frame_id,

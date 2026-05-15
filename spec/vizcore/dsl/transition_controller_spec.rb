@@ -113,6 +113,28 @@ RSpec.describe Vizcore::DSL::TransitionController do
       )
     end
 
+    it "exposes onset values to transition trigger context" do
+      controller = described_class.new(
+        scenes: [
+          { name: :intro, layers: [] },
+          { name: :drop, layers: [] }
+        ],
+        transitions: [
+          {
+            from: :intro,
+            to: :drop,
+            trigger: proc { onset > 0.3 && onset(:high) > 0.2 }
+          }
+        ]
+      )
+
+      expect(controller.next_transition(scene_name: :intro, audio: { onset: 0.4, onsets: { high: 0.1 } })).to be_nil
+      expect(controller.next_transition(scene_name: :intro, audio: { onset: 0.4, onsets: { high: 0.25 } })).to include(
+        from: :intro,
+        to: :drop
+      )
+    end
+
     it "exposes beat as an alias for beat? in transition triggers" do
       controller = described_class.new(
         scenes: [

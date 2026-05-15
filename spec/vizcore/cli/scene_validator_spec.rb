@@ -22,6 +22,7 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
             vj_effect :mirror
             map beat_confidence => :sync_strength
             map beat_pulse => :size
+            map onset(:high) => :spark
           end
         end
 
@@ -46,6 +47,7 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
             shader :missing_shader
             map :mystery => :speed
             map frequency_band(:ultra) => :size
+            map onset(:ultra) => :spark
           end
         end
 
@@ -60,6 +62,7 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
       expect(messages).to include("unknown shader: missing_shader")
       expect(messages).to include("unsupported mapping source: mystery")
       expect(messages).to include("unsupported frequency band: :ultra")
+      expect(messages).to include("unsupported onset band: :ultra")
       expect(messages).to include("unknown target scene: missing")
       expect(result.warnings.map(&:message).join("\n")).to include("has no trigger block")
     end
