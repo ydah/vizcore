@@ -1,6 +1,7 @@
 const RECONNECT_INTERVAL_MS = 1000;
 const READY_STATE_CONNECTING = 0;
 const READY_STATE_OPEN = 1;
+export const PROTOCOL_VERSION = "vizcore.frame.v1";
 
 export class WebSocketClient {
   constructor(url, callbacks = {}) {
@@ -97,6 +98,10 @@ export class WebSocketClient {
       return;
     }
 
+    if (message.protocol && message.protocol !== PROTOCOL_VERSION) {
+      return;
+    }
+
     if (message.type === "audio_frame") {
       this.onFrame(message.payload);
       return;
@@ -122,7 +127,7 @@ export class WebSocketClient {
     }
 
     try {
-      this.socket.send(JSON.stringify({ type, payload }));
+      this.socket.send(JSON.stringify({ protocol: PROTOCOL_VERSION, type, payload }));
       return true;
     } catch {
       return false;

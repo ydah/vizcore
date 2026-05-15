@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { WebSocketClient } from "../src/websocket-client.js";
+import { PROTOCOL_VERSION, WebSocketClient } from "../src/websocket-client.js";
 
 test("WebSocketClient routes parsed message payload by message type", () => {
   const calls = {
@@ -16,7 +16,7 @@ test("WebSocketClient routes parsed message payload by message type", () => {
     onConfigUpdate: (payload) => { calls.config = payload; }
   });
 
-  client.handleMessage(JSON.stringify({ type: "audio_frame", payload: { bpm: 120 } }));
+  client.handleMessage(JSON.stringify({ protocol: PROTOCOL_VERSION, type: "audio_frame", payload: { bpm: 120 } }));
   client.handleMessage(JSON.stringify({ type: "scene_change", payload: { from: "intro", to: "drop" } }));
   client.handleMessage(JSON.stringify({ type: "config_update", payload: { globals: { intensity: 0.7 } } }));
 
@@ -34,6 +34,23 @@ test("WebSocketClient ignores malformed or unsupported messages", () => {
   client.handleMessage("not-json");
   client.handleMessage(JSON.stringify({}));
   client.handleMessage(JSON.stringify({ type: "unknown", payload: { v: 1 } }));
+  client.handleMessage(JSON.stringify({ protocol: "vizcore.frame.v99", type: "audio_frame", payload: { v: 1 } }));
 
   assert.equal(called, false);
+});
+
+test("WebSocketClient sends protocol version in outgoing messages", () => {
+  const sent = [];
+  const client = new WebSocketClient("ws://127.0.0.1:4567/ws");
+  client.socket = {
+    readyState: 1,
+    send: (message) => { sent.push(message); }
+  };
+
+  assert.equal(client.send("switch_scene", { scene: "drop" }), true);
+  assert.deepEqual(JSON.parse(sent[0]), {
+    protocol: PROTOCOL_VERSION,
+    type: "switch_scene",
+    payload: { scene: "drop" }
+  });
 });

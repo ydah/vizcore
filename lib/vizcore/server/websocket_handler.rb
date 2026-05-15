@@ -9,6 +9,8 @@ module Vizcore
   module Server
     # Stateless WebSocket endpoint manager for frame broadcast transport.
     class WebSocketHandler
+      PROTOCOL_VERSION = "vizcore.frame.v1"
+
       class << self
         # Rack endpoint for WebSocket upgrade handling.
         #
@@ -36,7 +38,7 @@ module Vizcore
         def broadcast(type:, payload:)
           return false unless faye_websocket_class
 
-          message = JSON.generate(type: type, payload: payload)
+          message = JSON.generate(protocol: PROTOCOL_VERSION, type: type, payload: payload)
 
           each_socket do |socket|
             send_message(socket, message)
