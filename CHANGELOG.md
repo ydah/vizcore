@@ -6,6 +6,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+- Document the Ruby-to-browser WebSocket frame protocol.
 - Add `vizcore gallery` for browsing bundled examples in a local browser view.
 - Add hot reload for referenced custom GLSL shader files.
 - Add explicit `vizcore start --reload` / `--no-reload` control for scene hot reload.

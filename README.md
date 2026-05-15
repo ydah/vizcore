@@ -226,6 +226,7 @@ The browser HUD also includes an Audio Inspector with amplitude, sub/low/mid/hig
 
 `vizcore demo` starts a bundled scene with bundled audio, so it is the quickest way to verify a fresh installation.
 
+
 `vizcore start scene.rb --reload` watches the scene file and pushes changes to connected browsers without restarting the server. Hot reload is enabled by default; use `--no-reload` when you want a fixed scene for a show.
 
 Use `vizcore snapshot scene.rb --audio-source dummy --out screenshot.png` to create a software-rendered PNG preview for README, social cards, or quick visual checks without starting the browser.
