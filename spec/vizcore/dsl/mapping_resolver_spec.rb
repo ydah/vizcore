@@ -156,6 +156,27 @@ RSpec.describe Vizcore::DSL::MappingResolver do
       expect(active[0][:params][:wobble]).to eq(0.75)
     end
 
+    it "applies square curve after gain and before range clamping" do
+      resolver = described_class.new
+      scene_layers = [
+        {
+          name: :liquid,
+          params: {},
+          mappings: [
+            {
+              source: { kind: :amplitude },
+              target: :pulse,
+              transform: { gain: 1.2, min: 0.2, max: 0.8, curve: :square }
+            }
+          ]
+        }
+      ]
+
+      resolved = resolver.resolve_layers(scene_layers: scene_layers, audio: { amplitude: 0.5, bands: {} })
+
+      expect(resolved[0][:params][:pulse]).to be_within(0.0001).of(0.36)
+    end
+
     it "converts boolean sources when applying transforms" do
       resolver = described_class.new
       scene_layers = [
@@ -198,6 +219,34 @@ RSpec.describe Vizcore::DSL::MappingResolver do
 
       expect(first[0][:params][:wobble]).to eq(1.0)
       expect(second[0][:params][:wobble]).to eq(0.5)
+    end
+
+    it "keeps smoothing state isolated by mapping target" do
+      resolver = described_class.new
+      scene_layers = [
+        {
+          name: :smooth,
+          params: {},
+          mappings: [
+            {
+              source: { kind: :amplitude },
+              target: :slow,
+              transform: { attack: 1.0, release: 0.2 }
+            },
+            {
+              source: { kind: :amplitude },
+              target: :fast,
+              transform: { attack: 1.0, release: 0.8 }
+            }
+          ]
+        }
+      ]
+
+      resolver.resolve_layers(scene_layers: scene_layers, audio: { amplitude: 1.0, bands: {} })
+      resolved = resolver.resolve_layers(scene_layers: scene_layers, audio: { amplitude: 0.0, bands: {} })
+
+      expect(resolved[0][:params][:slow]).to be_within(0.0001).of(0.8)
+      expect(resolved[0][:params][:fast]).to be_within(0.0001).of(0.2)
     end
 
     it "applies transform options to array values without smoothing" do
