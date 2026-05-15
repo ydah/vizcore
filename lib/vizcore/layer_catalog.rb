@@ -106,6 +106,18 @@ module Vizcore
         ),
         mappable_params: %i[scale rotation opacity],
         description: "Inline PNG/JPEG/GIF/WebP image asset rendered as a textured visual layer."
+      ),
+      Capability.new(
+        type: :waveform,
+        aliases: %i[waveform_layer],
+        params: COMMON_PARAMS.merge(
+          source: "Symbol",
+          style: "Symbol",
+          height: "Float",
+          detail: "Integer"
+        ),
+        mappable_params: %i[height opacity color_shift],
+        description: "Audio feature waveform rendered as line, mirror, or ribbon geometry."
       )
     ].freeze
 

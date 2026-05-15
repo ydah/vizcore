@@ -17,7 +17,9 @@ RSpec.describe Vizcore::LayerCatalog do
       :svg_layer,
       :image,
       :image_layer,
-      :photo
+      :photo,
+      :waveform,
+      :waveform_layer
     )
     expect(described_class).to be_supported_type(:particle)
     expect(described_class).not_to be_supported_type(:video)
@@ -30,5 +32,6 @@ RSpec.describe Vizcore::LayerCatalog do
     expect(described_class.mappable_params_for(:particle_field)).to include(:speed, :size, :sparkle)
     expect(described_class.mappable_params_for(:svg)).to include(:scale, :rotation, :opacity)
     expect(described_class.mappable_params_for(:image)).to include(:scale, :rotation, :opacity)
+    expect(described_class.mappable_params_for(:waveform)).to include(:height, :opacity, :color_shift)
   end
 end

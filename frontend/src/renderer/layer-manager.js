@@ -1,7 +1,12 @@
 import { getBuiltinShader } from "../shaders/builtins.js";
 import { getPostEffectShader } from "../shaders/post-effects.js";
 import { SHADER_ERROR_EVENT, buildShaderErrorDetail } from "../shader-error-overlay.js";
-import { buildRadialBlobLines, buildWireframeLines, estimateDeformFromSpectrum } from "../visuals/geometry.js";
+import {
+  buildRadialBlobLines,
+  buildWaveformLines,
+  buildWireframeLines,
+  estimateDeformFromSpectrum
+} from "../visuals/geometry.js";
 import { ImageRenderer } from "../visuals/image-renderer.js";
 import { ParticleSystem } from "../visuals/particle-system.js";
 import { TextRenderer } from "../visuals/text-renderer.js";
@@ -250,6 +255,10 @@ export class LayerManager {
       this.renderImageLayer(layer, audio);
       return;
     }
+    if (isWaveformLayer(layer)) {
+      this.renderWaveformLayer(layer, audio, time, paletteIndex);
+      return;
+    }
     if (isShaderLayer(layer)) {
       this.renderShaderLayer(layer, audio, time, resolution, globals, visualSettings);
       return;
@@ -381,6 +390,33 @@ export class LayerManager {
       0.45 + amplitude * 0.45 + pulse * 0.15,
       0.75 + colorShift * 0.2,
       0.96
+    ];
+    const color = resolveLayerRgbColor(params, fallbackColor, paletteIndex);
+    gl.uniform3f(this.geometryColorLocation, color[0], color[1], color[2]);
+    gl.drawArrays(gl.LINES, 0, points.length / 2);
+  }
+
+  renderWaveformLayer(layer, audio, time, paletteIndex = 0) {
+    const gl = this.gl;
+    const params = layer?.params || {};
+    const points = buildWaveformLines({ time, params, audio });
+
+    if (points.length === 0) {
+      return;
+    }
+
+    gl.useProgram(this.geometryProgram);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.geometryBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(points), gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(this.geometryPositionLocation);
+    gl.vertexAttribPointer(this.geometryPositionLocation, 2, gl.FLOAT, false, 0, 0);
+
+    const amplitude = clamp(Number(audio?.amplitude || 0), 0, 1);
+    const high = clamp(Number(audio?.bands?.high || 0), 0, 1);
+    const fallbackColor = [
+      0.28 + high * 0.32,
+      0.86 + amplitude * 0.14,
+      0.72 + high * 0.22
     ];
     const color = resolveLayerRgbColor(params, fallbackColor, paletteIndex);
     gl.uniform3f(this.geometryColorLocation, color[0], color[1], color[2]);
@@ -660,6 +696,11 @@ const isRasterImageLayer = (layer) => {
 };
 
 const isImageLayer = (layer) => isSvgLayer(layer) || isRasterImageLayer(layer);
+
+const isWaveformLayer = (layer) => {
+  const type = String(layer?.type || "").toLowerCase();
+  return type === "waveform" || type === "waveform_layer";
+};
 
 const defaultLayer = (audio) => ({
   name: "wireframe_cube",

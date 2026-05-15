@@ -357,6 +357,29 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "stores waveform layer params and source" do
+      definition = described_class.define do
+        scene :audio_scope do
+          layer :waveform do
+            type :waveform
+            source :audio
+            style :ribbon
+            height 0.6
+            map amplitude, to: :height, range: 0.2..0.8
+          end
+        end
+      end
+
+      layer = definition[:scenes].first[:layers].first
+      expect(layer[:type]).to eq(:waveform)
+      expect(layer[:params]).to include(source: :audio, style: :ribbon, height: 0.6)
+      expect(layer[:mappings]).to include(
+        source: { kind: :amplitude },
+        target: :height,
+        transform: { min: 0.2, max: 0.8 }
+      )
+    end
+
     it "builds scenes from inherited layers" do
       definition = described_class.define do
         scene :base do

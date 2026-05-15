@@ -74,7 +74,7 @@
             </div>
             <div class="signal-step">
               <strong>Render</strong>
-              <span>GLSL / particles / text / wireframe</span>
+              <span>GLSL / particles / text / waveform</span>
             </div>
           </div>
         </div>
@@ -117,6 +117,13 @@
       blend :add
       map amplitude =&gt; :speed
       map beat? =&gt; :flash
+    end
+
+    layer :scope do
+      type :waveform
+      source :audio
+      style :ribbon
+      map amplitude, to: :height
     end
   end
 end</code></pre>

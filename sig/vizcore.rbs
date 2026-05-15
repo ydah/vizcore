@@ -202,6 +202,7 @@ module Vizcore::DSL
     def shader: (Symbol | String value, ?reload: bool? reload) -> Symbol
     def glsl: (String | Pathname path) -> String
     def file: (String | Pathname path) -> String
+    def source: (Symbol | String value, **untyped options) -> (Symbol | source)
     def count: (Integer value) -> Integer
     def content: (String value) -> String
     def font_size: (Integer value) -> Integer

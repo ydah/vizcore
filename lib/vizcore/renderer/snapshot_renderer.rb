@@ -50,6 +50,8 @@ module Vizcore
           render_text_layer(canvas, layer, audio, color)
         when "svg", "svg_layer", "image", "image_layer", "photo"
           render_image_layer(canvas, layer, audio, color)
+        when "waveform", "waveform_layer"
+          render_waveform_layer(canvas, layer, audio, color)
         else
           render_geometry_layer(canvas, audio, color, index)
         end
@@ -101,6 +103,22 @@ module Vizcore
         y = height * 0.5
         canvas.draw_rect_outline(x - size / 2, y - size / 2, size, size, color, alpha: 0.72)
         canvas.draw_label(File.basename(label.to_s), x: x, y: y + size * 0.62, color: color, alpha: 0.66)
+      rescue ArgumentError, TypeError
+        nil
+      end
+
+      def render_waveform_layer(canvas, layer, audio, color)
+        params = Hash(layer[:params] || layer["params"] || {})
+        amplitude = clamp(audio[:amplitude])
+        style = (params[:style] || params["style"] || "line").to_s
+        height_scale = normalize_waveform_height(params)
+        alpha = 0.45 + amplitude * 0.35
+        y_base = height * 0.5
+
+        canvas.draw_wave(y_base, amplitude: amplitude, color: color, alpha: alpha, height_scale: height_scale)
+        return unless %w[mirror ribbon].include?(style)
+
+        canvas.draw_wave(y_base, amplitude: amplitude, color: color, alpha: alpha * 0.68, height_scale: -height_scale)
       rescue ArgumentError, TypeError
         nil
       end
@@ -188,6 +206,12 @@ module Vizcore
         0.0
       end
 
+      def normalize_waveform_height(params)
+        Float(params[:height] || params["height"] || 0.46).clamp(0.05, 1.1)
+      rescue ArgumentError, TypeError
+        0.46
+      end
+
       # Tiny RGBA canvas with alpha blending and a few primitive drawing helpers.
       class Canvas
         def initialize(width:, height:)
@@ -207,11 +231,11 @@ module Vizcore
           end
         end
 
-        def draw_wave(y_base, amplitude:, color:, alpha:)
+        def draw_wave(y_base, amplitude:, color:, alpha:, height_scale: 1.0)
           previous = nil
           width.times do |x|
             phase = (x.to_f / width) * Math::PI * 4.0
-            y = y_base + Math.sin(phase) * height * (0.06 + amplitude * 0.08)
+            y = y_base + Math.sin(phase) * height * (0.06 + amplitude * 0.08) * height_scale
             draw_line(previous[0], previous[1], x, y, color, alpha: alpha) if previous
             previous = [x, y]
           end

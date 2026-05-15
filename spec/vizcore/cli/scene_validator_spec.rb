@@ -166,6 +166,7 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
           layer(:title) { type :text_layer }
           layer(:logo) { type :svg_layer }
           layer(:photo) { type :image_layer }
+          layer(:scope) { type :waveform_layer }
         end
       end
     RUBY

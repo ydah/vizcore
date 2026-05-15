@@ -62,6 +62,13 @@ Vizcore.define do
       map frequency_band(:low) => :size
     end
 
+    layer :waveform do
+      type :waveform
+      source :audio
+      style :ribbon
+      map amplitude, to: :height, range: 0.2..0.7
+    end
+
     layer :title do
       type :text
       content "DROP\nNOW"
@@ -235,6 +242,19 @@ layer :sparks do
   type :particle_field
   blend :screen
   map treble, to: :sparkle
+end
+```
+
+Waveform layers draw the current audio features as browser line geometry. Use
+`style :line`, `:mirror`, or `:ribbon`; `source :audio` documents that the layer
+uses the active audio stream:
+
+```ruby
+layer :scope do
+  type :waveform
+  source :audio
+  style :ribbon
+  map amplitude, to: :height, range: 0.2..0.7
 end
 ```
 

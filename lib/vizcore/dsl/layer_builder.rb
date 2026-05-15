@@ -8,6 +8,9 @@ module Vizcore
     # Builder for one render layer in a scene.
     class LayerBuilder
       NO_ARGUMENT = Object.new.freeze
+      MAPPING_SOURCE_KINDS = %i[
+        amplitude frequency_band fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
+      ].freeze
 
       # @param name [Symbol, String] layer identifier
       # @param styles [Hash] reusable layer parameter styles
@@ -62,6 +65,15 @@ module Vizcore
       # @return [String]
       def file(path)
         @params[:file] = path.to_s
+      end
+
+      # @param value [Symbol, String] input source for media-like layers
+      # @return [Symbol, Hash]
+      def source(value, **options)
+        source_name = value.to_sym
+        return mapping_source(source_name, **options) if options.any? || MAPPING_SOURCE_KINDS.include?(source_name)
+
+        @params[:source] = source_name
       end
 
       # @param value [Integer] particle count or similar numeric parameter
@@ -232,13 +244,13 @@ module Vizcore
 
       # @return [Hash] source descriptor for overall amplitude
       def amplitude
-        source(:amplitude)
+        mapping_source(:amplitude)
       end
 
       # @param name [Symbol, String] band key (`sub`, `low`, `mid`, `high`)
       # @return [Hash] source descriptor for a frequency band
       def frequency_band(name)
-        source(:frequency_band, band: name.to_sym)
+        mapping_source(:frequency_band, band: name.to_sym)
       end
 
       # @return [Hash] source descriptor for the sub-bass frequency band
@@ -273,40 +285,40 @@ module Vizcore
 
       # @return [Hash] source descriptor for FFT spectrum array
       def fft_spectrum
-        source(:fft_spectrum)
+        mapping_source(:fft_spectrum)
       end
 
       # @param band [Symbol, String, nil] optional band-specific onset key
       # @return [Hash] source descriptor for positive audio feature changes
       def onset(band = nil)
         options = band.nil? ? {} : { band: band.to_sym }
-        source(:onset, **options)
+        mapping_source(:onset, **options)
       end
 
       # @return [Hash] source descriptor for low-band percussive confidence
       def kick(value = NO_ARGUMENT)
         return @params[:kick] = value unless value.equal?(NO_ARGUMENT)
 
-        source(:kick)
+        mapping_source(:kick)
       end
 
       # @return [Hash] source descriptor for mid-band percussive confidence
       def snare(value = NO_ARGUMENT)
         return @params[:snare] = value unless value.equal?(NO_ARGUMENT)
 
-        source(:snare)
+        mapping_source(:snare)
       end
 
       # @return [Hash] source descriptor for high-band percussive confidence
       def hihat(value = NO_ARGUMENT)
         return @params[:hihat] = value unless value.equal?(NO_ARGUMENT)
 
-        source(:hihat)
+        mapping_source(:hihat)
       end
 
       # @return [Hash] source descriptor for beat trigger
       def beat?
-        source(:beat)
+        mapping_source(:beat)
       end
 
       # @return [Hash] source descriptor for beat trigger
@@ -316,22 +328,22 @@ module Vizcore
 
       # @return [Hash] source descriptor for beat detector confidence
       def beat_confidence
-        source(:beat_confidence)
+        mapping_source(:beat_confidence)
       end
 
       # @return [Hash] source descriptor for beat pulse decay value
       def beat_pulse
-        source(:beat_pulse)
+        mapping_source(:beat_pulse)
       end
 
       # @return [Hash] source descriptor for beat counter
       def beat_count
-        source(:beat_count)
+        mapping_source(:beat_count)
       end
 
       # @return [Hash] source descriptor for estimated BPM
       def bpm
-        source(:bpm)
+        mapping_source(:bpm)
       end
 
       # @return [Hash] serialized layer payload
@@ -385,11 +397,11 @@ module Vizcore
           kind = source_value[:kind] || source_value["kind"]
           raise ArgumentError, "mapping source hash must contain :kind" unless kind
 
-          source(kind.to_sym, **normalize_source_options(source_value))
+          mapping_source(kind.to_sym, **normalize_source_options(source_value))
         when Symbol
-          source(source_value)
+          mapping_source(source_value)
         when String
-          source(source_value.to_sym)
+          mapping_source(source_value.to_sym)
         else
           raise ArgumentError, "unsupported mapping source: #{source_value.inspect}"
         end
@@ -527,7 +539,7 @@ module Vizcore
         [[value, min].max, max].min
       end
 
-      def source(kind, **options)
+      def mapping_source(kind, **options)
         {
           kind: kind.to_sym,
           **options

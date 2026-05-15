@@ -70,6 +70,75 @@ export const buildRadialBlobLines = ({ time, params = {}, audio = {} }) => {
   return points;
 };
 
+export const normalizeWaveformStyle = (value) => {
+  const style = String(value || "line").trim().toLowerCase();
+  if (style === "mirror" || style === "ribbon") return style;
+  return "line";
+};
+
+export const buildWaveformLines = ({ time = 0, params = {}, audio = {} } = {}) => {
+  const detail = clampInt(params.detail || 96, 16, 256);
+  const height = clamp(finiteNumber(params.height ?? 0.46, 0.46), 0.05, 1.1);
+  const amplitude = clamp(finiteNumber(audio?.amplitude, 0), 0, 1);
+  const spectrum = Array.isArray(params.spectrum) ? params.spectrum : Array.isArray(audio?.fft) ? audio.fft : [];
+  const style = normalizeWaveformStyle(params.style);
+  const samples = buildWaveformSamples({ detail, height, amplitude, spectrum, time });
+  const points = [];
+
+  appendLineSegments(points, samples);
+
+  if (style === "mirror" || style === "ribbon") {
+    const mirrored = samples.map(([x, y]) => [x, -y]);
+    appendLineSegments(points, mirrored);
+  }
+
+  if (style === "ribbon") {
+    const stride = Math.max(4, Math.round(detail / 16));
+    for (let index = 0; index < samples.length; index += stride) {
+      const [x, y] = samples[index];
+      points.push(x, y, x, -y);
+    }
+  }
+
+  return points;
+};
+
+const buildWaveformSamples = ({ detail, height, amplitude, spectrum, time }) => {
+  const samples = [];
+  const safeTime = finiteNumber(time, 0);
+
+  for (let index = 0; index < detail; index += 1) {
+    const progress = detail === 1 ? 0 : index / (detail - 1);
+    const x = -0.92 + progress * 1.84;
+    const fftValue = sampleSpectrum(spectrum, progress);
+    const carrier = Math.sin(index * 0.55 + safeTime * (2.4 + amplitude * 2.0));
+    const harmonic = Math.sin(index * 0.13 + safeTime * 1.1);
+    const energy = 0.12 + amplitude * 0.35 + fftValue * 0.55;
+    const y = clamp((carrier * 0.72 + harmonic * 0.28) * energy * height, -0.92, 0.92);
+    samples.push([x, y]);
+  }
+
+  return samples;
+};
+
+const appendLineSegments = (points, samples) => {
+  for (let index = 1; index < samples.length; index += 1) {
+    points.push(samples[index - 1][0], samples[index - 1][1], samples[index][0], samples[index][1]);
+  }
+};
+
+const sampleSpectrum = (spectrum, progress) => {
+  if (!spectrum.length) return 0;
+
+  const position = progress * (spectrum.length - 1);
+  const left = Math.floor(position);
+  const right = Math.min(left + 1, spectrum.length - 1);
+  const mix = position - left;
+  const from = finiteNumber(spectrum[left], 0);
+  const to = finiteNumber(spectrum[right], 0);
+  return clamp(from + (to - from) * mix, 0, 1);
+};
+
 const appendRadialPoint = (points, index, segments, baseRadius, wobble, bass, mid, pulse, time, fftValue) => {
   const angle = (index / segments) * Math.PI * 2;
   const organic = Math.sin(angle * (3.0 + mid * 5.0) + time * (1.2 + bass * 2.0));
@@ -103,6 +172,11 @@ const clampInt = (value, min, max) => {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return min;
   return Math.round(Math.min(Math.max(numeric, min), max));
+};
+
+const finiteNumber = (value, fallback) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
 };
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
