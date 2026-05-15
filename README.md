@@ -224,7 +224,7 @@ Reusable layer styles keep repeated visual params in one place:
 
 ```ruby
 style :neon do
-  color "#00ffff"
+  palette "#00ffff", "#ff00aa", "#facc15"
   glow_strength 0.45
   blend :add
 end
@@ -242,7 +242,7 @@ Themes provide scene-wide layer defaults:
 
 ```ruby
 theme :ruby_night do
-  color "#e11d48"
+  palette "#e11d48", "#f59e0b", "#38bdf8"
   glow_strength 0.5
   blend :screen
 end

@@ -121,6 +121,15 @@ module Vizcore
         @params[:blend] = value.to_sym
       end
 
+      # Store an ordered color palette for this layer.
+      #
+      # @param colors [Array<String, Array<String>>] color values such as "#00ffff"
+      # @raise [ArgumentError] when no non-blank colors are supplied
+      # @return [Array<String>]
+      def palette(*colors)
+        @params[:palette] = normalize_palette(colors)
+      end
+
       # Apply a named style by merging its params into this layer.
       #
       # @param name [Symbol, String] style identifier
@@ -421,6 +430,13 @@ module Vizcore
         raise ArgumentError, "param name is required" if key.empty?
 
         key.to_sym
+      end
+
+      def normalize_palette(colors)
+        values = colors.flatten.map { |color| color.to_s.strip }.reject(&:empty?)
+        raise ArgumentError, "layer #{@name} palette requires at least one color" if values.empty?
+
+        values
       end
 
       def normalize_param_number(value, name)

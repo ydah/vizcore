@@ -108,10 +108,38 @@ module Vizcore
       end
 
       def layer_color(layer, audio, index)
-        base = PALETTE[index % PALETTE.length]
+        base = configured_layer_color(layer, index) || PALETTE[index % PALETTE.length]
         beat = clamp(audio[:beat_pulse])
         name_factor = (layer[:shader] || layer["shader"] || layer[:name] || layer["name"]).to_s.bytes.sum % 38
         base.map { |value| [[value + name_factor + (beat * 30).round, 255].min, 0].max }
+      end
+
+      def configured_layer_color(layer, index)
+        params = Hash(layer[:params] || layer["params"] || {})
+        color = configured_color(params) || palette_color(params, index)
+        parse_hex_color(color)
+      rescue StandardError
+        nil
+      end
+
+      def configured_color(params)
+        [params[:color], params["color"]].map { |value| value.to_s.strip }.find { |value| !value.empty? }
+      end
+
+      def palette_color(params, index)
+        palette = Array(params[:palette] || params["palette"]).map { |color| color.to_s.strip }.reject(&:empty?)
+        return nil if palette.empty?
+
+        palette[index % palette.length]
+      end
+
+      def parse_hex_color(value)
+        match = value.to_s.strip.match(/\A#(?<hex>[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\z/)
+        return nil unless match
+
+        hex = match[:hex]
+        hex = hex.chars.map { |char| "#{char}#{char}" }.join if hex.length == 3
+        [hex[0, 2], hex[2, 2], hex[4, 2]].map { |component| component.to_i(16) }
       end
 
       def default_layer

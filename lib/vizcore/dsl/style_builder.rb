@@ -31,6 +31,15 @@ module Vizcore
         }
       end
 
+      # Store an ordered color palette for styles and themes.
+      #
+      # @param colors [Array<String, Array<String>>] color values such as "#00ffff"
+      # @raise [ArgumentError] when no non-blank colors are supplied
+      # @return [Array<String>]
+      def palette(*colors)
+        @params[:palette] = normalize_palette(colors)
+      end
+
       # Stores one-argument style setters into `params`.
       # @api private
       def method_missing(method_name, *args, &block)
@@ -44,6 +53,15 @@ module Vizcore
 
       def respond_to_missing?(_method_name, _include_private = false)
         true
+      end
+
+      private
+
+      def normalize_palette(colors)
+        values = colors.flatten.map { |color| color.to_s.strip }.reject(&:empty?)
+        raise ArgumentError, "#{@kind} #{@name} palette requires at least one color" if values.empty?
+
+        values
       end
     end
   end

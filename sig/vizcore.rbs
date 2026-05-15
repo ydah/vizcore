@@ -106,6 +106,7 @@ module Vizcore::DSL
   class StyleBuilder
     def initialize: (name: Symbol | String name, ?kind: String kind) -> void
     def evaluate: () ?{ () -> void } -> StyleBuilder
+    def palette: (*untyped colors) -> Array[String]
     def to_h: () -> style
   end
 
@@ -128,6 +129,7 @@ module Vizcore::DSL
     def stroke: (?width: Numeric? width, ?color: String? color) -> Hash[Symbol, untyped]
     def shadow: (?color: String? color, ?blur: Numeric? blur) -> Hash[Symbol, untyped]
     def blend: (Symbol | String value) -> Symbol
+    def palette: (*untyped colors) -> Array[String]
     def use_style: (Symbol | String name) -> Hash[Symbol, untyped]
     def param: (
       Symbol | String name,

@@ -101,6 +101,7 @@ RSpec.describe Vizcore::DSL::Engine do
       definition = described_class.define do
         style :neon do
           color "#00ffff"
+          palette "#00ffff", "#ff00aa"
           glow_strength 0.45
           blend :add
         end
@@ -120,6 +121,7 @@ RSpec.describe Vizcore::DSL::Engine do
             name: :neon,
             params: {
               color: "#00ffff",
+              palette: %w[#00ffff #ff00aa],
               glow_strength: 0.45,
               blend: :add
             }
@@ -130,6 +132,7 @@ RSpec.describe Vizcore::DSL::Engine do
       params = definition[:scenes].first[:layers].first[:params]
       expect(params).to include(
         color: "#ffffff",
+        palette: %w[#00ffff #ff00aa],
         glow_strength: 0.45,
         blend: :add
       )
@@ -138,6 +141,7 @@ RSpec.describe Vizcore::DSL::Engine do
     it "applies scene themes as layer defaults" do
       definition = described_class.define do
         theme :ruby_night do
+          palette "#e11d48", "#f59e0b", "#38bdf8"
           color "#e11d48"
           glow_strength 0.5
           blend :screen
@@ -162,6 +166,7 @@ RSpec.describe Vizcore::DSL::Engine do
           {
             name: :ruby_night,
             params: {
+              palette: %w[#e11d48 #f59e0b #38bdf8],
               color: "#e11d48",
               glow_strength: 0.5,
               blend: :screen
@@ -175,8 +180,32 @@ RSpec.describe Vizcore::DSL::Engine do
 
       title_params = scene[:layers][0][:params]
       sparks_params = scene[:layers][1][:params]
-      expect(title_params).to include(color: "#ffffff", glow_strength: 0.5, blend: :screen)
-      expect(sparks_params).to include(color: "#e11d48", glow_strength: 0.5, blend: :screen)
+      expect(title_params).to include(color: "#ffffff", palette: %w[#e11d48 #f59e0b #38bdf8], glow_strength: 0.5, blend: :screen)
+      expect(sparks_params).to include(color: "#e11d48", palette: %w[#e11d48 #f59e0b #38bdf8], glow_strength: 0.5, blend: :screen)
+    end
+
+    it "stores layer-specific palettes" do
+      definition = described_class.define do
+        scene :palette_show do
+          layer :sparks do
+            type :particle_field
+            palette %w[#ff0055 #00ffff #facc15]
+          end
+        end
+      end
+
+      params = definition[:scenes].first[:layers].first[:params]
+      expect(params[:palette]).to eq(%w[#ff0055 #00ffff #facc15])
+    end
+
+    it "rejects empty palettes" do
+      expect do
+        described_class.define do
+          style :empty do
+            palette " "
+          end
+        end
+      end.to raise_error(ArgumentError, /palette requires at least one color/)
     end
 
     it "stores text presentation params" do

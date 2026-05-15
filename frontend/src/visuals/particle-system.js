@@ -73,11 +73,11 @@ export class ParticleSystem {
     this.velocities = new Float32Array(0);
   }
 
-  render({ count, speed, size, forceField, turbulence, bassExplosion, sparkle, audio, time }) {
+  render({ count, speed, size, forceField, turbulence, bassExplosion, sparkle, color, audio, time }) {
     const particleCount = clampInt(count, 200, 20_000);
     this.ensureParticles(particleCount);
     this.updateParticles({ speed, forceField, turbulence, bassExplosion, audio, time });
-    this.draw({ size, sparkle, audio });
+    this.draw({ size, sparkle, color, audio });
   }
 
   ensureParticles(nextCount) {
@@ -142,7 +142,7 @@ export class ParticleSystem {
     }
   }
 
-  draw({ size, sparkle, audio }) {
+  draw({ size, sparkle, color, audio }) {
     const gl = this.gl;
     const amplitude = clampNumber(audio?.amplitude, 0, 1);
     const bass = clampNumber(audio?.bands?.low, 0, 1);
@@ -157,11 +157,16 @@ export class ParticleSystem {
     gl.vertexAttribPointer(this.positionLocation, 2, gl.FLOAT, false, 0, 0);
 
     gl.uniform1f(this.pointSizeLocation, pointSize);
-    gl.uniform3f(
-      this.colorLocation,
+    const resolvedColor = Array.isArray(color) ? color : [
       0.35 + bass * 0.45,
       0.55 + high * 0.35 + sparkleAmount * 0.08,
       0.95 + amplitude * 0.05 + sparkleAmount * 0.05
+    ];
+    gl.uniform3f(
+      this.colorLocation,
+      clampNumber(resolvedColor[0], 0, 1),
+      clampNumber(resolvedColor[1], 0, 1),
+      clampNumber(resolvedColor[2], 0, 1)
     );
     gl.drawArrays(gl.POINTS, 0, this.count);
   }

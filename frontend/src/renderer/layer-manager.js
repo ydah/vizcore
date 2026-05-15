@@ -114,6 +114,46 @@ export const normalizeBlendMode = (mode) => {
   return "alpha";
 };
 
+export const normalizePaletteColors = (value) => {
+  const input = Array.isArray(value) ? value : [];
+  return input
+    .map((entry) => String(entry || "").trim())
+    .filter((entry) => entry.length > 0);
+};
+
+export const parseHexColor = (value) => {
+  const raw = String(value || "").trim();
+  const match = raw.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
+  if (!match) {
+    return null;
+  }
+
+  const hex = match[1].length === 3
+    ? match[1].split("").map((char) => `${char}${char}`).join("")
+    : match[1];
+
+  return [0, 2, 4].map((offset) => parseInt(hex.slice(offset, offset + 2), 16) / 255);
+};
+
+export const resolveLayerCssColor = (params = {}, fallback = "#e5f3ff", paletteIndex = 0) => {
+  const explicitColor = String(params?.color || "").trim();
+  if (explicitColor) {
+    return explicitColor;
+  }
+
+  const palette = normalizePaletteColors(params?.palette);
+  if (palette.length === 0) {
+    return fallback;
+  }
+
+  return palette[Math.abs(Number(paletteIndex) || 0) % palette.length];
+};
+
+export const resolveLayerRgbColor = (params = {}, fallback = null, paletteIndex = 0) => {
+  const parsed = parseHexColor(resolveLayerCssColor(params, "", paletteIndex));
+  return parsed || fallback;
+};
+
 export class LayerManager {
   constructor(gl, shaderManager) {
     this.gl = gl;
@@ -161,27 +201,27 @@ export class LayerManager {
     this.ensureLayerTarget(width, height);
 
     if (!this.layerTargetAvailable || !this.layerFramebuffer || !this.layerTexture) {
-      for (const layer of layerList) {
+      layerList.forEach((layer, index) => {
         try {
           const blend = String(layer?.params?.blend || "alpha").toLowerCase();
           this.setBlendMode(blend);
-          this.renderLayer(layer, audio, time, rotation, [width, height], globals, visualSettings);
+          this.renderLayer(layer, audio, time, rotation, [width, height], globals, visualSettings, index);
         } catch (error) {
           this.reportLayerError(layer, error, "direct-render");
         }
-      }
+      });
       this.setBlendMode("alpha");
       return;
     }
 
-    for (const layer of layerList) {
+    layerList.forEach((layer, index) => {
       try {
         this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.layerFramebuffer);
         this.gl.viewport(0, 0, this.layerTargetWidth, this.layerTargetHeight);
         this.gl.clearColor(0.0, 0.0, 0.0, 0.0);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
-        this.renderLayer(layer, audio, time, rotation, [this.layerTargetWidth, this.layerTargetHeight], globals, visualSettings);
+        this.renderLayer(layer, audio, time, rotation, [this.layerTargetWidth, this.layerTargetHeight], globals, visualSettings, index);
 
         this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
         this.gl.viewport(0, 0, width, height);
@@ -191,24 +231,24 @@ export class LayerManager {
         this.gl.viewport(0, 0, width, height);
         this.reportLayerError(layer, error, "layer-pass");
       }
-    }
+    });
     this.setBlendMode("alpha");
   }
 
-  renderLayer(layer, audio, time, rotation, resolution, globals, visualSettings) {
+  renderLayer(layer, audio, time, rotation, resolution, globals, visualSettings, paletteIndex = 0) {
     if (isParticleLayer(layer)) {
-      this.renderParticleLayer(layer, audio, time);
+      this.renderParticleLayer(layer, audio, time, paletteIndex);
       return;
     }
     if (isTextLayer(layer)) {
-      this.renderTextLayer(layer, audio, time);
+      this.renderTextLayer(layer, audio, time, paletteIndex);
       return;
     }
     if (isShaderLayer(layer)) {
       this.renderShaderLayer(layer, audio, time, resolution, globals, visualSettings);
       return;
     }
-    this.renderGeometryLayer(layer, audio, rotation, time);
+    this.renderGeometryLayer(layer, audio, rotation, time, paletteIndex);
   }
 
   renderShaderLayer(layer, audio, time, resolution, globals, visualSettings) {
@@ -309,7 +349,7 @@ export class LayerManager {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
-  renderGeometryLayer(layer, audio, rotation, time) {
+  renderGeometryLayer(layer, audio, rotation, time, paletteIndex = 0) {
     const gl = this.gl;
     const params = layer?.params || {};
     const colorShift = clamp(Number(params.color_shift || 0), 0, 1);
@@ -331,16 +371,17 @@ export class LayerManager {
 
     const amplitude = clamp(Number(audio?.amplitude || 0), 0, 1);
     const pulse = clamp(Number(audio?.beat_pulse || 0), 0, 1);
-    gl.uniform3f(
-      this.geometryColorLocation,
+    const fallbackColor = [
       0.45 + amplitude * 0.45 + pulse * 0.15,
       0.75 + colorShift * 0.2,
       0.96
-    );
+    ];
+    const color = resolveLayerRgbColor(params, fallbackColor, paletteIndex);
+    gl.uniform3f(this.geometryColorLocation, color[0], color[1], color[2]);
     gl.drawArrays(gl.LINES, 0, points.length / 2);
   }
 
-  renderParticleLayer(layer, audio, time) {
+  renderParticleLayer(layer, audio, time, paletteIndex = 0) {
     const params = layer?.params || {};
     this.particleSystem.render({
       count: Number(params.count || 2400),
@@ -350,17 +391,18 @@ export class LayerManager {
       turbulence: Number(params.turbulence || 0),
       bassExplosion: Number(params.bass_explosion || 0),
       sparkle: Number(params.sparkle || 0),
+      color: resolveLayerRgbColor(params, null, paletteIndex),
       audio,
       time
     });
   }
 
-  renderTextLayer(layer, audio, time) {
+  renderTextLayer(layer, audio, time, paletteIndex = 0) {
     const params = layer?.params || {};
     this.textRenderer.render({
       content: params.content || "VIZCORE",
       fontSize: Number(params.font_size || 120),
-      color: params.color || "#e5f3ff",
+      color: resolveLayerCssColor(params, "#e5f3ff", paletteIndex),
       fontFamily: params.font || params.font_family,
       align: params.align,
       strokeWidth: params.stroke_width,
