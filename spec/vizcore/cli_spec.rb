@@ -117,6 +117,16 @@ RSpec.describe Vizcore::CLI do
       end
     end
 
+    it "runs validate and inspect against a bundled example" do
+      expect do
+        described_class.start(["validate", "examples/basic.rb"])
+      end.to output(/Scene valid: examples\/basic\.rb/).to_stdout
+
+      expect do
+        described_class.start(["inspect", "examples/basic.rb"])
+      end.to output(/Scenes:\n  basic\n    layer wireframe_cube \(wireframe_cube\)/).to_stdout
+    end
+
     it "prints generated shader uniform docs" do
       expect do
         described_class.start(["shader-docs"])
