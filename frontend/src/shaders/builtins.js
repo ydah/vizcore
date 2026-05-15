@@ -273,6 +273,164 @@ void main() {
   outColor = vec4(color, 1.0);
 }
 `,
+  ruby_crystal: `#version 300 es
+precision mediump float;
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform float u_amplitude;
+uniform float u_bass;
+uniform float u_mid;
+uniform float u_high;
+uniform float u_beat;
+uniform float u_beat_pulse;
+uniform float u_bpm;
+uniform float u_param_facets;
+uniform float u_param_refraction;
+out vec4 outColor;
+
+const float PI = 3.14159265359;
+const float TAU = 6.28318530718;
+
+float sdDiamond(vec2 p) {
+  p = abs(p);
+  return p.x * 0.78 + p.y - 0.72;
+}
+
+float line(float value, float width) {
+  return 1.0 - smoothstep(0.0, width, abs(value));
+}
+
+vec3 rubyPalette(float t) {
+  vec3 deep = vec3(0.12, 0.00, 0.035);
+  vec3 red = vec3(0.92, 0.05, 0.18);
+  vec3 pink = vec3(1.00, 0.28, 0.52);
+  vec3 white = vec3(1.00, 0.86, 0.75);
+  vec3 hot = mix(red, pink, smoothstep(0.18, 0.78, t));
+  return mix(deep, mix(hot, white, smoothstep(0.72, 1.0, t)), smoothstep(0.0, 1.0, t));
+}
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / max(u_resolution.xy, vec2(1.0));
+  vec2 p = uv * 2.0 - 1.0;
+  p.x *= u_resolution.x / max(u_resolution.y, 1.0);
+
+  float facets = clamp(max(u_param_facets, 6.0), 4.0, 12.0);
+  float refraction = max(u_param_refraction, 0.35);
+  float tempo = max(u_bpm, 120.0) / 60.0;
+  float pulse = max(u_beat, u_beat_pulse);
+  float angle = atan(p.y, p.x);
+  float radius = length(p);
+  float spin = angle + u_time * (0.08 + tempo * 0.012) + u_mid * 0.55;
+  vec2 warped = p;
+  warped += vec2(cos(spin * facets), sin(spin * (facets - 1.0))) * (0.025 + u_bass * 0.055);
+
+  float body = 1.0 - smoothstep(-0.04, 0.05, sdDiamond(warped * (0.95 - pulse * 0.08)));
+  float edge = line(sdDiamond(warped), 0.035 + pulse * 0.02);
+  float facetLines = line(sin(spin * facets + radius * (8.0 + u_high * 8.0)), 0.06);
+  float crossCut = line(warped.x + warped.y * 0.42, 0.018) + line(warped.x - warped.y * 0.42, 0.018);
+  float sparkle = pow(max(0.0, sin(spin * 3.0 + radius * 18.0 - u_time * (1.4 + u_high * 5.0))), 18.0);
+  float light = clamp(body * (0.22 + facetLines * 0.34 + crossCut * 0.18) + edge * 0.9 + sparkle * (0.4 + u_high), 0.0, 1.5);
+  float glow = exp(-abs(sdDiamond(warped)) * 8.0) * (0.18 + u_bass * 0.35 + pulse * 0.45);
+
+  vec3 bg = vec3(0.018, 0.006, 0.018) + vec3(0.05, 0.00, 0.045) * (1.0 - smoothstep(0.0, 1.35, radius));
+  vec3 color = bg;
+  color += rubyPalette(light + refraction * u_amplitude * 0.28) * body;
+  color += vec3(1.0, 0.18, 0.32) * glow;
+  color += vec3(1.0, 0.82, 0.70) * sparkle * (0.4 + u_high);
+  outColor = vec4(color, 1.0);
+}
+`,
+  starfield: `#version 300 es
+precision mediump float;
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform float u_amplitude;
+uniform float u_bass;
+uniform float u_mid;
+uniform float u_high;
+uniform float u_beat;
+out vec4 outColor;
+
+float hash11(float p) {
+  return fract(sin(p * 127.1) * 43758.5453123);
+}
+
+float star(vec2 p, float size) {
+  float d = length(p);
+  float core = 1.0 - smoothstep(0.0, size, d);
+  float rays = 1.0 - smoothstep(0.0, size * 3.0, abs(p.x) * abs(p.y));
+  return core + rays * 0.08;
+}
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / max(u_resolution.xy, vec2(1.0));
+  vec2 p = uv * 2.0 - 1.0;
+  p.x *= u_resolution.x / max(u_resolution.y, 1.0);
+  vec3 color = vec3(0.004, 0.008, 0.018);
+  color += vec3(0.015, 0.02, 0.05) * (1.0 - smoothstep(0.0, 1.4, length(p)));
+
+  float speed = 0.10 + u_bass * 0.65 + u_amplitude * 0.25;
+  for (int i = 0; i < 56; i++) {
+    float fi = float(i);
+    vec2 seed = vec2(hash11(fi + 11.0), hash11(fi + 37.0)) * 2.0 - 1.0;
+    float depth = fract(hash11(fi + 73.0) - u_time * speed * (0.35 + hash11(fi + 5.0)));
+    vec2 pos = seed / max(depth, 0.08);
+    float size = (1.0 - depth) * (0.004 + u_high * 0.011 + u_beat * 0.006);
+    float trail = star(p - pos, size);
+    vec3 tint = mix(vec3(0.20, 0.72, 1.0), vec3(1.0, 0.26, 0.58), hash11(fi + 101.0));
+    color += tint * trail * (0.18 + (1.0 - depth) * 0.85 + u_beat * 0.5);
+  }
+
+  float warp = sin(length(p) * (12.0 + u_mid * 8.0) - u_time * (1.0 + u_high * 3.0));
+  color += vec3(0.08, 0.10, 0.18) * smoothstep(0.94, 1.0, warp) * (0.08 + u_mid * 0.22);
+  outColor = vec4(color, 1.0);
+}
+`,
+  waveform_ribbon: `#version 300 es
+precision mediump float;
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform float u_amplitude;
+uniform float u_bass;
+uniform float u_mid;
+uniform float u_high;
+uniform float u_beat;
+uniform float u_beat_pulse;
+uniform float u_fft[32];
+out vec4 outColor;
+
+float fftSample(float t) {
+  float index = clamp(floor(t * 31.0), 0.0, 31.0);
+  return u_fft[int(index)];
+}
+
+float line(float y, float center, float width) {
+  return 1.0 - smoothstep(0.0, width, abs(y - center));
+}
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / max(u_resolution.xy, vec2(1.0));
+  float spectrum = fftSample(uv.x);
+  float phase = uv.x * 18.8495559215 + u_time * (1.2 + u_mid * 3.5);
+  float center = 0.5 + sin(phase) * (0.035 + u_bass * 0.08) + sin(phase * 0.43 - u_time) * 0.035;
+  float width = 0.018 + u_amplitude * 0.055 + spectrum * 0.16 + u_beat_pulse * 0.025;
+  float primary = line(uv.y, center, width);
+  float echoA = line(uv.y, center + 0.16 + u_high * 0.08, width * 0.62);
+  float echoB = line(uv.y, center - 0.15 - u_bass * 0.06, width * 0.58);
+  float grid = smoothstep(0.012, 0.0, abs(fract(uv.x * 32.0) - 0.5)) * 0.08;
+
+  vec3 bg = vec3(0.006, 0.012, 0.026);
+  bg += vec3(0.02, 0.03, 0.055) * smoothstep(0.9, 0.0, abs(uv.y - 0.5));
+  vec3 ribbon = vec3(0.08, 0.92, 1.0) * primary;
+  ribbon += vec3(1.0, 0.18, 0.58) * echoA * (0.5 + u_high);
+  ribbon += vec3(0.95, 0.78, 0.28) * echoB * (0.35 + u_bass);
+  ribbon += vec3(0.7, 0.85, 1.0) * primary * u_beat * 0.35;
+
+  vec3 color = bg + ribbon * (0.65 + spectrum * 0.75 + u_amplitude * 0.5);
+  color += vec3(0.18, 0.28, 0.44) * grid * (0.2 + spectrum);
+  outColor = vec4(color, 1.0);
+}
+`,
   unyo_geometry: `#version 300 es
 precision mediump float;
 

@@ -269,6 +269,11 @@ map beat_confidence, to: :sync_strength
 
 ### Custom GLSL Shaders
 
+Built-in shader presets include `:gradient_pulse`, `:bass_tunnel`,
+`:neon_grid`, `:kaleidoscope`, `:spectrum_rings`, `:liquid_wobble`,
+`:audio_bars`, `:ruby_crystal`, `:starfield`, `:waveform_ribbon`,
+`:unyo_geometry`, and `:glitch_flash`.
+
 ```ruby
 layer :wave_shader do
   type :shader

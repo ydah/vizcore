@@ -36,6 +36,15 @@ test("getBuiltinShader resolves unyo_geometry shader", () => {
   assert.match(shader, /sdRegularPolygon/);
 });
 
+test("getBuiltinShader resolves added visual preset shaders", () => {
+  assert.equal(getBuiltinShader("ruby_crystal"), BUILTIN_FRAGMENT_SHADERS.ruby_crystal);
+  assert.match(getBuiltinShader("ruby_crystal"), /rubyPalette/);
+  assert.equal(getBuiltinShader("starfield"), BUILTIN_FRAGMENT_SHADERS.starfield);
+  assert.match(getBuiltinShader("starfield"), /star/);
+  assert.equal(getBuiltinShader("waveform_ribbon"), BUILTIN_FRAGMENT_SHADERS.waveform_ribbon);
+  assert.match(getBuiltinShader("waveform_ribbon"), /u_fft\[32\]/);
+});
+
 test("getPostEffectShader resolves known effects and returns null for unknown", () => {
   assert.equal(getPostEffectShader("bloom"), POST_EFFECT_SHADERS.bloom);
   assert.equal(getPostEffectShader("chromatic"), POST_EFFECT_SHADERS.chromatic);

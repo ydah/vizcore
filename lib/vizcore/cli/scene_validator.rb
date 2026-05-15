@@ -14,7 +14,8 @@ module Vizcore
 
       BUILTIN_SHADERS = %i[
         default gradient_pulse bass_tunnel neon_grid kaleidoscope spectrum_rings
-        liquid_wobble audio_bars unyo_geometry glitch_flash
+        liquid_wobble audio_bars ruby_crystal starfield waveform_ribbon
+        unyo_geometry glitch_flash
       ].freeze
 
       MAPPING_SOURCE_KINDS = %i[

@@ -1,23 +1,16 @@
 # frozen_string_literal: true
 
-# Ruby-themed showcase using existing geometry, text, and particle layers.
+# Ruby-themed showcase using crystal, text, and particle layers.
 Vizcore.define do
   scene :ruby_crystal do
     layer :crystal_core do
-      shader :unyo_geometry
-      sides 6.0
-      scale 0.96
-      wobble 0.62
-      twist 0.78
-      line_glow 0.42
+      shader :ruby_crystal
+      facets 6.0
+      refraction 0.48
       blend :screen
 
-      map beat_count => :seed
-      map bass, to: :kick, gain: 3.0, range: 0.0..1.4, curve: :sqrt
-      map bass, to: :scale, gain: 0.5, range: 0.82..1.22, curve: :sqrt
-      map mid, to: :twist, gain: 2.0, range: 0.55..2.2
-      map treble, to: :snare, gain: 2.2, range: 0.0..1.1, curve: :sqrt
-      map beat_pulse, to: :pulse, range: 0.0..1.6, attack: 1.0, release: 0.12
+      map bass, to: :refraction, gain: 0.8, range: 0.28..0.78, curve: :sqrt
+      map mid, to: :facets, gain: 2.0, range: 5.0..10.0
     end
 
     layer :gem_sparks do
