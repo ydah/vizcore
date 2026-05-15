@@ -48,6 +48,7 @@ module Vizcore::DSL
     def style: (Symbol | String name) { () -> void } -> void
     def theme: (Symbol | String name) { () -> void } -> void
     def midi: (Symbol | String name, **untyped options) -> Array[Hash[Symbol, untyped]]
+    def audio_normalize: (?mode: Symbol | String mode, **untyped options) -> Hash[Symbol, untyped]
     def scene: (Symbol | String name, ?extends: Symbol | String? extends) { () -> void } -> void
     def section: (Symbol | String name, bars: Integer bars, ?beats_per_bar: Integer beats_per_bar) { () -> void } -> void
     def transition: (from: Symbol | String, to: Symbol | String) { () -> void } -> void

@@ -101,6 +101,26 @@ RSpec.describe Vizcore::Analysis::Pipeline do
     expect(result[:beat_confidence]).to eq(0.5)
   end
 
+  it "can adaptively normalize feature levels when enabled" do
+    smoother = instance_double(Vizcore::Analysis::Smoother)
+    allow(smoother).to receive(:smooth) { |_key, value, **_opts| value }
+    allow(smoother).to receive(:smooth_hash) { |hash, **_opts| hash }
+    allow(smoother).to receive(:smooth_array) { |array, **_opts| array }
+
+    pipeline = described_class.new(
+      sample_rate: 44_100,
+      fft_size: 1024,
+      smoother: smoother,
+      audio_normalize: { mode: :adaptive, window_size: 4, target: 0.8, floor: 0.05 }
+    )
+    samples = Array.new(1024, 0.2)
+
+    result = pipeline.call(samples)
+
+    expect(result[:amplitude]).to eq(0.8)
+    expect(result[:fft].max).to be <= 1.0
+  end
+
   it "keeps intentional microphone-level input above the noise gate active" do
     pipeline = described_class.new(sample_rate: 44_100, fft_size: 1024)
     samples = sine_samples(frequency_hz: 180.0, sample_rate: 44_100, count: 1024, amplitude: 0.03)

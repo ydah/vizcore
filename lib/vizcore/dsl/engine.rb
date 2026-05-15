@@ -74,6 +74,7 @@ module Vizcore
         @transitions = []
         @midi_mappings = []
         @global_params = {}
+        @analysis_settings = {}
         @section_tail = nil
         @styles = {}
         @themes = {}
@@ -127,6 +128,16 @@ module Vizcore
       # @return [void]
       def midi(name, **options)
         @midi_inputs << { name: name.to_sym, options: symbolize_keys(options) }
+      end
+
+      # Configure analysis-level audio feature normalization.
+      #
+      # @param mode [Symbol, String] `:off` or `:adaptive`
+      # @param options [Hash] optional `window`, `target`, and `floor` values
+      # @return [Hash] normalized audio normalization settings
+      def audio_normalize(mode: :adaptive, **options)
+        settings = normalize_audio_normalize(mode: mode, **options)
+        @analysis_settings[:audio_normalize] = settings
       end
 
       # Define a scene and its layers.
@@ -215,6 +226,7 @@ module Vizcore
           transitions: @transitions.map { |transition| deep_dup(transition) },
           midi_maps: @midi_mappings.map { |mapping| deep_dup(mapping) },
           globals: deep_dup(@global_params),
+          analysis: deep_dup(@analysis_settings),
           styles: @styles.map { |name, params| { name: name, params: deep_dup(params) } },
           themes: @themes.map { |name, params| { name: name, params: deep_dup(params) } }
         }
@@ -228,9 +240,34 @@ module Vizcore
         end
       end
 
+      def normalize_audio_normalize(mode:, **options)
+        normalized_mode = mode.to_s.strip.to_sym
+        raise ArgumentError, "unsupported audio_normalize mode: #{mode}" unless %i[off adaptive].include?(normalized_mode)
+
+        settings = { mode: normalized_mode }
+        settings[:window] = positive_float(options[:window], "audio_normalize window") if options.key?(:window)
+        settings[:target] = unit_float(options[:target], "audio_normalize target") if options.key?(:target)
+        settings[:floor] = unit_float(options[:floor], "audio_normalize floor") if options.key?(:floor)
+        settings
+      end
+
       def positive_integer(value, name)
         numeric = Integer(value)
         raise ArgumentError, "#{name} must be positive" unless numeric.positive?
+
+        numeric
+      end
+
+      def positive_float(value, name)
+        numeric = Float(value)
+        raise ArgumentError, "#{name} must be positive" unless numeric.positive?
+
+        numeric
+      end
+
+      def unit_float(value, name)
+        numeric = Float(value)
+        raise ArgumentError, "#{name} must be between 0.0 and 1.0" unless numeric.between?(0.0, 1.0)
 
         numeric
       end

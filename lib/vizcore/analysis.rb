@@ -7,6 +7,7 @@ module Vizcore
 end
 
 require_relative "analysis/band_splitter"
+require_relative "analysis/adaptive_normalizer"
 require_relative "analysis/beat_detector"
 require_relative "analysis/bpm_estimator"
 require_relative "analysis/fft_processor"

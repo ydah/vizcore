@@ -75,8 +75,15 @@ module Vizcore
         Vizcore::Analysis::Pipeline.new(
           sample_rate: @input_manager.sample_rate,
           fft_size: supported_fft_size(@input_manager.frame_size),
-          noise_gate: @config.noise_gate
+          noise_gate: @config.noise_gate,
+          audio_normalize: audio_normalize_settings
         )
+      end
+
+      def audio_normalize_settings
+        Hash(@definition[:analysis] || {})[:audio_normalize]
+      rescue StandardError
+        nil
       end
 
       def supported_fft_size(size)

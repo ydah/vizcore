@@ -7,6 +7,7 @@ module Vizcore
       BEAT_PULSE_DECAY = 0.86
       BEAT_PULSE_FLOOR = 0.001
       DEFAULT_NOISE_GATE = 0.01
+      DEFAULT_AUDIO_NORMALIZE = { mode: :off }.freeze
       SILENCE_RESET_FRAMES = 90
 
       attr_reader :fft_processor, :band_splitter, :beat_detector, :bpm_estimator, :smoother
@@ -18,17 +19,26 @@ module Vizcore
       # @param bpm_estimator [Vizcore::Analysis::BPMEstimator, nil]
       # @param smoother [Vizcore::Analysis::Smoother, nil]
       # @param noise_gate [Numeric] RMS threshold below which input is treated as silence
-      def initialize(sample_rate: 44_100, fft_size: 1024, window: :hamming, beat_detector: nil, bpm_estimator: nil, smoother: nil, noise_gate: DEFAULT_NOISE_GATE)
+      # @param audio_normalize [Hash, nil] optional audio normalization settings
+      def initialize(sample_rate: 44_100, fft_size: 1024, window: :hamming, beat_detector: nil, bpm_estimator: nil, smoother: nil, noise_gate: DEFAULT_NOISE_GATE, audio_normalize: nil)
         @fft_processor = FFTProcessor.new(sample_rate: sample_rate, fft_size: fft_size, window: window)
         @band_splitter = BandSplitter.new(sample_rate: sample_rate, fft_size: fft_size)
         @beat_detector = beat_detector || BeatDetector.new
-        frame_rate = sample_rate.to_f / fft_size.to_f
-        @bpm_estimator = bpm_estimator || BPMEstimator.new(frame_rate: frame_rate)
+        @analysis_frame_rate = sample_rate.to_f / fft_size.to_f
+        @bpm_estimator = bpm_estimator || BPMEstimator.new(frame_rate: @analysis_frame_rate)
         @smoother = smoother || Smoother.new(alpha: 0.35)
         @noise_gate = normalize_noise_gate(noise_gate)
+        self.audio_normalize = audio_normalize
         @beat_pulse = 0.0
         @last_bpm = 0.0
         @silent_frame_count = 0
+      end
+
+      # @param settings [Hash, nil]
+      # @return [Hash] normalized settings
+      def audio_normalize=(settings)
+        @audio_normalize = normalize_audio_normalize(settings)
+        @normalizer = build_normalizer(@audio_normalize)
       end
 
       # @param samples [Array<Numeric>] audio frame samples
@@ -50,12 +60,16 @@ module Vizcore
         @beat_pulse = beat_detected ? 1.0 : @beat_pulse * BEAT_PULSE_DECAY
         @beat_pulse = 0.0 if @beat_pulse < BEAT_PULSE_FLOOR
         bpm = resolve_bpm(beat_detected)
-        spectrum_preview = preview_spectrum(fft[:magnitudes])
+        normalized = normalize_features(
+          amplitude: amplitude,
+          bands: bands,
+          fft: preview_spectrum(fft[:magnitudes])
+        )
 
         {
-          amplitude: @smoother.smooth(:amplitude, amplitude),
-          bands: @smoother.smooth_hash(bands, namespace: :bands),
-          fft: @smoother.smooth_array(spectrum_preview, namespace: :fft),
+          amplitude: @smoother.smooth(:amplitude, normalized[:amplitude]),
+          bands: @smoother.smooth_hash(normalized[:bands], namespace: :bands),
+          fft: @smoother.smooth_array(normalized[:fft], namespace: :fft),
           beat: beat_detected,
           beat_confidence: confidence,
           beat_pulse: @beat_pulse,
@@ -75,6 +89,41 @@ module Vizcore
         Float(value).clamp(0.0, 1.0)
       rescue ArgumentError, TypeError
         DEFAULT_NOISE_GATE
+      end
+
+      def normalize_audio_normalize(value)
+        settings = DEFAULT_AUDIO_NORMALIZE.merge(symbolize_hash(value))
+        mode = settings[:mode].to_s.strip.to_sym
+        raise ArgumentError, "unsupported audio_normalize mode: #{settings[:mode]}" unless %i[off adaptive].include?(mode)
+
+        settings.merge(mode: mode)
+      end
+
+      def build_normalizer(settings)
+        return nil unless settings[:mode] == :adaptive
+
+        AdaptiveNormalizer.new(
+          window_size: normalization_window_size(settings),
+          target: settings.fetch(:target, AdaptiveNormalizer::DEFAULT_TARGET),
+          floor: settings.fetch(:floor, AdaptiveNormalizer::DEFAULT_FLOOR)
+        )
+      end
+
+      def normalization_window_size(settings)
+        return settings[:window_size] if settings.key?(:window_size)
+
+        seconds = settings.fetch(:window, nil)
+        return AdaptiveNormalizer::DEFAULT_WINDOW_SIZE if seconds.nil?
+
+        (Float(seconds) * @analysis_frame_rate).round.clamp(1, 10_000)
+      rescue ArgumentError, TypeError
+        AdaptiveNormalizer::DEFAULT_WINDOW_SIZE
+      end
+
+      def normalize_features(amplitude:, bands:, fft:)
+        return { amplitude: amplitude, bands: bands, fft: fft } unless @normalizer
+
+        @normalizer.call(amplitude: amplitude, bands: bands, fft: fft)
       end
 
       def silent_frame(reset_tempo:)
@@ -157,6 +206,14 @@ module Vizcore
         Math.sqrt(sum / values.length.to_f).clamp(0.0, 1.0)
       rescue ArgumentError, TypeError
         0.0
+      end
+
+      def symbolize_hash(value)
+        Hash(value).each_with_object({}) do |(key, entry), output|
+          output[key.to_sym] = entry
+        end
+      rescue StandardError
+        {}
       end
     end
   end

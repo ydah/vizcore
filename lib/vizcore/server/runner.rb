@@ -57,6 +57,7 @@ module Vizcore
           transitions: definition[:transitions],
           input_manager: input_manager,
           noise_gate: @config.noise_gate,
+          audio_normalize: audio_normalize_settings(definition),
           error_reporter: ->(message) { @output.puts(message) }
         )
         replace_scene_catalog(definition[:scenes])
@@ -139,6 +140,7 @@ module Vizcore
             scenes: Array(definition[:scenes]),
             transitions: Array(definition[:transitions])
           )
+          broadcaster.update_analysis_settings(audio_normalize: audio_normalize_settings(definition))
           broadcaster.update_scene(scene_name: scene[:name], scene_layers: scene[:layers])
           on_reload&.call(definition)
           WebSocketHandler.broadcast(
@@ -340,6 +342,12 @@ module Vizcore
         end
       rescue StandardError
         []
+      end
+
+      def audio_normalize_settings(definition)
+        Hash(definition[:analysis] || {})[:audio_normalize]
+      rescue StandardError
+        nil
       end
 
       def switch_scene_from_client(target_name, broadcaster)

@@ -20,6 +20,7 @@ RSpec.describe Vizcore::Server::Runner do
         stop: nil,
         update_scene: nil,
         update_transition_definition: nil,
+        update_analysis_settings: nil,
         current_scene_snapshot: { name: "intro", layers: [] }
       )
     end
@@ -181,6 +182,7 @@ RSpec.describe Vizcore::Server::Runner do
         scenes: [hash_including(name: :updated)],
         transitions: []
       )
+      expect(broadcaster).to have_received(:update_analysis_settings).with(audio_normalize: nil)
       expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
         type: "config_update",
         payload: hash_including(

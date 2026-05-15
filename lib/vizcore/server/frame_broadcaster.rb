@@ -24,6 +24,7 @@ module Vizcore
       # @param transitions [Array<Hash>, nil]
       # @param transition_controller [Vizcore::DSL::TransitionController, nil]
       # @param noise_gate [Numeric]
+      # @param audio_normalize [Hash, nil]
       # @param error_reporter [#call, nil]
       def initialize(
         scene_name: "basic",
@@ -37,6 +38,7 @@ module Vizcore
         transitions: nil,
         transition_controller: nil,
         noise_gate: Vizcore::Analysis::Pipeline::DEFAULT_NOISE_GATE,
+        audio_normalize: nil,
         error_reporter: nil
       )
         @scene_name = scene_name
@@ -47,7 +49,8 @@ module Vizcore
         @analysis_pipeline = analysis_pipeline || Vizcore::Analysis::Pipeline.new(
           sample_rate: @input_manager.sample_rate,
           fft_size: fft_size,
-          noise_gate: noise_gate
+          noise_gate: noise_gate,
+          audio_normalize: audio_normalize
         )
         @mapping_resolver = mapping_resolver || Vizcore::DSL::MappingResolver.new
         @scene_serializer = scene_serializer || Vizcore::Renderer::SceneSerializer.new
@@ -149,6 +152,16 @@ module Vizcore
         @scene_mutex.synchronize do
           @transition_controller.update(scenes: scenes, transitions: transitions)
         end
+      end
+
+      # Replace audio analysis settings after scene hot reload.
+      #
+      # @param audio_normalize [Hash, nil]
+      # @return [void]
+      def update_analysis_settings(audio_normalize:)
+        return unless @analysis_pipeline.respond_to?(:audio_normalize=)
+
+        @analysis_pipeline.audio_normalize = audio_normalize
       end
 
       # Build one frame payload for transport to frontend.

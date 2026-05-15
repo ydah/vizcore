@@ -113,6 +113,16 @@ Block syntax is additive and writes the same transform metadata as keyword
 syntax. `deadzone` suppresses tiny values before gain and curve are applied;
 `curve` also supports `:ease_out`.
 
+For tracks with very different levels, opt in to adaptive feature
+normalization at the top of the scene file:
+
+```ruby
+audio_normalize mode: :adaptive, window: 3.0, target: 0.85, floor: 0.05
+```
+
+This keeps `amplitude` and FFT-driven mappings in a repeatable range without
+changing the default analysis behavior.
+
 For a more music-oriented style, `react_to` groups the same mappings by source:
 
 ```ruby
