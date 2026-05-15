@@ -7,6 +7,7 @@ require_relative "../vizcore"
 require_relative "audio"
 require_relative "cli/doctor"
 require_relative "cli/scene_diagnostics"
+require_relative "cli/shader_uniform_docs"
 require_relative "config"
 require_relative "server"
 
@@ -244,6 +245,15 @@ module Vizcore
       raise Thor::Error, "scene validation failed" unless result.valid?
 
       say("Scene valid: #{scene_file}")
+    end
+
+    map "shader-docs" => :shader_docs
+    desc "shader-docs", "Print custom GLSL shader uniform reference"
+    # Print generated documentation for custom GLSL uniforms.
+    #
+    # @return [void]
+    def shader_docs
+      Vizcore::CLISupport::ShaderUniformDocs.new.lines.each { |line| say(line) }
     end
 
     desc "snapshot SCENE_FILE", "Render one scene frame to a PNG snapshot"

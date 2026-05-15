@@ -117,6 +117,12 @@ RSpec.describe Vizcore::CLI do
       end
     end
 
+    it "prints generated shader uniform docs" do
+      expect do
+        described_class.start(["shader-docs"])
+      end.to output(/# Vizcore Shader Uniforms.*`u_amplitude`.*`u_param_<name>`/m).to_stdout
+    end
+
     it "writes a PNG scene snapshot" do
       Dir.mktmpdir("vizcore-cli-snapshot") do |dir|
         out = File.join(dir, "snapshot.png")
