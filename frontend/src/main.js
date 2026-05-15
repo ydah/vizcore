@@ -18,6 +18,10 @@ import { applyProjectorMode, resolveProjectorMode } from "./projector-mode.js";
 import { Engine } from "./renderer/engine.js";
 import { SHADER_COMPILE_EVENT } from "./renderer/shader-manager.js";
 import { SHADER_ERROR_EVENT, formatShaderErrorMessage, formatShaderErrorTitle } from "./shader-error-overlay.js";
+import {
+  loadVisualSettingsPreset,
+  saveVisualSettingsPreset
+} from "./visual-settings-preset.js";
 import { WebSocketClient } from "./websocket-client.js";
 
 const canvas = document.querySelector("#vizcore-canvas");
@@ -54,6 +58,8 @@ const bassBoostControl = document.querySelector("#bass-boost-control");
 const smoothingControl = document.querySelector("#smoothing-control");
 const beatHoldControl = document.querySelector("#beat-hold-control");
 const wobbleControl = document.querySelector("#wobble-control");
+const reactivitySaveButton = document.querySelector("#reactivity-save");
+const reactivityLoadButton = document.querySelector("#reactivity-load");
 const reactivityStatusElement = document.querySelector("#reactivity-status");
 const shaderErrorOverlay = document.querySelector("#shader-error-overlay");
 const shaderErrorTitleElement = document.querySelector("#shader-error-title");
@@ -61,13 +67,7 @@ const shaderErrorMessageElement = document.querySelector("#shader-error-message"
 const shaderErrorCloseButton = document.querySelector("#shader-error-close");
 const LATENCY_PROBE_INTERVAL_MS = 3000;
 
-const visualSettings = {
-  visualGain: 2.5,
-  bassBoost: 1.4,
-  smoothing: 0.25,
-  beatHoldMs: 180,
-  wobbleAmount: 1.0,
-};
+const visualSettings = loadVisualSettingsPreset(browserStorage());
 const liveControls = createLiveControlState();
 const performanceMonitor = createPerformanceMonitorState();
 let projectorMode = resolveProjectorMode({ body: document.body, location: window.location });
@@ -83,8 +83,10 @@ bindVisualControl(bassBoostControl, "bassBoost");
 bindVisualControl(smoothingControl, "smoothing");
 bindVisualControl(beatHoldControl, "beatHoldMs");
 bindVisualControl(wobbleControl, "wobbleAmount");
+bindVisualPresetControls();
 renderLiveControlStatus();
 renderPerformanceMonitor();
+syncVisualControls();
 renderReactivityStatus();
 bindShaderErrorOverlay();
 const fftBars = initializeFftPreview(fftPreviewElement);
@@ -490,18 +492,60 @@ function bindVisualControl(control, key, parser = Number) {
   });
 }
 
-function renderReactivityStatus() {
+function bindVisualPresetControls() {
+  if (reactivitySaveButton) {
+    reactivitySaveButton.addEventListener("click", () => {
+      Object.assign(visualSettings, saveVisualSettingsPreset(browserStorage(), visualSettings));
+      renderReactivityStatus("Saved");
+    });
+  }
+
+  if (reactivityLoadButton) {
+    reactivityLoadButton.addEventListener("click", () => {
+      Object.assign(visualSettings, loadVisualSettingsPreset(browserStorage(), { fallback: visualSettings }));
+      syncVisualControls();
+      engine.setVisualSettings(visualSettings);
+      renderReactivityStatus("Loaded");
+    });
+  }
+}
+
+function syncVisualControls() {
+  setControlValue(visualGainControl, visualSettings.visualGain);
+  setControlValue(bassBoostControl, visualSettings.bassBoost);
+  setControlValue(smoothingControl, visualSettings.smoothing);
+  setControlValue(beatHoldControl, visualSettings.beatHoldMs);
+  setControlValue(wobbleControl, visualSettings.wobbleAmount);
+}
+
+function setControlValue(control, value) {
+  if (control) {
+    control.value = String(value);
+  }
+}
+
+function browserStorage() {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function renderReactivityStatus(prefix = null) {
   if (!reactivityStatusElement) {
     return;
   }
 
-  reactivityStatusElement.textContent = [
+  const values = [
     `Visual Gain: ${visualSettings.visualGain.toFixed(1)}x`,
     `Bass: ${visualSettings.bassBoost.toFixed(1)}x`,
     `Smooth: ${visualSettings.smoothing.toFixed(2)}`,
     `Beat Hold: ${Math.round(visualSettings.beatHoldMs)}ms`,
     `Wobble: ${visualSettings.wobbleAmount.toFixed(2)}x`,
   ].join(" | ");
+
+  reactivityStatusElement.textContent = prefix ? `${prefix} | ${values}` : values;
 }
 
 function bindShaderErrorOverlay() {
