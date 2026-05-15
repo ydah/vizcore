@@ -18,7 +18,7 @@ module Vizcore
       ].freeze
 
       MAPPING_SOURCE_KINDS = %i[
-        amplitude frequency_band fft_spectrum beat beat_pulse beat_count bpm
+        amplitude frequency_band fft_spectrum beat beat_confidence beat_pulse beat_count bpm
       ].freeze
 
       FREQUENCY_BANDS = %i[sub low mid high].freeze

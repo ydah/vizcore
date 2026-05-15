@@ -46,6 +46,7 @@ module Vizcore
         bands = @band_splitter.call(fft[:magnitudes])
         beat = @beat_detector.call(samples)
         beat_detected = beat[:beat]
+        confidence = beat_confidence(beat)
         @beat_pulse = beat_detected ? 1.0 : @beat_pulse * BEAT_PULSE_DECAY
         @beat_pulse = 0.0 if @beat_pulse < BEAT_PULSE_FLOOR
         bpm = resolve_bpm(beat_detected)
@@ -56,6 +57,7 @@ module Vizcore
           bands: @smoother.smooth_hash(bands, namespace: :bands),
           fft: @smoother.smooth_array(spectrum_preview, namespace: :fft),
           beat: beat_detected,
+          beat_confidence: confidence,
           beat_pulse: @beat_pulse,
           beat_count: beat[:beat_count],
           bpm: bpm,
@@ -85,6 +87,7 @@ module Vizcore
           bands: { sub: 0.0, low: 0.0, mid: 0.0, high: 0.0 },
           fft: Array.new(32, 0.0),
           beat: false,
+          beat_confidence: 0.0,
           beat_pulse: 0.0,
           beat_count: current_beat_count,
           bpm: @last_bpm,
@@ -115,6 +118,16 @@ module Vizcore
         0
       rescue StandardError
         0
+      end
+
+      def beat_confidence(beat)
+        threshold = Float(beat[:threshold])
+        instant_energy = Float(beat[:instant_energy])
+        return beat[:beat] ? 1.0 : 0.0 unless threshold.positive?
+
+        (instant_energy / threshold).clamp(0.0, 1.0)
+      rescue ArgumentError, TypeError
+        beat[:beat] ? 1.0 : 0.0
       end
 
       def resolve_bpm(beat_detected)

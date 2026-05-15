@@ -199,6 +199,7 @@ Frequency bands can be written with musical aliases when that reads better in a 
 map bass, to: :size      # same as frequency_band(:low)
 map mid, to: :twist
 map treble, to: :sparkle # same as frequency_band(:high)
+map beat_confidence, to: :sync_strength
 ```
 
 ### Custom GLSL Shaders

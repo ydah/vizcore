@@ -10,6 +10,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 - Add `section` DSL for bar-counted scene sequencing.
 - Add reusable layer `style` / `use_style` DSL.
 - Add `scene ... extends:` for sharing base scene layers.
+- Add `beat_confidence` analysis output and DSL mapping source.
 - Add block-style `map` transform DSL with `deadzone` and `ease_out` curve support.
 - Add gemspec coverage for packaged examples, browser assets, docs, and RBS files.
 - Add deterministic `Vizcore::Audio::FixtureInput` for repeatable audio tests.

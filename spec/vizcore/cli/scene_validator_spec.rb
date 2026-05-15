@@ -18,6 +18,7 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
         scene :drop do
           layer :particles do
             type :particle_field
+            map beat_confidence => :sync_strength
             map beat_pulse => :size
           end
         end

@@ -223,6 +223,11 @@ module Vizcore
         beat?
       end
 
+      # @return [Hash] source descriptor for beat detector confidence
+      def beat_confidence
+        source(:beat_confidence)
+      end
+
       # @return [Hash] source descriptor for beat pulse decay value
       def beat_pulse
         source(:beat_pulse)

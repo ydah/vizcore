@@ -32,6 +32,7 @@ module Vizcore
           bands: bands.transform_values { |value| round_float(value) },
           fft: Array(audio[:fft]).map { |value| round_float(value) },
           beat: !!audio[:beat],
+          beat_confidence: round_float(audio[:beat_confidence]),
           beat_pulse: round_float(audio[:beat_pulse]),
           beat_count: Integer(audio[:beat_count] || 0),
           bpm: audio[:bpm],

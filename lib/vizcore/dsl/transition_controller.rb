@@ -170,6 +170,11 @@ module Vizcore
         end
 
         # @return [Float]
+        def beat_confidence
+          @audio[:beat_confidence].to_f
+        end
+
+        # @return [Float]
         def beat_pulse
           @audio[:beat_pulse].to_f
         end

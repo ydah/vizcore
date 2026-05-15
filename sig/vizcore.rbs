@@ -112,6 +112,7 @@ module Vizcore::DSL
     def fft_spectrum: () -> source
     def beat?: () -> source
     def beat: () -> source
+    def beat_confidence: () -> source
     def beat_pulse: () -> source
     def beat_count: () -> source
     def bpm: () -> source
