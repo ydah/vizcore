@@ -6,6 +6,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+- Add browser latency probes for RTT and Ruby/browser clock-offset measurement.
 - Drop stale realtime `audio_frame` sends when a browser WebSocket connection is backpressured.
 - Add `vizcore.frame.v1` protocol version to WebSocket message envelopes.
 - Document the Ruby-to-browser WebSocket frame protocol.

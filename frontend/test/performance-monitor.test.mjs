@@ -6,6 +6,7 @@ import {
   estimateDroppedFrames,
   formatPerformanceMonitorText,
   recordConnectionStatus,
+  recordLatencyProbe,
   recordRenderFrame,
   recordShaderCompile,
   recordSocketFrame,
@@ -44,6 +45,38 @@ test("recordSocketFrame estimates dropped frames from timestamp gaps", () => {
   assert.equal(state.droppedFrames, 4);
 });
 
+test("recordLatencyProbe estimates round trip time and clock offset", () => {
+  const state = recordLatencyProbe(
+    createPerformanceMonitorState(),
+    {
+      client_sent_at_ms: 1_000,
+      server_received_at_ms: 1_065,
+      server_sent_at_ms: 1_070,
+    },
+    1_035,
+  );
+
+  assert.equal(state.rttMs, 30);
+  assert.equal(state.clockOffsetMs, 50);
+});
+
+test("recordSocketFrame corrects websocket latency with measured clock offset", () => {
+  let state = createPerformanceMonitorState();
+  state = recordLatencyProbe(
+    state,
+    {
+      client_sent_at_ms: 1_000,
+      server_received_at_ms: 1_065,
+      server_sent_at_ms: 1_070,
+    },
+    1_035,
+  );
+
+  state = recordSocketFrame(state, { timestamp: 2.05 }, 2_020);
+
+  assert.equal(state.wsLatencyMs, 20);
+});
+
 test("recordConnectionStatus counts reconnect attempts", () => {
   let state = createPerformanceMonitorState();
 
@@ -68,12 +101,14 @@ test("formatPerformanceMonitorText produces stable HUD copy", () => {
     frameMs: 16.72,
     reconnects: 1,
     shaderCompileMs: 3.4,
+    rttMs: 8,
+    clockOffsetMs: -2,
     wsLatencyMs: 12.4,
   };
 
   assert.equal(
     formatPerformanceMonitorText(state),
-    "Perf: 59.9 FPS | Frame 16.7ms | WS 12ms | Drop 3 | Audio 1.2ms | Shader 3.4ms | Reconnect 1",
+    "Perf: 59.9 FPS | Frame 16.7ms | WS 12ms | RTT 8ms | Clock -2ms | Drop 3 | Audio 1.2ms | Shader 3.4ms | Reconnect 1",
   );
 });
 

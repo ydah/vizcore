@@ -9,6 +9,7 @@ import {
   createPerformanceMonitorState,
   formatPerformanceMonitorText,
   recordConnectionStatus,
+  recordLatencyProbe,
   recordRenderFrame,
   recordShaderCompile,
   recordSocketFrame,
@@ -58,6 +59,7 @@ const shaderErrorOverlay = document.querySelector("#shader-error-overlay");
 const shaderErrorTitleElement = document.querySelector("#shader-error-title");
 const shaderErrorMessageElement = document.querySelector("#shader-error-message");
 const shaderErrorCloseButton = document.querySelector("#shader-error-close");
+const LATENCY_PROBE_INTERVAL_MS = 3000;
 
 const visualSettings = {
   visualGain: 2.5,
@@ -94,6 +96,7 @@ let audioElement = null;
 let frameCount = 0;
 let lastConnectedAt = null;
 let lastTransportSyncAt = 0;
+let latencyProbeTimer = null;
 let beatFlashUntil = 0;
 let availableSceneNames = [];
 let pendingSceneName = null;
@@ -157,12 +160,17 @@ const client = new WebSocketClient(websocketUrl, {
       renderSceneButtons();
     }
   },
+  onLatencyProbe: (payload) => {
+    updatePerformanceMonitor(recordLatencyProbe(performanceMonitor, payload, Date.now()));
+  },
   onStatus: (status) => {
     updatePerformanceMonitor(recordConnectionStatus(performanceMonitor, status));
     if (status === "connected") {
       lastConnectedAt = new Date();
+      startLatencyProbeLoop();
       syncAudioTransportToServer({ force: true });
     } else {
+      stopLatencyProbeLoop();
       pendingSceneName = null;
       pendingSceneRequestedAt = 0;
       currentSceneName = "unknown";
@@ -285,6 +293,27 @@ function startPerformanceMonitorLoop() {
   requestAnimationFrame((time) => {
     updatePerformanceMonitor(recordRenderFrame(performanceMonitor, time));
     startPerformanceMonitorLoop();
+  });
+}
+
+function startLatencyProbeLoop() {
+  stopLatencyProbeLoop();
+  sendLatencyProbe();
+  latencyProbeTimer = setInterval(sendLatencyProbe, LATENCY_PROBE_INTERVAL_MS);
+}
+
+function stopLatencyProbeLoop() {
+  if (!latencyProbeTimer) {
+    return;
+  }
+
+  clearInterval(latencyProbeTimer);
+  latencyProbeTimer = null;
+}
+
+function sendLatencyProbe() {
+  client.send("latency_probe", {
+    client_sent_at_ms: Date.now()
   });
 }
 

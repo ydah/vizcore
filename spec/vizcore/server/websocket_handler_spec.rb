@@ -60,4 +60,27 @@ RSpec.describe Vizcore::Server::WebSocketHandler do
     )
     expect(described_class.dropped_frame_count).to eq(0)
   end
+
+  it "sends envelopes to a single socket" do
+    socket = FakeSocket.new([])
+
+    described_class.send_to(socket, type: "latency_probe", payload: { server_sent_at_ms: 1.0 })
+
+    message = JSON.parse(socket.messages.first)
+    expect(message).to eq(
+      "protocol" => "vizcore.frame.v1",
+      "type" => "latency_probe",
+      "payload" => { "server_sent_at_ms" => 1.0 }
+    )
+  end
+
+  it "passes the source socket to inbound message handlers" do
+    socket = FakeSocket.new([])
+    handled = nil
+    described_class.on_message { |message, source_socket| handled = [message, source_socket] }
+
+    described_class.send(:handle_message, socket, JSON.generate(type: "latency_probe", payload: {}))
+
+    expect(handled).to eq([{ "type" => "latency_probe", "payload" => {} }, socket])
+  end
 end

@@ -49,6 +49,20 @@ module Vizcore
           true
         end
 
+        # Send one typed payload to a single websocket client.
+        #
+        # @param socket [#send]
+        # @param type [String]
+        # @param payload [Hash]
+        # @return [Boolean] false when websocket backend is unavailable
+        def send_to(socket, type:, payload:)
+          return false unless faye_websocket_class
+
+          message = JSON.generate(protocol: PROTOCOL_VERSION, type: type, payload: payload)
+          send_message(socket, message, type: type)
+          true
+        end
+
         # @return [Integer]
         def connection_count
           mutex.synchronize { sockets.size }
@@ -137,9 +151,9 @@ module Vizcore
           [500, json_headers, [JSON.generate(error: "Missing dependency: faye-websocket")]]
         end
 
-        def handle_message(_socket, raw_message)
+        def handle_message(socket, raw_message)
           message = JSON.parse(raw_message)
-          dispatch_message(message)
+          dispatch_message(message, socket)
           message
         rescue JSON::ParserError => e
           set_last_error(e)
@@ -175,12 +189,12 @@ module Vizcore
           mutex.synchronize { @dropped_frame_count = (@dropped_frame_count || 0) + 1 }
         end
 
-        def dispatch_message(message)
+        def dispatch_message(message, socket)
           handler = mutex.synchronize { @message_handler }
           return unless handler
           return unless message.is_a?(Hash)
 
-          handler.call(message)
+          handler.call(message, socket)
         rescue StandardError => e
           set_last_error(e)
           nil

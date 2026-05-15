@@ -226,6 +226,31 @@ RSpec.describe Vizcore::Server::Runner do
       )
     end
 
+    it "responds to client latency probes on the source socket" do
+      runner = described_class.new(config, output: output)
+      broadcaster = instance_double(Vizcore::Server::FrameBroadcaster)
+      socket = instance_double("WebSocket")
+      allow(runner).to receive(:wall_clock_ms).and_return(1_100.0, 1_101.5)
+      allow(Vizcore::Server::WebSocketHandler).to receive(:send_to)
+
+      runner.send(
+        :handle_client_message,
+        { "type" => "latency_probe", "payload" => { "client_sent_at_ms" => 1_000.0 } },
+        broadcaster,
+        socket
+      )
+
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:send_to).with(
+        socket,
+        type: "latency_probe",
+        payload: {
+          client_sent_at_ms: 1_000.0,
+          server_received_at_ms: 1_100.0,
+          server_sent_at_ms: 1_101.5
+        }
+      )
+    end
+
     it "raises when file source is selected without an existing file" do
       file_config = Vizcore::Config.new(
         scene_file: scene_file.to_s,

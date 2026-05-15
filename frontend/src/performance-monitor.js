@@ -3,6 +3,7 @@ const FPS_WINDOW_MS = 500;
 
 export const createPerformanceMonitorState = () => ({
   audioLatencyMs: null,
+  clockOffsetMs: null,
   droppedFrames: 0,
   fps: 0,
   frameMs: 0,
@@ -11,6 +12,7 @@ export const createPerformanceMonitorState = () => ({
   reconnects: 0,
   renderWindowFrames: 0,
   renderWindowStartedAtMs: null,
+  rttMs: null,
   shaderCompileMs: null,
   wsLatencyMs: null,
 });
@@ -67,13 +69,43 @@ export const recordSocketFrame = (
   const frameGapMs = previousTimestamp === null ? 0 : Math.max(0, timestampMs - previousTimestamp);
   const droppedFrames = Number(state?.droppedFrames || 0) + estimateDroppedFrames(frameGapMs, expectedFrameMs);
   const audioLatencyMs = audioLatencyFromMetrics(frame?.metrics, state?.audioLatencyMs);
+  const clockOffsetMs = Number.isFinite(state?.clockOffsetMs) ? Number(state.clockOffsetMs) : 0;
+  const browserTimestampMs = timestampMs - clockOffsetMs;
 
   return {
     ...state,
     audioLatencyMs,
     droppedFrames,
     lastSocketTimestampMs: timestampMs,
-    wsLatencyMs: Math.max(0, Math.round(receivedAt - timestampMs)),
+    wsLatencyMs: Math.max(0, Math.round(receivedAt - browserTimestampMs)),
+  };
+};
+
+export const recordLatencyProbe = (state, payload, receivedAtMs) => {
+  const clientSentAtMs = Number(payload?.client_sent_at_ms);
+  const serverReceivedAtMs = Number(payload?.server_received_at_ms);
+  const serverSentAtMs = Number(payload?.server_sent_at_ms);
+  const browserReceivedAtMs = Number(receivedAtMs);
+
+  if (
+    !Number.isFinite(clientSentAtMs) ||
+    !Number.isFinite(serverReceivedAtMs) ||
+    !Number.isFinite(serverSentAtMs) ||
+    !Number.isFinite(browserReceivedAtMs) ||
+    browserReceivedAtMs < clientSentAtMs ||
+    serverSentAtMs < serverReceivedAtMs
+  ) {
+    return { ...state };
+  }
+
+  const serverProcessingMs = serverSentAtMs - serverReceivedAtMs;
+  const rttMs = Math.max(0, browserReceivedAtMs - clientSentAtMs - serverProcessingMs);
+  const clockOffsetMs = ((serverReceivedAtMs - clientSentAtMs) + (serverSentAtMs - browserReceivedAtMs)) / 2;
+
+  return {
+    ...state,
+    clockOffsetMs: Math.round(clockOffsetMs),
+    rttMs: Math.round(rttMs),
   };
 };
 
@@ -104,12 +136,14 @@ export const formatPerformanceMonitorText = (state) => {
   const fps = Number(state?.fps || 0) > 0 ? Number(state.fps).toFixed(1) : "--";
   const frameMs = Number(state?.frameMs || 0) > 0 ? `${Number(state.frameMs).toFixed(1)}ms` : "--";
   const wsLatency = Number.isFinite(state?.wsLatencyMs) ? `${Math.round(state.wsLatencyMs)}ms` : "--";
+  const rtt = Number.isFinite(state?.rttMs) ? `${Math.round(state.rttMs)}ms` : "--";
+  const clockOffset = Number.isFinite(state?.clockOffsetMs) ? `${formatSignedInteger(state.clockOffsetMs)}ms` : "--";
   const audioLatency = Number.isFinite(state?.audioLatencyMs) ? `${Number(state.audioLatencyMs).toFixed(1)}ms` : "--";
   const shaderCompile = Number.isFinite(state?.shaderCompileMs) ? `${Number(state.shaderCompileMs).toFixed(1)}ms` : "--";
   const droppedFrames = Math.max(0, Number(state?.droppedFrames || 0));
   const reconnects = Math.max(0, Number(state?.reconnects || 0));
 
-  return `Perf: ${fps} FPS | Frame ${frameMs} | WS ${wsLatency} | Drop ${droppedFrames} | Audio ${audioLatency} | Shader ${shaderCompile} | Reconnect ${reconnects}`;
+  return `Perf: ${fps} FPS | Frame ${frameMs} | WS ${wsLatency} | RTT ${rtt} | Clock ${clockOffset} | Drop ${droppedFrames} | Audio ${audioLatency} | Shader ${shaderCompile} | Reconnect ${reconnects}`;
 };
 
 export const estimateDroppedFrames = (frameGapMs, expectedFrameMs = DEFAULT_EXPECTED_FRAME_MS) => {
@@ -142,3 +176,8 @@ const coerceMetric = (value) => {
 };
 
 const roundOneDecimal = (value) => Math.round(value * 10) / 10;
+
+const formatSignedInteger = (value) => {
+  const rounded = Math.round(Number(value) || 0);
+  return rounded > 0 ? `+${rounded}` : `${rounded}`;
+};

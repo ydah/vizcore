@@ -235,15 +235,17 @@ module Vizcore
       end
 
       def register_client_message_handler(broadcaster)
-        Vizcore::Server::WebSocketHandler.on_message do |message|
-          handle_client_message(message, broadcaster)
+        Vizcore::Server::WebSocketHandler.on_message do |message, socket|
+          handle_client_message(message, broadcaster, socket)
         end
       end
 
-      def handle_client_message(message, broadcaster)
+      def handle_client_message(message, broadcaster, socket = nil)
         type = message["type"] || message[:type]
         payload = message["payload"] || message[:payload]
         case type.to_s
+        when "latency_probe"
+          respond_to_latency_probe(socket, payload)
         when "transport_sync"
           return unless @config.audio_source == :file
 
@@ -259,6 +261,21 @@ module Vizcore
         end
       rescue StandardError => e
         @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "Client control message failed"))
+      end
+
+      def respond_to_latency_probe(socket, payload)
+        return unless socket
+
+        received_at_ms = wall_clock_ms
+        values = Hash(payload)
+        response = {
+          server_received_at_ms: received_at_ms,
+          server_sent_at_ms: wall_clock_ms
+        }
+        client_sent_at_ms = finite_float(values["client_sent_at_ms"] || values[:client_sent_at_ms])
+        response[:client_sent_at_ms] = client_sent_at_ms if client_sent_at_ms
+
+        WebSocketHandler.send_to(socket, type: "latency_probe", payload: response)
       end
 
       def apply_midi_action(action, executor, broadcaster)
@@ -358,6 +375,19 @@ module Vizcore
           end
           nil
         end
+      rescue StandardError
+        nil
+      end
+
+      def wall_clock_ms
+        Time.now.to_f * 1000.0
+      end
+
+      def finite_float(value)
+        numeric = Float(value)
+        return nil unless numeric.finite?
+
+        numeric
       rescue StandardError
         nil
       end

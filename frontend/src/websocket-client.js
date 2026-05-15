@@ -9,6 +9,7 @@ export class WebSocketClient {
     this.onFrame = callbacks.onFrame || (() => {});
     this.onSceneChange = callbacks.onSceneChange || (() => {});
     this.onConfigUpdate = callbacks.onConfigUpdate || (() => {});
+    this.onLatencyProbe = callbacks.onLatencyProbe || (() => {});
     this.onStatus = callbacks.onStatus || (() => {});
     this.socket = null;
     this.reconnectTimer = null;
@@ -114,6 +115,11 @@ export class WebSocketClient {
 
     if (message.type === "config_update") {
       this.onConfigUpdate(message.payload);
+      return;
+    }
+
+    if (message.type === "latency_probe") {
+      this.onLatencyProbe(message.payload);
     }
   }
 
