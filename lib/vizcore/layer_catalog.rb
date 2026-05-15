@@ -1,0 +1,128 @@
+# frozen_string_literal: true
+
+module Vizcore
+  # Metadata for built-in layer types, params, shaders, and browser effects.
+  module LayerCatalog
+    Capability = Struct.new(:type, :aliases, :params, :mappable_params, :description, keyword_init: true) do
+      def types
+        [type, *aliases].map(&:to_sym)
+      end
+
+      def supports?(value)
+        types.include?(value.to_sym)
+      rescue StandardError
+        false
+      end
+    end
+
+    COMMON_PARAMS = {
+      opacity: "Float",
+      blend: "Symbol",
+      effect: "Symbol",
+      effect_intensity: "Float",
+      vj_effect: "Symbol",
+      palette: "Array<String>",
+      color: "String"
+    }.freeze
+
+    CAPABILITIES = [
+      Capability.new(
+        type: :geometry,
+        aliases: %i[wireframe_cube radial_blob],
+        params: COMMON_PARAMS.merge(
+          rotation_speed: "Float",
+          color_shift: "Float",
+          deform: "Array<Float>"
+        ),
+        mappable_params: %i[rotation_speed color_shift deform],
+        description: "Wireframe and radial geometry rendered by the browser."
+      ),
+      Capability.new(
+        type: :shader,
+        aliases: [],
+        params: COMMON_PARAMS.merge(
+          shader_reload: "Boolean",
+          param_schema: "Array<Hash>"
+        ),
+        mappable_params: %i[effect_intensity],
+        description: "GLSL ES fragment shader layer with built-in audio uniforms."
+      ),
+      Capability.new(
+        type: :particle_field,
+        aliases: %i[particles particle],
+        params: COMMON_PARAMS.merge(
+          count: "Integer",
+          speed: "Float",
+          size: "Float",
+          force_field: "Symbol",
+          turbulence: "Float",
+          bass_explosion: "Float",
+          sparkle: "Float"
+        ),
+        mappable_params: %i[speed size turbulence bass_explosion sparkle],
+        description: "Audio-reactive point particles with simple force fields."
+      ),
+      Capability.new(
+        type: :text,
+        aliases: %i[text_layer],
+        params: COMMON_PARAMS.merge(
+          content: "String",
+          font_size: "Integer",
+          font: "String",
+          align: "Symbol",
+          stroke_width: "Float",
+          stroke_color: "String",
+          shadow_color: "String",
+          shadow_blur: "Float",
+          glow_strength: "Float"
+        ),
+        mappable_params: %i[font_size glow_strength],
+        description: "Canvas text rendered into the WebGL scene."
+      )
+    ].freeze
+
+    BUILTIN_SHADERS = %i[
+      default gradient_pulse bass_tunnel neon_grid kaleidoscope spectrum_rings
+      liquid_wobble audio_bars ruby_crystal starfield waveform_ribbon
+      unyo_geometry glitch_flash
+    ].freeze
+
+    BLEND_MODES = %i[
+      alpha normal add additive multiply screen difference
+    ].freeze
+
+    POST_EFFECTS = %i[
+      bloom glitch chromatic feedback motion_blur crt
+    ].freeze
+
+    VJ_EFFECTS = %i[
+      mirror color_shift pixelate
+    ].freeze
+
+    module_function
+
+    def capabilities
+      CAPABILITIES
+    end
+
+    def capability_for(type)
+      capabilities.find { |capability| capability.supports?(type) }
+    end
+
+    def supported_type?(type)
+      !!capability_for(type)
+    end
+
+    def supported_types
+      capabilities.flat_map(&:types).uniq.freeze
+    end
+
+    def params_for(type)
+      capability_for(type)&.params || {}
+    end
+
+    def mappable_params_for(type)
+      capability_for(type)&.mappable_params || []
+    end
+  end
+end

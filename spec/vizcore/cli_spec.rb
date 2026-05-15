@@ -147,6 +147,12 @@ RSpec.describe Vizcore::CLI do
       end.to output(/# Vizcore Shader Uniforms.*`u_amplitude`.*`u_onset`.*`u_param_<name>`/m).to_stdout
     end
 
+    it "prints layer capability metadata" do
+      expect do
+        described_class.start(["layers"])
+      end.to output(/# Vizcore Layer Capabilities.*## particle_field.*Params:.*count: Integer.*Built-in shaders:/m).to_stdout
+    end
+
     it "creates a custom shader template" do
       Dir.mktmpdir("vizcore-cli-shader") do |dir|
         Dir.chdir(dir) do

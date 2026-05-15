@@ -6,6 +6,7 @@ require "thor"
 require_relative "../vizcore"
 require_relative "audio"
 require_relative "cli/doctor"
+require_relative "cli/layer_docs"
 require_relative "cli/scene_diagnostics"
 require_relative "cli/shader_template"
 require_relative "cli/shader_uniform_docs"
@@ -254,6 +255,14 @@ module Vizcore
       raise Thor::Error, "scene validation failed" unless result.valid?
 
       say("Scene valid: #{scene_file}")
+    end
+
+    desc "layers", "Print built-in layer capability metadata"
+    # Print supported layer types, params, and browser-side capabilities.
+    #
+    # @return [void]
+    def layers
+      Vizcore::CLISupport::LayerDocs.new.lines.each { |line| say(line) }
     end
 
     map "shader-docs" => :shader_docs

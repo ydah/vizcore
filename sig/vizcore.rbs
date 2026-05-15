@@ -7,6 +7,26 @@ module Vizcore
   def self.define: () { () -> void } -> Hash[Symbol, untyped]
 end
 
+module Vizcore::LayerCatalog
+  class Capability < Struct[untyped]
+    attr_accessor type: Symbol
+    attr_accessor aliases: Array[Symbol]
+    attr_accessor params: Hash[Symbol, String]
+    attr_accessor mappable_params: Array[Symbol]
+    attr_accessor description: String
+
+    def types: () -> Array[Symbol]
+    def supports?: (untyped value) -> bool
+  end
+
+  def self.capabilities: () -> Array[Capability]
+  def self.capability_for: (untyped type) -> Capability?
+  def self.supported_type?: (untyped type) -> bool
+  def self.supported_types: () -> Array[Symbol]
+  def self.params_for: (untyped type) -> Hash[Symbol, String]
+  def self.mappable_params_for: (untyped type) -> Array[Symbol]
+end
+
 module Vizcore::DSL
   type source = { kind: Symbol, ?band: Symbol }
   type transform = {

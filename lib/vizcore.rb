@@ -2,6 +2,7 @@
 
 require_relative "vizcore/version"
 require_relative "vizcore/errors"
+require_relative "vizcore/layer_catalog"
 require_relative "vizcore/dsl"
 require "pathname"
 

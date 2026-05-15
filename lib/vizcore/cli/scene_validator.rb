@@ -3,35 +3,24 @@
 require "set"
 require_relative "../../vizcore"
 require_relative "../dsl"
+require_relative "../layer_catalog"
 
 module Vizcore
   module CLISupport
     # Validates scene DSL files without starting the realtime server.
     class SceneValidator
-      SUPPORTED_LAYER_TYPES = %i[
-        geometry wireframe_cube radial_blob shader particle_field particles particle text text_layer
-      ].freeze
+      SUPPORTED_LAYER_TYPES = Vizcore::LayerCatalog.supported_types
 
-      BUILTIN_SHADERS = %i[
-        default gradient_pulse bass_tunnel neon_grid kaleidoscope spectrum_rings
-        liquid_wobble audio_bars ruby_crystal starfield waveform_ribbon
-        unyo_geometry glitch_flash
-      ].freeze
+      BUILTIN_SHADERS = Vizcore::LayerCatalog::BUILTIN_SHADERS
 
       MAPPING_SOURCE_KINDS = %i[
         amplitude frequency_band fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
       ].freeze
 
       FREQUENCY_BANDS = %i[sub low mid high].freeze
-      SUPPORTED_BLEND_MODES = %i[
-        alpha normal add additive multiply screen difference
-      ].freeze
-      SUPPORTED_POST_EFFECTS = %i[
-        bloom glitch chromatic feedback motion_blur crt
-      ].freeze
-      SUPPORTED_VJ_EFFECTS = %i[
-        mirror color_shift pixelate
-      ].freeze
+      SUPPORTED_BLEND_MODES = Vizcore::LayerCatalog::BLEND_MODES
+      SUPPORTED_POST_EFFECTS = Vizcore::LayerCatalog::POST_EFFECTS
+      SUPPORTED_VJ_EFFECTS = Vizcore::LayerCatalog::VJ_EFFECTS
 
       Issue = Struct.new(:severity, :message, keyword_init: true) do
         def error?

@@ -147,6 +147,23 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
     end
   end
 
+  it "uses layer capability metadata for supported type aliases" do
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :aliases do
+          layer(:cube) { type :wireframe_cube }
+          layer(:blob) { type :radial_blob }
+          layer(:points) { type :particles }
+          layer(:title) { type :text_layer }
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+
+      expect(result).to be_valid
+    end
+  end
+
   it "formats scene structure for inspection" do
     with_scene_file(<<~RUBY) do |scene_path|
       Vizcore.define do
