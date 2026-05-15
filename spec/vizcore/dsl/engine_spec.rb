@@ -94,6 +94,47 @@ RSpec.describe Vizcore::DSL::Engine do
         { source: { kind: :frequency_band, band: :sub }, target: :rumble }
       )
     end
+
+    it "builds react_to blocks as normal mappings" do
+      definition = described_class.define do
+        scene :reactive do
+          layer :particles do
+            type :particle_field
+
+            react_to amplitude do
+              change :speed, gain: 2.5, range: 0.1..4.0
+            end
+
+            react_to beat do
+              trigger :burst
+            end
+          end
+        end
+      end
+
+      mappings = definition[:scenes].first[:layers].first[:mappings]
+
+      expect(mappings).to include(
+        {
+          source: { kind: :amplitude },
+          target: :speed,
+          transform: { gain: 2.5, min: 0.1, max: 4.0 }
+        },
+        { source: { kind: :beat }, target: :burst }
+      )
+    end
+
+    it "rejects react_to without a reaction body" do
+      expect do
+        described_class.define do
+          scene :invalid do
+            layer :particles do
+              react_to amplitude
+            end
+          end
+        end
+      end.to raise_error(ArgumentError, /react_to requires a block/)
+    end
   end
 
   describe ".load_file" do

@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "reaction_builder"
+
 module Vizcore
   module DSL
     # Builder for one render layer in a scene.
@@ -87,6 +89,28 @@ module Vizcore
         end
       end
 
+      # High-level mapping DSL for describing audio reactions inside a layer.
+      #
+      # @param source_value [Hash, Symbol, String] analysis source descriptor
+      # @yield Reaction block with `change` and `trigger`
+      # @raise [ArgumentError] when no reaction block is provided
+      # @return [void]
+      def react_to(source_value, &block)
+        raise ArgumentError, "react_to requires a block" unless block
+
+        source_descriptor = normalize_source(source_value)
+        reaction = ReactionBuilder.new(
+          mapping_factory: lambda do |target, transform_options|
+            build_mapping(
+              source: source_descriptor,
+              target: target,
+              transform: normalize_transform(**transform_options)
+            )
+          end
+        )
+        @mappings.concat(reaction.evaluate(&block))
+      end
+
       # @return [Hash] source descriptor for overall amplitude
       def amplitude
         source(:amplitude)
@@ -136,6 +160,11 @@ module Vizcore
       # @return [Hash] source descriptor for beat trigger
       def beat?
         source(:beat)
+      end
+
+      # @return [Hash] source descriptor for beat trigger
+      def beat
+        beat?
       end
 
       # @return [Hash] source descriptor for beat pulse decay value

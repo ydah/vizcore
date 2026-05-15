@@ -6,10 +6,11 @@ module Vizcore
   end
 end
 
-require_relative "dsl/layer_builder"
 require_relative "dsl/file_watcher"
 require_relative "dsl/mapping_resolver"
 require_relative "dsl/midi_map_executor"
+require_relative "dsl/reaction_builder"
+require_relative "dsl/layer_builder"
 require_relative "dsl/scene_builder"
 require_relative "dsl/shader_source_resolver"
 require_relative "dsl/transition_controller"

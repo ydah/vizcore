@@ -164,6 +164,11 @@ module Vizcore
           !!@audio[:beat]
         end
 
+        # @return [Boolean]
+        def beat
+          beat?
+        end
+
         # @return [Float]
         def beat_pulse
           @audio[:beat_pulse].to_f
