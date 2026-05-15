@@ -180,7 +180,7 @@ end
 ## CLI
 
 ```bash
-vizcore start SCENE_FILE [--host 127.0.0.1] [--port 4567] [--audio-source mic|file|dummy] [--audio-file PATH] [--audio-device INDEX_OR_NAME] [--noise-gate RMS] [--projector]
+vizcore start SCENE_FILE [--host 127.0.0.1] [--port 4567] [--audio-source mic|file|dummy] [--audio-file PATH] [--audio-device INDEX_OR_NAME] [--noise-gate RMS] [--reload|--no-reload] [--projector]
 vizcore demo [--host 127.0.0.1] [--port 4567] [--projector]
 vizcore doctor
 vizcore validate SCENE_FILE
@@ -222,6 +222,8 @@ When using file source, the HUD exposes **Play Audio** / **Pause Audio** control
 The browser HUD also includes an Audio Inspector with amplitude, sub/low/mid/high meters, FFT preview bars, a performance monitor for FPS/frame/latency/drop/audio/shader/reconnect health, shader compile error overlay, emergency Blackout/Freeze controls, and Visual Gain, Bass Boost, Smoothing, Beat Hold, and Wobble controls for adapting visual response to different tracks and input levels. Use `--projector` or open `/projector` when the browser output should hide operator UI, and open `/control` for a separate operator panel.
 
 `vizcore demo` starts a bundled scene with bundled audio, so it is the quickest way to verify a fresh installation.
+
+`vizcore start scene.rb --reload` watches the scene file and pushes changes to connected browsers without restarting the server. Hot reload is enabled by default; use `--no-reload` when you want a fixed scene for a show.
 
 Use `vizcore snapshot scene.rb --audio-source dummy --out screenshot.png` to create a software-rendered PNG preview for README, social cards, or quick visual checks without starting the browser.
 

@@ -65,14 +65,17 @@ module Vizcore
         broadcaster.start
         register_client_message_handler(broadcaster)
         midi_runtime = start_midi_runtime(definition, broadcaster)
-        watcher = start_scene_watcher(broadcaster) do |updated_definition|
-          midi_runtime = refresh_midi_runtime(midi_runtime, updated_definition, broadcaster)
-        end
+        watcher = if @config.reload?
+                    start_scene_watcher(broadcaster) do |updated_definition|
+                      midi_runtime = refresh_midi_runtime(midi_runtime, updated_definition, broadcaster)
+                    end
+                  end
 
         @output.puts("Vizcore server listening at http://#{@config.host}:#{@config.port}")
         @output.puts("Projector output: http://#{@config.host}:#{@config.port}/projector")
         @output.puts("Control panel: http://#{@config.host}:#{@config.port}/control")
         @output.puts("Scene: #{scene[:name]}")
+        @output.puts("Hot reload: #{@config.reload? ? 'enabled' : 'disabled'}")
         @output.puts("Audio playback: http://#{@config.host}:#{@config.port}/audio-file") if @config.audio_source == :file
         @output.puts("Press Ctrl+C to stop.")
 

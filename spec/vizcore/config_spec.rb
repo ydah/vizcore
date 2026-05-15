@@ -36,6 +36,14 @@ RSpec.describe Vizcore::Config do
     expect(config.projector?).to eq(true)
   end
 
+  it "enables scene hot reload by default and can disable it" do
+    default_config = described_class.new(scene_file: scene_file)
+    disabled_config = described_class.new(scene_file: scene_file, reload: false)
+
+    expect(default_config.reload?).to eq(true)
+    expect(disabled_config.reload?).to eq(false)
+  end
+
   it "raises for unsupported audio source" do
     expect do
       described_class.new(scene_file: scene_file, audio_source: "invalid")

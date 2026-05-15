@@ -13,6 +13,8 @@ module Vizcore
     DEFAULT_AUDIO_SOURCE = :mic
     # Default RMS noise gate for live audio.
     DEFAULT_NOISE_GATE = 0.01
+    # Default scene file hot reload behavior.
+    DEFAULT_RELOAD = true
     # Supported CLI audio source values.
     SUPPORTED_AUDIO_SOURCES = %i[mic file dummy].freeze
 
@@ -25,6 +27,7 @@ module Vizcore
     # @param audio_file [String, Pathname, nil] file path used with `audio_source=:file`
     # @param audio_device [String, Integer, nil] input device index/name used with `audio_source=:mic`
     # @param noise_gate [Numeric] RMS threshold below which live input is treated as silence
+    # @param reload [Boolean] true when scene file changes should be reloaded while running
     # @param projector_mode [Boolean] true when the browser should hide operator UI by default
     def initialize(
       scene_file:,
@@ -34,6 +37,7 @@ module Vizcore
       audio_file: nil,
       audio_device: nil,
       noise_gate: DEFAULT_NOISE_GATE,
+      reload: DEFAULT_RELOAD,
       projector_mode: false
     )
       @scene_file = Pathname.new(scene_file).expand_path if scene_file
@@ -43,6 +47,7 @@ module Vizcore
       @audio_file = audio_file ? Pathname.new(audio_file).expand_path : nil
       @audio_device = normalize_audio_device(audio_device)
       @noise_gate = normalize_noise_gate(noise_gate)
+      @reload = !!reload
       @projector_mode = !!projector_mode
     end
 
@@ -54,6 +59,11 @@ module Vizcore
     # @return [Boolean] true when browser output should start without operator UI.
     def projector?
       projector_mode
+    end
+
+    # @return [Boolean] true when scene hot reload is enabled.
+    def reload?
+      @reload
     end
 
     private

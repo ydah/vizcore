@@ -98,6 +98,7 @@ module Vizcore
     option :audio_file, type: :string, desc: "Path to audio file used when --audio-source file (wav/mp3/flac)"
     option :audio_device, type: :string, desc: "Audio input device index or name used when --audio-source mic"
     option :noise_gate, type: :numeric, default: Config::DEFAULT_NOISE_GATE, desc: "RMS level below which audio is treated as silence"
+    option :reload, type: :boolean, default: Config::DEFAULT_RELOAD, desc: "Reload the scene file when it changes"
     option :projector, type: :boolean, default: false, desc: "Hide browser operator UI for projection output"
     # Start the Vizcore server with the given scene file.
     #
@@ -113,6 +114,7 @@ module Vizcore
         audio_file: options[:audio_file],
         audio_device: options[:audio_device],
         noise_gate: options.fetch(:noise_gate),
+        reload: options.fetch(:reload),
         projector_mode: options.fetch(:projector)
       )
       Server::Runner.new(config).run

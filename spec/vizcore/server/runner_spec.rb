@@ -68,6 +68,23 @@ RSpec.describe Vizcore::Server::Runner do
       expect(broadcaster).to have_received(:stop)
     end
 
+    it "skips scene watcher when hot reload is disabled" do
+      no_reload_config = Vizcore::Config.new(scene_file: scene_file.to_s, host: "127.0.0.1", port: 4567, reload: false)
+      allow(Vizcore::Server::RackApp).to receive(:new).and_return(rack_app)
+      allow(Puma::Server).to receive(:new).and_return(puma_server)
+      allow(Vizcore::Audio::InputManager).to receive(:new).and_return(input_manager)
+      allow(Vizcore::Server::FrameBroadcaster).to receive(:new).and_return(broadcaster)
+      allow(Vizcore::DSL::Engine).to receive(:watch_file).and_return(watcher)
+
+      runner = described_class.new(no_reload_config, output: output)
+      allow(runner).to receive(:wait_for_interrupt)
+
+      runner.run
+
+      expect(Vizcore::DSL::Engine).not_to have_received(:watch_file)
+      expect(output.string).to include("Hot reload: disabled")
+    end
+
     it "passes file source metadata to RackApp when file input is enabled" do
       fixture = Vizcore.root.join("spec", "fixtures", "audio", "pulse16_mono.wav")
       file_config = Vizcore::Config.new(
