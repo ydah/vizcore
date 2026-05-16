@@ -2,6 +2,7 @@
 
 require "puma"
 require_relative "../config"
+require_relative "../control_preset"
 require_relative "../dsl"
 require_relative "../errors"
 require_relative "frame_broadcaster"
@@ -31,8 +32,10 @@ module Vizcore
       def run
         validate_scene_file!
         validate_feature_settings!
+        validate_control_preset_settings!
         validate_audio_settings!
         definition = load_definition!
+        control_preset = load_control_preset
         @tap_tempo_key = tap_tempo_key(definition)
         scene = first_scene(definition) || fallback_scene
 
@@ -44,6 +47,7 @@ module Vizcore
           tap_tempo_key: @tap_tempo_key,
           key_mappings: key_mappings_for(definition),
           globals: globals_for(definition),
+          control_preset: control_preset,
           projector_mode: @config.projector_mode
         )
         server = Puma::Server.new(app, nil, min_threads: 0, max_threads: 4)
@@ -132,6 +136,21 @@ module Vizcore
         return if @config.feature_file.file?
 
         raise Vizcore::ConfigurationError, "Feature file not found: #{@config.feature_file}"
+      end
+
+      def validate_control_preset_settings!
+        return unless @config.control_preset
+        return if @config.control_preset.file?
+
+        raise Vizcore::ConfigurationError, "Control preset file not found: #{@config.control_preset}"
+      end
+
+      def load_control_preset
+        return nil unless @config.control_preset
+
+        Vizcore::ControlPreset.load(@config.control_preset)
+      rescue ArgumentError => e
+        raise Vizcore::ConfigurationError, e.message
       end
 
       def build_input_manager

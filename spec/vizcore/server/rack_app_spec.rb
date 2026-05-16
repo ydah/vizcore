@@ -37,6 +37,7 @@ RSpec.describe Vizcore::Server::RackApp do
     expect(response.body).to include("\"audio_source\":\"unknown\"")
     expect(response.body).to include("\"scene_names\":[]")
     expect(response.body).to include("\"key_mappings\":[]")
+    expect(response.body).to include("\"control_preset\":{}")
     expect(response.body).to include("\"projector_mode\":false")
   end
 
@@ -116,6 +117,22 @@ RSpec.describe Vizcore::Server::RackApp do
     expect(response.body).to include("\"key_mappings\":[{\"key\":\"d\",\"action\":{\"type\":\"switch_scene\",\"scene\":\"drop\"}}")
     expect(response.body).to include("{\"key\":\"space\",\"action\":{\"type\":\"live_control\",\"control\":\"freeze\"}}")
     expect(response.body).to include("\"globals\":{\"global_intensity\":0.75}")
+  end
+
+  it "includes control presets in runtime metadata" do
+    runtime_app = described_class.new(
+      frontend_root: Vizcore.frontend_root,
+      control_preset: {
+        visual_settings: { visualGain: 3.25 },
+        midi_learn_bindings: { "cc:1:7" => { type: "live_control", control: "freeze" } }
+      }
+    )
+
+    response = Rack::MockRequest.new(runtime_app).get("/runtime")
+
+    expect(response.status).to eq(200)
+    expect(response.body).to include("\"visual_settings\":{\"visualGain\":3.25}")
+    expect(response.body).to include("\"midi_learn_bindings\":{\"cc:1:7\":{\"type\":\"live_control\",\"control\":\"freeze\"}}")
   end
 
   it "supports byte range requests for audio file streaming" do

@@ -30,6 +30,13 @@ RSpec.describe Vizcore::Config do
     expect(config.feature_file.to_s).to end_with("features.json")
   end
 
+  it "parses optional control preset file" do
+    config = described_class.new(scene_file: scene_file, control_preset: "controls.json")
+
+    expect(config.control_preset).to be_a(Pathname)
+    expect(config.control_preset.to_s).to end_with("controls.json")
+  end
+
   it "parses optional noise gate" do
     config = described_class.new(scene_file: scene_file, noise_gate: "0.03")
 

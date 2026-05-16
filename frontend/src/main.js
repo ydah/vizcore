@@ -35,6 +35,7 @@ import {
   pruneShaderParamOverrides,
   shaderParamControlEntries
 } from "./shader-param-controls.js";
+import { normalizeRuntimeControlPreset } from "./runtime-control-preset.js";
 import { SHADER_ERROR_EVENT, formatShaderErrorMessage, formatShaderErrorTitle } from "./shader-error-overlay.js";
 import {
   exportVisualSettingsPreset,
@@ -135,6 +136,7 @@ let pendingSceneName = null;
 let pendingSceneRequestedAt = 0;
 let tapTempoKey = null;
 let runtimeGlobalsReceived = false;
+let runtimeControlPresetApplied = false;
 let shaderParamOverrides = {};
 let shaderParamControlsSignature = "";
 let midiAccess = null;
@@ -273,6 +275,7 @@ function applyRuntime(runtime) {
   if (!runtimeGlobalsReceived) {
     applyRuntimeGlobals(runtime?.globals);
   }
+  applyRuntimeControlPreset(runtime?.control_preset);
 
   const fileName = runtime?.audio_file_name;
   const fileUrl = runtime?.audio_file_url;
@@ -290,6 +293,31 @@ function applyRuntime(runtime) {
 
 function applyRuntimeGlobals(globals) {
   engine.setRuntimeGlobals(globals);
+}
+
+function applyRuntimeControlPreset(value) {
+  if (runtimeControlPresetApplied) {
+    return;
+  }
+
+  const preset = normalizeRuntimeControlPreset(value);
+  let applied = false;
+  if (preset.visualSettings) {
+    const imported = importVisualSettingsPreset({ visual_settings: preset.visualSettings }, { fallback: visualSettings });
+    Object.assign(visualSettings, saveVisualSettingsPreset(browserStorage(), imported));
+    syncVisualControls();
+    engine.setVisualSettings(visualSettings);
+    renderReactivityStatus("Project preset");
+    applied = true;
+  }
+
+  if (preset.midiLearnBindings) {
+    midiLearnBindings = saveMidiLearnBindings(browserStorage(), preset.midiLearnBindings);
+    renderMidiLearnStatus();
+    applied = true;
+  }
+
+  runtimeControlPresetApplied = applied;
 }
 
 function updateAvailableScenes(sceneValues) {

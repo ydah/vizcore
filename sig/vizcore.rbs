@@ -44,6 +44,24 @@ module Vizcore::LayerCatalog
   def self.plugin_capabilities: () -> Array[Capability]
 end
 
+module Vizcore
+  class ControlPreset
+    def self.load: (String | Pathname path) -> Hash[String, untyped]
+    def initialize: (String | Pathname path) -> void
+    def load: () -> Hash[String, untyped]
+  end
+
+  class ProjectManifest
+    attr_reader path: Pathname
+    attr_reader root: Pathname
+
+    def self.load: (String | Pathname path) -> ProjectManifest
+    def initialize: (String | Pathname path) -> void
+    def config_defaults: () -> Hash[Symbol, untyped]
+    def plugins: () -> Array[String]
+  end
+end
+
 module Vizcore::CLISupport
   class DslReference
     def lines: () -> Array[String]

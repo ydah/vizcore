@@ -18,7 +18,7 @@ module Vizcore
     # Supported CLI audio source values.
     SUPPORTED_AUDIO_SOURCES = %i[mic file dummy].freeze
 
-    attr_reader :host, :port, :scene_file, :audio_source, :audio_file, :audio_device, :feature_file, :noise_gate, :bpm, :projector_mode
+    attr_reader :host, :port, :scene_file, :audio_source, :audio_file, :audio_device, :feature_file, :control_preset, :noise_gate, :bpm, :projector_mode
 
     # @param scene_file [String, Pathname] scene DSL file path
     # @param host [String] bind host
@@ -27,6 +27,7 @@ module Vizcore
     # @param audio_file [String, Pathname, nil] file path used with `audio_source=:file`
     # @param audio_device [String, Integer, nil] input device index/name used with `audio_source=:mic`
     # @param feature_file [String, Pathname, nil] recorded feature JSON used instead of live analysis
+    # @param control_preset [String, Pathname, nil] browser control preset JSON
     # @param noise_gate [Numeric] RMS threshold below which live input is treated as silence
     # @param bpm [Numeric, nil] fixed BPM value used when BPM lock is enabled
     # @param bpm_lock [Boolean] true when the analysis output BPM should stay fixed
@@ -40,6 +41,7 @@ module Vizcore
       audio_file: nil,
       audio_device: nil,
       feature_file: nil,
+      control_preset: nil,
       noise_gate: DEFAULT_NOISE_GATE,
       bpm: nil,
       bpm_lock: false,
@@ -53,6 +55,7 @@ module Vizcore
       @audio_file = audio_file ? Pathname.new(audio_file).expand_path : nil
       @audio_device = normalize_audio_device(audio_device)
       @feature_file = feature_file ? Pathname.new(feature_file).expand_path : nil
+      @control_preset = control_preset ? Pathname.new(control_preset).expand_path : nil
       @noise_gate = normalize_noise_gate(noise_gate)
       @bpm = normalize_bpm(bpm)
       @bpm_lock = !!bpm_lock

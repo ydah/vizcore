@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "fileutils"
 require "pathname"
 require "tmpdir"
 require "vizcore/cli"
@@ -336,6 +337,8 @@ RSpec.describe Vizcore::CLI do
           "--bpm-lock",
           "--feature-file",
           "features.json",
+          "--control-preset",
+          "controls.json",
           "--no-reload",
           "--projector"
         ]
@@ -349,10 +352,39 @@ RSpec.describe Vizcore::CLI do
         expect(config.bpm).to eq(128.0)
         expect(config.bpm_lock?).to eq(true)
         expect(config.feature_file.to_s).to end_with("features.json")
+        expect(config.control_preset.to_s).to end_with("controls.json")
         expect(config.reload?).to eq(false)
         expect(config.projector_mode).to eq(true)
       end
       expect(runner).to have_received(:run)
+    end
+
+    it "starts from a project manifest" do
+      Dir.mktmpdir("vizcore-cli-manifest") do |dir|
+        scene_path = File.join(dir, "scenes", "show.rb")
+        control_path = File.join(dir, "controls", "live.json")
+        FileUtils.mkdir_p(File.dirname(scene_path))
+        FileUtils.mkdir_p(File.dirname(control_path))
+        File.write(
+          File.join(dir, "vizcore.yml"),
+          <<~YAML
+            scene: scenes/show.rb
+            audio:
+              source: file
+              file: audio/show.wav
+            control_preset: controls/live.json
+          YAML
+        )
+
+        described_class.start(["start", "--manifest", File.join(dir, "vizcore.yml")])
+
+        expect(Vizcore::Server::Runner).to have_received(:new) do |config|
+          expect(config.scene_file.to_s).to eq(Pathname.new(scene_path).expand_path.to_s)
+          expect(config.audio_source).to eq(:file)
+          expect(config.audio_file.to_s).to eq(Pathname.new(dir).join("audio/show.wav").expand_path.to_s)
+          expect(config.control_preset.to_s).to eq(Pathname.new(control_path).expand_path.to_s)
+        end
+      end
     end
 
     it "starts the bundled demo with bundled audio" do

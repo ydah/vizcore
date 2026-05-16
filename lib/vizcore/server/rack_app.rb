@@ -22,6 +22,7 @@ module Vizcore
       # @param tap_tempo_key [String, Symbol, nil]
       # @param key_mappings [Array<Hash>, nil]
       # @param globals [Hash, nil]
+      # @param control_preset [Hash, nil]
       # @param projector_mode [Boolean]
       def initialize(
         frontend_root:,
@@ -32,6 +33,7 @@ module Vizcore
         tap_tempo_key: nil,
         key_mappings: nil,
         globals: nil,
+        control_preset: nil,
         projector_mode: false
       )
         @frontend_root = frontend_root.expand_path
@@ -42,6 +44,7 @@ module Vizcore
         @tap_tempo_key = normalize_tap_tempo_key(tap_tempo_key)
         @key_mappings = normalize_key_mappings(key_mappings)
         @globals = normalize_globals(globals)
+        @control_preset = normalize_control_preset(control_preset)
         @projector_mode = !!projector_mode
       end
 
@@ -78,6 +81,7 @@ module Vizcore
           tap_tempo_key: @tap_tempo_key,
           key_mappings: @key_mappings,
           globals: @globals,
+          control_preset: @control_preset,
           projector_mode: @projector_mode
         }
 
@@ -242,6 +246,19 @@ module Vizcore
           next if name.empty?
 
           output[name] = value
+        end
+      rescue StandardError
+        {}
+      end
+
+      def normalize_control_preset(values)
+        preset = values.is_a?(Hash) ? values : {}
+        visual_settings = preset[:visual_settings] || preset["visual_settings"] || preset[:visualSettings] || preset["visualSettings"]
+        midi_learn_bindings = preset[:midi_learn_bindings] || preset["midi_learn_bindings"] || preset[:midiLearnBindings] || preset["midiLearnBindings"]
+
+        {}.tap do |payload|
+          payload["visual_settings"] = visual_settings if visual_settings.is_a?(Hash)
+          payload["midi_learn_bindings"] = midi_learn_bindings if midi_learn_bindings.is_a?(Hash)
         end
       rescue StandardError
         {}

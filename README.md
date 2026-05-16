@@ -528,8 +528,8 @@ end
 ## CLI
 
 ```bash
-vizcore start SCENE_FILE [--host 127.0.0.1] [--port 4567] [--audio-source mic|file|dummy] [--audio-file PATH] [--audio-device INDEX_OR_NAME] [--feature-file features.json] [--noise-gate RMS] [--bpm BPM --bpm-lock] [--reload|--no-reload] [--projector]
-vizcore demo [--host 127.0.0.1] [--port 4567] [--projector]
+vizcore start [SCENE_FILE] [--manifest vizcore.yml] [--host 127.0.0.1] [--port 4567] [--audio-source mic|file|dummy] [--audio-file PATH] [--audio-device INDEX_OR_NAME] [--feature-file features.json] [--control-preset controls.json] [--noise-gate RMS] [--bpm BPM --bpm-lock] [--reload|--no-reload] [--projector]
+vizcore demo [--host 127.0.0.1] [--port 4567] [--control-preset controls.json] [--projector]
 vizcore doctor
 vizcore validate SCENE_FILE
 vizcore inspect SCENE_FILE
@@ -541,6 +541,7 @@ vizcore layers
 vizcore dsl-docs
 vizcore shader new NAME [--out shaders/name.frag]
 vizcore shader-docs
+vizcore plugin new NAME [--out plugins/name]
 vizcore new PROJECT_NAME [--template standard|minimal|shader|midi|live-set|rubykaigi]
 vizcore devices [audio|midi]
 ```
@@ -578,6 +579,23 @@ vizcore start scene.rb --feature-file features.json
 When using file source, the HUD exposes **Play Audio** / **Pause Audio** controls and shows BPM, Beat, and Beat Count.
 
 The browser HUD also includes an Audio Inspector with amplitude, sub/low/mid/high meters, FFT preview bars, a performance monitor for FPS/frame/latency/drop/audio/shader/reconnect health, shader compile error overlay, emergency Blackout/Freeze controls, and Visual Gain, Bass Boost, Smoothing, Beat Hold, and Wobble controls for adapting visual response to different tracks and input levels. Reactivity controls can be saved, loaded, imported, and exported for repeatable HUD presets. MIDI Learn can bind Web MIDI note/CC/program messages to the current scene, Blackout/Freeze, or reactivity controls. Scene launcher entries can be selected with `1`-`9`, and scene-defined `key` mappings can switch scenes or toggle live controls. Use `--projector` or open `/projector` when the browser output should hide operator UI, and open `/control` for a separate operator panel.
+
+Project manifests keep show startup repeatable:
+
+```yaml
+# vizcore.yml
+scene: scenes/show.rb
+audio:
+  source: file
+  file: audio/set.wav
+control_preset: controls/live.json
+plugins:
+  - vizcore-laser-grid
+```
+
+Start it with `vizcore start --manifest vizcore.yml`. A control preset JSON can
+include `visual_settings` and `midi_learn_bindings`; Vizcore sends it through
+`/runtime` and the browser applies it to HUD reactivity and MIDI Learn state.
 
 `vizcore demo` starts a bundled scene with bundled audio, so it is the quickest way to verify a fresh installation.
 

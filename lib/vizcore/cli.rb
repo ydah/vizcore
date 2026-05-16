@@ -13,6 +13,7 @@ require_relative "cli/scene_diagnostics"
 require_relative "cli/shader_template"
 require_relative "cli/shader_uniform_docs"
 require_relative "config"
+require_relative "project_manifest"
 require_relative "server"
 
 module Vizcore
@@ -103,13 +104,15 @@ module Vizcore
       ["plugin_scene.rb", "examples/{{plugin_name}}_scene.rb"]
     ].freeze
 
-    desc "start SCENE_FILE", "Start vizcore HTTP/WebSocket server"
+    desc "start [SCENE_FILE]", "Start vizcore HTTP/WebSocket server"
+    option :manifest, type: :string, desc: "Project manifest YAML path"
     option :host, type: :string, default: Config::DEFAULT_HOST, desc: "Bind host"
     option :port, type: :numeric, default: Config::DEFAULT_PORT, desc: "Bind port"
-    option :audio_source, type: :string, default: Config::DEFAULT_AUDIO_SOURCE.to_s, desc: "Audio source: mic, file, dummy"
+    option :audio_source, type: :string, desc: "Audio source: mic, file, dummy"
     option :audio_file, type: :string, desc: "Path to audio file used when --audio-source file (wav/mp3/flac)"
     option :audio_device, type: :string, desc: "Audio input device index or name used when --audio-source mic"
     option :feature_file, type: :string, desc: "Replay recorded feature JSON instead of live audio analysis"
+    option :control_preset, type: :string, desc: "Control preset JSON for browser HUD and MIDI learn"
     option :noise_gate, type: :numeric, default: Config::DEFAULT_NOISE_GATE, desc: "RMS level below which audio is treated as silence"
     option :bpm, type: :numeric, desc: "Fixed BPM value used with --bpm-lock"
     option :bpm_lock, type: :boolean, default: false, desc: "Lock analysis BPM output to --bpm"
@@ -120,15 +123,19 @@ module Vizcore
     # @param scene_file [String] path to a Ruby scene DSL file
     # @raise [Thor::Error] when CLI arguments are invalid
     # @return [void]
-    def start(scene_file)
+    def start(scene_file = nil)
+      manifest = load_project_manifest(options[:manifest])
+      load_manifest_plugins(manifest)
+      defaults = manifest&.config_defaults || {}
       config = Config.new(
-        scene_file: scene_file,
+        scene_file: scene_file || defaults[:scene_file],
         host: options.fetch(:host),
         port: options.fetch(:port),
-        audio_source: options.fetch(:audio_source),
-        audio_file: options[:audio_file],
-        audio_device: options[:audio_device],
-        feature_file: options[:feature_file],
+        audio_source: options[:audio_source] || defaults[:audio_source] || Config::DEFAULT_AUDIO_SOURCE,
+        audio_file: options[:audio_file] || defaults[:audio_file],
+        audio_device: options[:audio_device] || defaults[:audio_device],
+        feature_file: options[:feature_file] || defaults[:feature_file],
+        control_preset: options[:control_preset] || defaults[:control_preset],
         noise_gate: options.fetch(:noise_gate),
         bpm: options[:bpm],
         bpm_lock: options.fetch(:bpm_lock),
@@ -146,6 +153,7 @@ module Vizcore
     option :noise_gate, type: :numeric, default: Config::DEFAULT_NOISE_GATE, desc: "RMS level below which audio is treated as silence"
     option :bpm, type: :numeric, desc: "Fixed BPM value used with --bpm-lock"
     option :bpm_lock, type: :boolean, default: false, desc: "Lock analysis BPM output to --bpm"
+    option :control_preset, type: :string, desc: "Control preset JSON for browser HUD and MIDI learn"
     option :projector, type: :boolean, default: false, desc: "Hide browser operator UI for projection output"
     # Start a bundled scene with bundled audio for first-run verification.
     #
@@ -160,6 +168,7 @@ module Vizcore
         noise_gate: options.fetch(:noise_gate),
         bpm: options[:bpm],
         bpm_lock: options.fetch(:bpm_lock),
+        control_preset: options[:control_preset],
         projector_mode: options.fetch(:projector)
       )
       Server::Runner.new(config).run
@@ -582,6 +591,22 @@ module Vizcore
     def plugin_module_name(plugin_name)
       module_name = plugin_name.split("_").map(&:capitalize).join
       module_name.match?(/\A[A-Z]/) ? module_name : "Plugin#{module_name}"
+    end
+
+    def load_project_manifest(path)
+      return nil if path.to_s.strip.empty?
+
+      Vizcore::ProjectManifest.load(path)
+    end
+
+    def load_manifest_plugins(manifest)
+      return unless manifest
+
+      manifest.plugins.each do |plugin|
+        Vizcore.plugin(plugin)
+      rescue LoadError => e
+        raise Thor::Error, "Failed to load manifest plugin #{plugin}: #{e.message}"
+      end
     end
 
     def feature_audio_normalize_setting
