@@ -34,6 +34,7 @@ module Vizcore
         validate_scene_file!
         validate_feature_settings!
         validate_control_preset_settings!
+        validate_plugin_asset_settings!
         validate_audio_settings!
         definition = load_definition!
         control_preset = load_control_preset
@@ -49,6 +50,7 @@ module Vizcore
           key_mappings: key_mappings_for(definition),
           globals: globals_for(definition),
           control_preset: control_preset,
+          plugin_assets: @config.plugin_assets,
           projector_mode: @config.projector_mode
         )
         server = Puma::Server.new(app, nil, min_threads: 0, max_threads: 4)
@@ -147,6 +149,13 @@ module Vizcore
         return if @config.control_preset.file?
 
         raise Vizcore::ConfigurationError, "Control preset file not found: #{@config.control_preset}"
+      end
+
+      def validate_plugin_asset_settings!
+        missing = @config.plugin_assets.find { |path| !path.file? }
+        return unless missing
+
+        raise Vizcore::ConfigurationError, "Plugin asset file not found: #{missing}"
       end
 
       def load_control_preset

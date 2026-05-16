@@ -57,8 +57,10 @@ module Vizcore
 
     def self.load: (String | Pathname path) -> ProjectManifest
     def initialize: (String | Pathname path) -> void
-    def config_defaults: () -> Hash[Symbol, untyped]
-    def plugins: () -> Array[String]
+    def config_defaults: (?profile: String? profile) -> Hash[Symbol, untyped]
+    def plugins: (?profile: String? profile) -> Array[String]
+    def plugin_assets: (?profile: String? profile) -> Array[Pathname]
+    def profile_names: () -> Array[String]
   end
 end
 

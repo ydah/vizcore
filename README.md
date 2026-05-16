@@ -594,12 +594,23 @@ sync:
   osc:
     port: 9000
 plugins:
-  - vizcore-laser-grid
+  - require: vizcore-laser-grid
+    frontend: frontend/laser-grid-renderer.js
+plugin_assets:
+  - frontend/local-overlay.js
+profiles:
+  rehearsal:
+    audio:
+      source: dummy
+    control_preset: controls/rehearsal.json
 ```
 
-Start it with `vizcore start --manifest vizcore.yml`. A control preset JSON can
-include `visual_settings` and `midi_learn_bindings`; Vizcore sends it through
-`/runtime` and the browser applies it to HUD reactivity and MIDI Learn state.
+Start it with `vizcore start --manifest vizcore.yml`, or
+`vizcore start --manifest vizcore.yml --profile rehearsal` for profile-specific
+overrides. Manifest plugin `frontend` entries and `plugin_assets` are served by
+RackApp and loaded before `/src/main.js`. A control preset JSON can include
+`visual_settings` and `midi_learn_bindings`; Vizcore sends it through `/runtime`
+and the browser applies it to HUD reactivity and MIDI Learn state.
 Set `--osc-port` or `sync.osc.port` to receive OSC controls:
 `/vizcore/scene` with a string scene name and `/vizcore/tap` for tap tempo.
 

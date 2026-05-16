@@ -37,6 +37,12 @@ RSpec.describe Vizcore::Config do
     expect(config.control_preset.to_s).to end_with("controls.json")
   end
 
+  it "parses optional plugin asset files" do
+    config = described_class.new(scene_file: scene_file, plugin_assets: ["frontend/plugin.js"])
+
+    expect(config.plugin_assets.map(&:to_s).first).to end_with("frontend/plugin.js")
+  end
+
   it "parses optional noise gate" do
     config = described_class.new(scene_file: scene_file, noise_gate: "0.03")
 

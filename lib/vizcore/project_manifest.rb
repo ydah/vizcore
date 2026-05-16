@@ -26,35 +26,103 @@ module Vizcore
     end
 
     # @return [Hash] config defaults accepted by Vizcore::Config
-    def config_defaults
+    def config_defaults(profile: nil)
+      data = data_for(profile)
       {
-        scene_file: expand_path(value_at("scene") || value_at("scene_file")),
-        audio_source: value_at("audio_source") || value_at("audio", "source"),
-        audio_file: expand_path(value_at("audio_file") || value_at("audio", "file")),
-        audio_device: value_at("audio_device") || value_at("audio", "device"),
-        feature_file: expand_path(value_at("feature_file") || value_at("features")),
-        control_preset: expand_path(value_at("control_preset") || value_at("controlPreset")),
-        osc_port: value_at("osc_port") || value_at("sync", "osc_port") || value_at("sync", "osc", "port")
+        scene_file: expand_path(value_at(data, "scene") || value_at(data, "scene_file")),
+        audio_source: value_at(data, "audio_source") || value_at(data, "audio", "source"),
+        audio_file: expand_path(value_at(data, "audio_file") || value_at(data, "audio", "file")),
+        audio_device: value_at(data, "audio_device") || value_at(data, "audio", "device"),
+        feature_file: expand_path(value_at(data, "feature_file") || value_at(data, "features")),
+        control_preset: expand_path(value_at(data, "control_preset") || value_at(data, "controlPreset")),
+        osc_port: value_at(data, "osc_port") || value_at(data, "sync", "osc_port") || value_at(data, "sync", "osc", "port"),
+        plugin_assets: plugin_assets(profile: profile)
       }.compact
     end
 
     # @return [Array<String>] require paths loaded before scene evaluation
-    def plugins
-      values = value_at("plugins") || value_at("package", "plugins")
-      Array(values).filter_map do |value|
-        plugin = value.to_s.strip
-        plugin unless plugin.empty?
-      end
+    def plugins(profile: nil)
+      plugin_entries(profile: profile).filter_map { |entry| plugin_require_path(entry) }.uniq
+    end
+
+    # @return [Array<Pathname>] frontend plugin assets served and loaded by RackApp
+    def plugin_assets(profile: nil)
+      entries = plugin_entries(profile: profile)
+      assets = base_values("plugin_assets", "frontend_plugins") + profile_values(profile, "plugin_assets", "frontend_plugins")
+      (entries.filter_map { |entry| plugin_asset_path(entry) } + assets.filter_map { |entry| expand_path(entry) }).uniq
+    end
+
+    # @return [Array<String>] configured profile names
+    def profile_names
+      Hash(@data["profiles"] || {}).keys
     end
 
     private
 
-    def value_at(*keys)
-      keys.reduce(@data) do |current, key|
+    def value_at(data, *keys)
+      keys.reduce(data) do |current, key|
         break nil unless current.is_a?(Hash)
 
         current[key.to_s]
       end
+    end
+
+    def data_for(profile)
+      profile_name = profile.to_s.strip
+      return @data if profile_name.empty?
+
+      deep_merge(@data.reject { |key, _value| key == "profiles" }, profile_overlay(profile_name))
+    end
+
+    def plugin_entries(profile:)
+      base_entries = base_values("plugins", ["package", "plugins"])
+      profile_entries = profile_values(profile, "plugins", ["package", "plugins"])
+      base_entries + profile_entries
+    end
+
+    def base_values(*paths)
+      paths.each do |path|
+        value = path.is_a?(Array) ? value_at(@data, *path) : value_at(@data, path)
+        return Array(value) if value
+      end
+      []
+    end
+
+    def profile_values(profile, *paths)
+      overlay = profile_overlay(profile)
+      return [] if overlay.empty?
+
+      paths.each do |path|
+        value = path.is_a?(Array) ? value_at(overlay, *path) : value_at(overlay, path)
+        return Array(value) if value
+      end
+      []
+    end
+
+    def profile_overlay(profile)
+      profile_name = profile.to_s.strip
+      return {} if profile_name.empty?
+
+      profiles = Hash(@data["profiles"] || {})
+      normalize_hash(profiles.fetch(profile_name) do
+        raise ArgumentError, "Unknown project profile: #{profile_name}. Use one of: #{profile_names.join(', ')}"
+      end)
+    end
+
+    def plugin_require_path(entry)
+      value = if entry.is_a?(Hash)
+                entry["require"] || entry[:require] || entry["name"] || entry[:name]
+              else
+                entry
+              end
+      plugin = value.to_s.strip
+      plugin unless plugin.empty?
+    end
+
+    def plugin_asset_path(entry)
+      return nil unless entry.is_a?(Hash)
+
+      expand_path(entry["asset"] || entry[:asset] || entry["frontend"] || entry[:frontend])
     end
 
     def expand_path(value)
@@ -63,6 +131,12 @@ module Vizcore
 
       path_value = Pathname.new(raw_value)
       path_value.absolute? ? path_value : @root.join(path_value).expand_path
+    end
+
+    def deep_merge(base, overlay)
+      base.merge(overlay) do |_key, left, right|
+        left.is_a?(Hash) && right.is_a?(Hash) ? deep_merge(left, right) : right
+      end
     end
 
     def normalize_hash(value)

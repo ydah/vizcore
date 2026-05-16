@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rack/mock"
+require "tmpdir"
 require "vizcore/server/rack_app"
 
 RSpec.describe Vizcore::Server::RackApp do
@@ -133,6 +134,26 @@ RSpec.describe Vizcore::Server::RackApp do
     expect(response.status).to eq(200)
     expect(response.body).to include("\"visual_settings\":{\"visualGain\":3.25}")
     expect(response.body).to include("\"midi_learn_bindings\":{\"cc:1:7\":{\"type\":\"live_control\",\"control\":\"freeze\"}}")
+  end
+
+  it "injects and serves configured plugin assets" do
+    Dir.mktmpdir("vizcore-plugin-assets") do |dir|
+      asset_path = Pathname.new(dir).join("laser-renderer.js")
+      asset_path.write("globalThis.__laserPluginLoaded = true;")
+      runtime_app = described_class.new(
+        frontend_root: Vizcore.frontend_root,
+        plugin_assets: [asset_path]
+      )
+
+      root = Rack::MockRequest.new(runtime_app).get("/")
+      runtime = Rack::MockRequest.new(runtime_app).get("/runtime")
+      asset = Rack::MockRequest.new(runtime_app).get("/plugins/0/laser-renderer.js")
+
+      expect(root.body).to include('<script type="module" src="/plugins/0/laser-renderer.js"></script>')
+      expect(runtime.body).to include("\"plugin_assets\":[\"/plugins/0/laser-renderer.js\"]")
+      expect(asset.status).to eq(200)
+      expect(asset.body).to include("__laserPluginLoaded")
+    end
   end
 
   it "supports byte range requests for audio file streaming" do

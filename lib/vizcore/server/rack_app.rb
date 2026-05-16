@@ -11,6 +11,7 @@ module Vizcore
     class RackApp
       AUDIO_FILE_PATH = "/audio-file"
       CONTROL_PATH = "/control"
+      PLUGIN_ASSET_PREFIX = "/plugins/"
       PROJECTOR_PATH = "/projector"
       RUNTIME_PATH = "/runtime"
 
@@ -23,6 +24,7 @@ module Vizcore
       # @param key_mappings [Array<Hash>, nil]
       # @param globals [Hash, nil]
       # @param control_preset [Hash, nil]
+      # @param plugin_assets [Array<String, Pathname>, nil]
       # @param projector_mode [Boolean]
       def initialize(
         frontend_root:,
@@ -34,6 +36,7 @@ module Vizcore
         key_mappings: nil,
         globals: nil,
         control_preset: nil,
+        plugin_assets: nil,
         projector_mode: false
       )
         @frontend_root = frontend_root.expand_path
@@ -45,6 +48,7 @@ module Vizcore
         @key_mappings = normalize_key_mappings(key_mappings)
         @globals = normalize_globals(globals)
         @control_preset = normalize_control_preset(control_preset)
+        @plugin_assets = normalize_plugin_assets(plugin_assets)
         @projector_mode = !!projector_mode
       end
 
@@ -57,6 +61,7 @@ module Vizcore
         return health_response if request.path_info == "/health"
         return runtime_response if request.path_info == RUNTIME_PATH
         return audio_file_response(request) if request.path_info == AUDIO_FILE_PATH
+        return plugin_asset_response(request.path_info) if request.path_info.start_with?(PLUGIN_ASSET_PREFIX)
         return serve_index(display_mode: root_display_mode) if request.path_info == "/"
         return serve_index(display_mode: "control") if request.path_info == CONTROL_PATH
         return serve_index(display_mode: "projector") if request.path_info == PROJECTOR_PATH
@@ -82,6 +87,7 @@ module Vizcore
           key_mappings: @key_mappings,
           globals: @globals,
           control_preset: @control_preset,
+          plugin_assets: @plugin_assets.map { |asset| asset.fetch(:url) },
           projector_mode: @projector_mode
         }
 
@@ -140,7 +146,17 @@ module Vizcore
           'data-display-mode="auto"',
           "data-display-mode=\"#{display_mode}\""
         )
+        body = inject_plugin_asset_scripts(body)
         static_response(body, content_type: "text/html")
+      end
+
+      def plugin_asset_response(path_info)
+        asset = @plugin_assets.find { |entry| entry.fetch(:url) == path_info }
+        return not_found_response unless asset
+        return not_found_response unless asset.fetch(:path).file?
+
+        body = File.binread(asset.fetch(:path))
+        static_response(body, content_type: Rack::Mime.mime_type(asset.fetch(:path).extname, "text/javascript"))
       end
 
       def root_display_mode
@@ -262,6 +278,34 @@ module Vizcore
         end
       rescue StandardError
         {}
+      end
+
+      def normalize_plugin_assets(values)
+        Array(values).each_with_index.filter_map do |value, index|
+          raw_value = value.to_s.strip
+          next if raw_value.empty?
+
+          path = value.is_a?(Pathname) ? value.expand_path : Pathname.new(raw_value).expand_path
+          {
+            path: path,
+            url: "#{PLUGIN_ASSET_PREFIX}#{index}/#{rack_escape_path(path.basename.to_s)}"
+          }
+        end
+      rescue StandardError
+        []
+      end
+
+      def inject_plugin_asset_scripts(body)
+        return body if @plugin_assets.empty?
+
+        scripts = @plugin_assets.map do |asset|
+          %(<script type="module" src="#{asset.fetch(:url)}"></script>)
+        end.join("\n  ")
+        body.sub(%(<script type="module" src="/src/main.js"></script>), "#{scripts}\n  \\0")
+      end
+
+      def rack_escape_path(value)
+        Rack::Utils.escape_path(value)
       end
 
       def parse_byte_range(raw_range, file_size)

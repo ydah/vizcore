@@ -18,7 +18,7 @@ module Vizcore
     # Supported CLI audio source values.
     SUPPORTED_AUDIO_SOURCES = %i[mic file dummy].freeze
 
-    attr_reader :host, :port, :scene_file, :audio_source, :audio_file, :audio_device, :feature_file, :control_preset, :noise_gate, :bpm, :osc_port, :projector_mode
+    attr_reader :host, :port, :scene_file, :audio_source, :audio_file, :audio_device, :feature_file, :control_preset, :plugin_assets, :noise_gate, :bpm, :osc_port, :projector_mode
 
     # @param scene_file [String, Pathname] scene DSL file path
     # @param host [String] bind host
@@ -28,6 +28,7 @@ module Vizcore
     # @param audio_device [String, Integer, nil] input device index/name used with `audio_source=:mic`
     # @param feature_file [String, Pathname, nil] recorded feature JSON used instead of live analysis
     # @param control_preset [String, Pathname, nil] browser control preset JSON
+    # @param plugin_assets [Array<String, Pathname>] browser plugin renderer files to serve
     # @param noise_gate [Numeric] RMS threshold below which live input is treated as silence
     # @param bpm [Numeric, nil] fixed BPM value used when BPM lock is enabled
     # @param bpm_lock [Boolean] true when the analysis output BPM should stay fixed
@@ -43,6 +44,7 @@ module Vizcore
       audio_device: nil,
       feature_file: nil,
       control_preset: nil,
+      plugin_assets: [],
       noise_gate: DEFAULT_NOISE_GATE,
       bpm: nil,
       bpm_lock: false,
@@ -58,6 +60,7 @@ module Vizcore
       @audio_device = normalize_audio_device(audio_device)
       @feature_file = feature_file ? Pathname.new(feature_file).expand_path : nil
       @control_preset = control_preset ? Pathname.new(control_preset).expand_path : nil
+      @plugin_assets = normalize_plugin_assets(plugin_assets)
       @noise_gate = normalize_noise_gate(noise_gate)
       @bpm = normalize_bpm(bpm)
       @bpm_lock = !!bpm_lock
@@ -130,6 +133,15 @@ module Vizcore
       port_value
     rescue ArgumentError, TypeError
       raise ArgumentError, "OSC port must be between 1 and 65535"
+    end
+
+    def normalize_plugin_assets(values)
+      Array(values).filter_map do |value|
+        raw_value = value.to_s.strip
+        next if raw_value.empty?
+
+        value.is_a?(Pathname) ? value.expand_path : Pathname.new(raw_value).expand_path
+      end
     end
   end
 end

@@ -51,6 +51,7 @@ RSpec.describe Vizcore::Server::Runner do
         key_mappings: [],
         globals: {},
         control_preset: nil,
+        plugin_assets: [],
         projector_mode: false
       )
       expect(Puma::Server).to have_received(:new).with(rack_app, nil, min_threads: 0, max_threads: 4)
@@ -123,6 +124,7 @@ RSpec.describe Vizcore::Server::Runner do
         key_mappings: [],
         globals: {},
         control_preset: nil,
+        plugin_assets: [],
         projector_mode: false
       )
       expect(broadcaster).to have_received(:sync_transport).with(playing: false, position_seconds: 0.0)
@@ -184,6 +186,32 @@ RSpec.describe Vizcore::Server::Runner do
       expect(Vizcore::Server::RackApp).to have_received(:new).with(
         hash_including(projector_mode: true)
       )
+    end
+
+    it "passes plugin assets to RackApp" do
+      Dir.mktmpdir("vizcore-runner-plugin-assets") do |dir|
+        asset_path = File.join(dir, "plugin.js")
+        File.write(asset_path, "export {};")
+        plugin_config = Vizcore::Config.new(
+          scene_file: scene_file.to_s,
+          host: "127.0.0.1",
+          port: 4567,
+          plugin_assets: [asset_path]
+        )
+        allow(Vizcore::Server::RackApp).to receive(:new).and_return(rack_app)
+        allow(Puma::Server).to receive(:new).and_return(puma_server)
+        allow(Vizcore::Audio::InputManager).to receive(:new).and_return(input_manager)
+        allow(Vizcore::Server::FrameBroadcaster).to receive(:new).and_return(broadcaster)
+
+        runner = described_class.new(plugin_config, output: output)
+        allow(runner).to receive(:wait_for_interrupt)
+
+        runner.run
+
+        expect(Vizcore::Server::RackApp).to have_received(:new).with(
+          hash_including(plugin_assets: [Pathname.new(asset_path).expand_path])
+        )
+      end
     end
 
     it "hot-reloads scene changes and broadcasts config updates" do

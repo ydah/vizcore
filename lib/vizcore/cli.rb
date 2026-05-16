@@ -106,6 +106,7 @@ module Vizcore
 
     desc "start [SCENE_FILE]", "Start vizcore HTTP/WebSocket server"
     option :manifest, type: :string, desc: "Project manifest YAML path"
+    option :profile, type: :string, desc: "Project manifest profile name"
     option :host, type: :string, default: Config::DEFAULT_HOST, desc: "Bind host"
     option :port, type: :numeric, default: Config::DEFAULT_PORT, desc: "Bind port"
     option :audio_source, type: :string, desc: "Audio source: mic, file, dummy"
@@ -126,8 +127,9 @@ module Vizcore
     # @return [void]
     def start(scene_file = nil)
       manifest = load_project_manifest(options[:manifest])
-      load_manifest_plugins(manifest)
-      defaults = manifest&.config_defaults || {}
+      profile = options[:profile]
+      load_manifest_plugins(manifest, profile: profile)
+      defaults = manifest&.config_defaults(profile: profile) || {}
       config = Config.new(
         scene_file: scene_file || defaults[:scene_file],
         host: options.fetch(:host),
@@ -137,6 +139,7 @@ module Vizcore
         audio_device: options[:audio_device] || defaults[:audio_device],
         feature_file: options[:feature_file] || defaults[:feature_file],
         control_preset: options[:control_preset] || defaults[:control_preset],
+        plugin_assets: defaults[:plugin_assets],
         noise_gate: options.fetch(:noise_gate),
         bpm: options[:bpm],
         bpm_lock: options.fetch(:bpm_lock),
@@ -636,10 +639,10 @@ module Vizcore
       Vizcore::ProjectManifest.load(path)
     end
 
-    def load_manifest_plugins(manifest)
+    def load_manifest_plugins(manifest, profile: nil)
       return unless manifest
 
-      manifest.plugins.each do |plugin|
+      manifest.plugins(profile: profile).each do |plugin|
         Vizcore.plugin(plugin)
       rescue LoadError => e
         raise Thor::Error, "Failed to load manifest plugin #{plugin}: #{e.message}"

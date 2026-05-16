@@ -409,17 +409,31 @@ RSpec.describe Vizcore::CLI do
               source: file
               file: audio/show.wav
             control_preset: controls/live.json
+            plugin_assets:
+              - frontend/laser.js
             osc_port: 9001
+            profiles:
+              rehearsal:
+                audio:
+                  source: dummy
+                plugin_assets:
+                  - frontend/rehearsal.js
           YAML
         )
 
-        described_class.start(["start", "--manifest", File.join(dir, "vizcore.yml")])
+        described_class.start(["start", "--manifest", File.join(dir, "vizcore.yml"), "--profile", "rehearsal"])
 
         expect(Vizcore::Server::Runner).to have_received(:new) do |config|
           expect(config.scene_file.to_s).to eq(Pathname.new(scene_path).expand_path.to_s)
-          expect(config.audio_source).to eq(:file)
+          expect(config.audio_source).to eq(:dummy)
           expect(config.audio_file.to_s).to eq(Pathname.new(dir).join("audio/show.wav").expand_path.to_s)
           expect(config.control_preset.to_s).to eq(Pathname.new(control_path).expand_path.to_s)
+          expect(config.plugin_assets.map(&:to_s)).to eq(
+            [
+              Pathname.new(dir).join("frontend/laser.js").expand_path.to_s,
+              Pathname.new(dir).join("frontend/rehearsal.js").expand_path.to_s
+            ]
+          )
           expect(config.osc_port).to eq(9001)
         end
       end
