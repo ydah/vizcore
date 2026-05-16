@@ -11,7 +11,12 @@ import {
 } from "../visuals/geometry.js";
 import { ImageRenderer } from "../visuals/image-renderer.js";
 import { ParticleSystem } from "../visuals/particle-system.js";
-import { normalizePluginLineOutput, resolveLayerRenderer } from "../plugin-runtime.js";
+import {
+  normalizePluginLineOutput,
+  normalizePluginShaderOutput,
+  resolveLayerRenderer,
+  resolveShaderRenderer
+} from "../plugin-runtime.js";
 import { SpectrogramRenderer } from "../visuals/spectrogram-renderer.js";
 import { TextRenderer } from "../visuals/text-renderer.js";
 import { getVJEffectShader } from "../visuals/vj-effects.js";
@@ -283,12 +288,7 @@ export class LayerManager {
   }
 
   renderPluginLayer(layer, audio, time, rotation, resolution, globals, visualSettings, paletteIndex = 0) {
-    const renderer = resolveLayerRenderer(layer?.type);
-    if (!renderer) {
-      return false;
-    }
-
-    const output = renderer({
+    const context = {
       layer,
       audio,
       time,
@@ -297,14 +297,40 @@ export class LayerManager {
       globals,
       visualSettings,
       paletteIndex
-    });
+    };
+
+    const renderer = resolveLayerRenderer(layer?.type);
+    if (renderer && this.renderPluginOutput(layer, renderer(context), audio, time, resolution, globals, visualSettings, paletteIndex)) {
+      return true;
+    }
+
+    const shaderRenderer = resolveShaderRenderer(layer?.type);
+    if (shaderRenderer && this.renderPluginOutput(layer, shaderRenderer(context), audio, time, resolution, globals, visualSettings, paletteIndex)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  renderPluginOutput(layer, output, audio, time, resolution, globals, visualSettings, paletteIndex = 0) {
     const lines = normalizePluginLineOutput(output);
-    if (!lines) {
+    if (lines) {
+      const fallbackColor = resolveLayerRgbColor(layer?.params || {}, [0.82, 0.92, 1.0], paletteIndex);
+      this.renderLinePoints(lines.points, lines.color || fallbackColor);
+      return true;
+    }
+
+    const shader = normalizePluginShaderOutput(output);
+    if (!shader) {
       return false;
     }
 
-    const fallbackColor = resolveLayerRgbColor(layer?.params || {}, [0.82, 0.92, 1.0], paletteIndex);
-    this.renderLinePoints(lines.points, lines.color || fallbackColor);
+    this.renderShaderLayer({
+      ...layer,
+      shader: layer?.shader || "default",
+      glsl: `plugin:${String(layer?.type || "layer")}:${shader.cacheKey}`,
+      glsl_source: shader.fragmentShader
+    }, audio, time, resolution, globals, visualSettings);
     return true;
   }
 

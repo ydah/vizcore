@@ -496,9 +496,14 @@ aware of the extension.
 
 `vizcore plugin new laser-grid` creates a small plugin scaffold with a Ruby
 capability file, a browser renderer that registers with
-`globalThis.VizcorePlugins`, and an example scene. Browser plugin renderers can
-return `{ kind: "lines", points: [...], color: [r, g, b] }`; Vizcore composites
-the result using the layer's normal `opacity`, `blend`, and palette behavior.
+`globalThis.VizcorePlugins`, and an example scene. The browser plugin API exposes
+`apiVersion` and version 1 supports `registerLayerRenderer(type, renderer)` for
+line renderers and `registerShaderRenderer(type, renderer)` for shader
+renderers. Browser plugin renderers can return
+`{ kind: "lines", points: [...], color: [r, g, b] }`; shader renderers can return
+a GLSL fragment shader string or `{ kind: "shader", fragmentShader }`. Vizcore
+composites the result using the layer's normal `opacity`, `blend`, and palette
+behavior.
 
 ### MIDI Scene Switching
 
