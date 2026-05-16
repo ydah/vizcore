@@ -6,55 +6,19 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
-- Add `on_beat` and `on_bar` transition DSL helpers.
-- Add `section` DSL for bar-counted scene sequencing.
-- Add reusable layer `style` / `use_style` DSL.
-- Add scene-wide `theme` / `use_theme` DSL.
-- Add `scene ... extends:` for sharing base scene layers.
-- Add opt-in adaptive `audio_normalize` DSL for repeatable audio feature levels.
-- Add `onset` and band onset analysis sources for mappings, transitions, and shaders.
-- Add simple `kick`, `snare`, and `hihat` percussive confidence sources.
-- Add BPM lock settings via Ruby DSL and CLI options.
-- Add opt-in browser tap tempo for locking BPM during live control.
-- Add `beat_confidence` analysis output and DSL mapping source.
-- Add `motion_blur` and `crt` browser post effects for layers.
-- Add `ruby_crystal`, `starfield`, and `waveform_ribbon` built-in shader presets.
-- Add browser HUD sliders for declared shader parameter schemas.
-- Add a parser-themed bundled visualizer example.
-- Validate unsupported layer `effect` and `vj_effect` names in `vizcore validate`.
-- Add text layer `font`, `align`, `fill`, `stroke`, and `shadow` styling.
-- Add browser HUD save/load for visual reactivity controls.
-- Add `1`-`9` keyboard shortcuts for browser scene switching.
-- Add block-style `map` transform DSL with `deadzone` and `ease_out` curve support.
-- Add gemspec coverage for packaged examples, browser assets, docs, and RBS files.
-- Add deterministic `Vizcore::Audio::FixtureInput` for repeatable audio tests.
-- Add ruby crystal, live-coding, club intro/drop, shader playground, and audio inspector examples.
-- Add concept, architecture, DSL guide, cookbook, one-line walkthrough, and troubleshooting docs.
-- Add initial RBS signatures for the public Ruby DSL.
-- Add shader parameter schema metadata through the Ruby `param` layer DSL.
-- Add `vizcore shader new NAME` for generating custom GLSL starter shaders.
-- Add `vizcore shader-docs` for generated custom GLSL uniform reference output.
-- Add browser latency probes for RTT and Ruby/browser clock-offset measurement.
-- Drop stale realtime `audio_frame` sends when a browser WebSocket connection is backpressured.
-- Add `vizcore.frame.v1` protocol version to WebSocket message envelopes.
-- Document the Ruby-to-browser WebSocket frame protocol.
-- Add `vizcore gallery` for browsing bundled examples in a local browser view.
-- Add hot reload for referenced custom GLSL shader files.
-- Add explicit `vizcore start --reload` / `--no-reload` control for scene hot reload.
-- Add `vizcore render` for writing a software-rendered PNG image sequence.
-- Add `vizcore snapshot` for writing a software-rendered PNG preview of a scene.
-- Add `vizcore new --template` scaffold variants for minimal, shader, MIDI, live-set, and rubykaigi starters.
-- Add `/control` for a separate HUD/operator panel alongside projector output.
-- Add projector output mode via `vizcore start --projector`, `vizcore demo --projector`, and `/projector`.
-- Add a browser HUD performance monitor for FPS, frame time, WebSocket latency, dropped-frame estimates, audio processing time, shader compile time, and reconnect count.
-- Add browser HUD Blackout/Freeze emergency controls for live output.
-- Add explicit layer `blend` DSL support and frontend compositing for alpha/add/multiply/screen/difference modes.
-- Add `react_to` layer DSL for grouping source-driven `change` and `trigger` mappings.
-- Add `vizcore demo` for launching a bundled scene with bundled audio.
-- Show GLSL compile/link failures in a browser shader error overlay while keeping fallback rendering.
-- Add `vizcore doctor`, `vizcore validate`, and `vizcore inspect` CLI commands for setup and scene diagnostics.
-- Add musical frequency band aliases (`bass`, `mid`, `treble`, `sub`, `low`, `high`) to layer mappings and transition triggers.
-- Add a browser HUD Audio Inspector with amplitude, band meters, FFT preview bars, and peak frequency display.
+### Added
+
+- Expanded the Ruby DSL for musical timing, scene sequencing, reusable styles/themes, scene inheritance, layer styling, blending, and source-driven reactivity.
+- Added richer audio-reactive sources, including onset, percussive confidence, beat confidence, BPM locking, tap tempo, audio normalization, and musical frequency band aliases.
+- Added shader and visual effect workflows with new built-in presets, shader parameter schemas, custom shader scaffolding, generated shader docs, hot reload, and browser shader error reporting.
+- Added browser control surfaces for live operation, including the HUD controls, Audio Inspector, performance monitor, operator panel, projector mode, scene shortcuts, and emergency Blackout/Freeze controls.
+- Added CLI workflows for demos, project templates, galleries, diagnostics, validation, inspection, snapshots, and software-rendered image sequences.
+- Expanded bundled examples, documentation, packaged assets, and public Ruby DSL type signatures.
+
+### Improved
+
+- Improved live reliability and diagnostics with WebSocket protocol versioning, latency probes, dropped-frame visibility, stale audio-frame backpressure handling, and repeatable audio fixtures.
+- Improved scene validation and packaging coverage for examples, browser assets, docs, and RBS files.
 
 ## 0.1.0 (2026-02-23)
 
