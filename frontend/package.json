@@ -4,6 +4,10 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "test:browser": "node --test test/browser-smoke.test.mjs"
+    "test:browser": "node --test test/browser-smoke.test.mjs test/browser-regression.test.mjs",
+    "test:browser:required": "VIZCORE_BROWSER_TEST_REQUIRED=1 node --test test/browser-smoke.test.mjs test/browser-regression.test.mjs"
+  },
+  "devDependencies": {
+    "playwright": ">=1.40 <2"
   }
 }

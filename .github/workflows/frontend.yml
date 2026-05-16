@@ -24,5 +24,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
       - name: Run frontend tests
-        run: npm --prefix frontend test
+        working-directory: frontend
+        run: npm test
+      - name: Install Playwright browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Run browser regression tests
+        working-directory: frontend
+        run: npm run test:browser:required

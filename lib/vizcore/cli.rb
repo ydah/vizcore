@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "net/http"
 require "pathname"
 require "thor"
 require_relative "../vizcore"
@@ -103,6 +104,7 @@ module Vizcore
       ["plugin_renderer.js", "frontend/{{plugin_name}}-renderer.js"],
       ["plugin_scene.rb", "examples/{{plugin_name}}_scene.rb"]
     ].freeze
+    DEFAULT_CAPTURE_PORT = 4579
 
     desc "start [SCENE_FILE]", "Start vizcore HTTP/WebSocket server"
     option :manifest, type: :string, desc: "Project manifest YAML path"
@@ -361,24 +363,64 @@ module Vizcore
     # @raise [Thor::Error] when Playwright capture fails
     # @return [void]
     def browser_capture(url)
-      script = Vizcore.root.join("scripts", "browser_capture.mjs")
-      command = [
-        "node",
-        script.to_s,
-        url.to_s,
-        "--out",
-        options.fetch(:out).to_s,
-        "--selector",
-        options.fetch(:selector).to_s,
-        "--wait",
-        options.fetch(:wait).to_s,
-        "--width",
-        options.fetch(:width).to_s,
-        "--height",
-        options.fetch(:height).to_s
-      ]
-      success = Kernel.system(*command)
-      raise Thor::Error, "browser capture failed" unless success
+      run_browser_capture(
+        url,
+        out: options.fetch(:out),
+        selector: options.fetch(:selector),
+        wait: options.fetch(:wait),
+        width: options.fetch(:width),
+        height: options.fetch(:height)
+      )
+    end
+
+    desc "capture SCENE_FILE", "Start a temporary server and capture the browser-rendered canvas"
+    option :host, type: :string, default: Config::DEFAULT_HOST, desc: "Temporary server host"
+    option :port, type: :numeric, default: DEFAULT_CAPTURE_PORT, desc: "Temporary server port"
+    option :audio_source, type: :string, default: "dummy", desc: "Audio source: dummy, file, mic"
+    option :audio_file, type: :string, desc: "Path to audio file used when --audio-source file"
+    option :feature_file, type: :string, desc: "Replay recorded feature JSON instead of live audio analysis"
+    option :control_preset, type: :string, desc: "Control preset JSON for browser HUD and MIDI learn"
+    option :out, type: :string, default: "browser-capture.png", desc: "Output PNG path"
+    option :selector, type: :string, default: "#vizcore-canvas", desc: "Element selector to capture"
+    option :wait, type: :numeric, default: 1000, desc: "Milliseconds to wait after page load"
+    option :timeout, type: :numeric, default: 10, desc: "Seconds to wait for the temporary server"
+    option :width, type: :numeric, default: 1280, desc: "Browser viewport width"
+    option :height, type: :numeric, default: 720, desc: "Browser viewport height"
+    # Start Vizcore and capture a browser-rendered canvas from the projector route.
+    #
+    # @param scene_file [String]
+    # @raise [Thor::Error] when server startup or capture fails
+    # @return [void]
+    def capture(scene_file)
+      config = Config.new(
+        scene_file: scene_file,
+        host: options.fetch(:host),
+        port: options.fetch(:port),
+        audio_source: options.fetch(:audio_source),
+        audio_file: options[:audio_file],
+        feature_file: options[:feature_file],
+        control_preset: options[:control_preset],
+        reload: false,
+        projector_mode: true
+      )
+      validate_snapshot_config!(config)
+
+      pid = Kernel.spawn(*temporary_server_command(config), out: File::NULL, err: File::NULL)
+      begin
+        wait_for_http("http://#{config.host}:#{config.port}/health", timeout: options.fetch(:timeout))
+        run_browser_capture(
+          "http://#{config.host}:#{config.port}/projector",
+          out: options.fetch(:out),
+          selector: options.fetch(:selector),
+          wait: options.fetch(:wait),
+          width: options.fetch(:width),
+          height: options.fetch(:height)
+        )
+      ensure
+        stop_temporary_server(pid)
+      end
+    rescue StandardError => e
+      raise Thor::Error, e.message
     end
 
     desc "snapshot SCENE_FILE", "Render one scene frame to a PNG snapshot"
@@ -581,6 +623,74 @@ module Vizcore
     def render_video_message(result)
       "Video written: #{result[:path]} " \
         "(scene=#{result[:scene]}, frames=#{result[:frames]}, fps=#{result[:fps]}, #{result[:width]}x#{result[:height]})"
+    end
+
+    def run_browser_capture(url, out:, selector:, wait:, width:, height:)
+      script = Vizcore.root.join("scripts", "browser_capture.mjs")
+      command = [
+        "node",
+        script.to_s,
+        url.to_s,
+        "--out",
+        out.to_s,
+        "--selector",
+        selector.to_s,
+        "--wait",
+        wait.to_s,
+        "--width",
+        width.to_s,
+        "--height",
+        height.to_s
+      ]
+      success = Kernel.system(*command)
+      raise Thor::Error, "browser capture failed" unless success
+    end
+
+    def temporary_server_command(config)
+      command = [
+        Gem.ruby,
+        "-I#{Vizcore.root.join('lib')}",
+        Vizcore.root.join("exe", "vizcore").to_s,
+        "start",
+        config.scene_file.to_s,
+        "--host",
+        config.host,
+        "--port",
+        config.port.to_s,
+        "--audio-source",
+        config.audio_source.to_s,
+        "--no-reload",
+        "--projector"
+      ]
+      command.concat(["--audio-file", config.audio_file.to_s]) if config.audio_file
+      command.concat(["--feature-file", config.feature_file.to_s]) if config.feature_file
+      command.concat(["--control-preset", config.control_preset.to_s]) if config.control_preset
+      command
+    end
+
+    def wait_for_http(url, timeout:)
+      return true if Float(timeout) <= 0
+
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + Float(timeout)
+      uri = URI(url)
+      loop do
+        response = Net::HTTP.get_response(uri)
+        return true if response.is_a?(Net::HTTPSuccess)
+        raise "Timed out waiting for #{url}" if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+
+        sleep(0.1)
+      rescue StandardError
+        raise "Timed out waiting for #{url}" if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+
+        sleep(0.1)
+      end
+    end
+
+    def stop_temporary_server(pid)
+      Process.kill("TERM", pid)
+      Process.wait(pid)
+    rescue Errno::ECHILD, Errno::ESRCH
+      nil
     end
 
     def create_plugin_scaffold(name)

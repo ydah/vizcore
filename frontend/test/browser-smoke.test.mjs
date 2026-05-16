@@ -1,19 +1,16 @@
 import assert from "node:assert/strict";
-import fs from "node:fs/promises";
-import http from "node:http";
-import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import {
+  loadChromiumOrSkip,
+  startStaticServer,
+  stopServer,
+} from "./support/static-vizcore-server.mjs";
 
-let chromium = null;
-try {
-  ({ chromium } = await import("playwright"));
-} catch {
-  test("browser smoke renders the frontend canvas", { skip: "Install Playwright to run browser smoke tests." }, () => {});
-}
+const testName = "browser smoke renders the frontend canvas";
+const chromium = await loadChromiumOrSkip(test, testName);
 
 if (chromium) {
-  test("browser smoke renders the frontend canvas", async (t) => {
+  test(testName, async (t) => {
     const server = await startStaticServer();
     const browser = await chromium.launch({ headless: true });
     t.after(async () => {
@@ -51,67 +48,3 @@ if (chromium) {
     assert.deepEqual(pageErrors, []);
   });
 }
-
-const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-
-const startStaticServer = async () => {
-  const instance = http.createServer(async (request, response) => {
-    const url = new URL(request.url || "/", "http://127.0.0.1");
-    if (url.pathname === "/runtime") {
-      const body = JSON.stringify({
-        status: "ok",
-        audio_source: "dummy",
-        scene_names: ["basic"],
-        key_mappings: [],
-        control_preset: {},
-        projector_mode: false,
-      });
-      response.writeHead(200, {
-        "content-type": "application/json; charset=utf-8",
-        "content-length": Buffer.byteLength(body),
-      });
-      response.end(body);
-      return;
-    }
-
-    const filePath = resolveStaticPath(url.pathname);
-    if (!filePath) {
-      response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
-      response.end("Not Found");
-      return;
-    }
-
-    try {
-      const body = await fs.readFile(filePath);
-      response.writeHead(200, { "content-type": contentType(filePath) });
-      response.end(body);
-    } catch {
-      response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
-      response.end("Not Found");
-    }
-  });
-
-  await new Promise((resolve) => instance.listen(0, "127.0.0.1", resolve));
-  const address = instance.address();
-  return {
-    instance,
-    url: `http://127.0.0.1:${address.port}/`,
-  };
-};
-
-const stopServer = (server) => new Promise((resolve, reject) => {
-  server.close((error) => (error ? reject(error) : resolve()));
-});
-
-const resolveStaticPath = (pathname) => {
-  const relativePath = pathname === "/" ? "index.html" : pathname.slice(1);
-  const filePath = path.resolve(frontendRoot, relativePath);
-  return filePath.startsWith(frontendRoot) ? filePath : null;
-};
-
-const contentType = (filePath) => {
-  if (filePath.endsWith(".html")) return "text/html; charset=utf-8";
-  if (filePath.endsWith(".js")) return "text/javascript; charset=utf-8";
-  if (filePath.endsWith(".css")) return "text/css; charset=utf-8";
-  return "application/octet-stream";
-};

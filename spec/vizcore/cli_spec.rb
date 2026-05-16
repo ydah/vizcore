@@ -228,6 +228,60 @@ RSpec.describe Vizcore::CLI do
       )
     end
 
+    it "starts a temporary server for scene browser capture" do
+      expect(Kernel).to receive(:spawn).with(
+        Gem.ruby,
+        "-I#{Vizcore.root.join('lib')}",
+        Vizcore.root.join("exe", "vizcore").to_s,
+        "start",
+        Pathname.new("examples/basic.rb").expand_path.to_s,
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "4579",
+        "--audio-source",
+        "dummy",
+        "--no-reload",
+        "--projector",
+        out: File::NULL,
+        err: File::NULL
+      ).and_return(12_345)
+      expect(Kernel).to receive(:system).with(
+        "node",
+        Vizcore.root.join("scripts", "browser_capture.mjs").to_s,
+        "http://127.0.0.1:4579/projector",
+        "--out",
+        "scene-browser.png",
+        "--selector",
+        "#vizcore-canvas",
+        "--wait",
+        "0",
+        "--width",
+        "320",
+        "--height",
+        "180"
+      ).and_return(true)
+      expect(Process).to receive(:kill).with("TERM", 12_345)
+      expect(Process).to receive(:wait).with(12_345)
+
+      described_class.start(
+        [
+          "capture",
+          "examples/basic.rb",
+          "--out",
+          "scene-browser.png",
+          "--wait",
+          "0",
+          "--timeout",
+          "0",
+          "--width",
+          "320",
+          "--height",
+          "180"
+        ]
+      )
+    end
+
     it "writes a PNG scene snapshot" do
       Dir.mktmpdir("vizcore-cli-snapshot") do |dir|
         out = File.join(dir, "snapshot.png")
