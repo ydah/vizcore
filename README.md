@@ -39,11 +39,11 @@ vizcore start examples/basic.rb
 Then open `http://127.0.0.1:4567`.
 
 <p align="center">
-  <img src="docs/assets/vizcore-demo.gif" width="640" alt="Animated Vizcore demo with audio-reactive particles, waveforms, spectrum bars, and wireframe geometry" />
+  <img src="docs/assets/vizcore-demo.gif" width="640" alt="Animated Vizcore demo with an audio-reactive waveform and wireframe cube" />
 </p>
 
-This short preview is generated from `examples/complex_audio_showcase.rb` with
-the bundled demo audio.
+This short preview is generated from `examples/intro_drop.rb` with the bundled
+demo audio.
 
 
 ## Scene DSL
