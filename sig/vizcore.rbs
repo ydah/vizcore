@@ -5,6 +5,14 @@ module Vizcore
   def self.frontend_root: () -> Pathname
   def self.templates_root: () -> Pathname
   def self.define: () { () -> void } -> Hash[Symbol, untyped]
+  def self.plugin: (String | Symbol name) -> bool
+  def self.register_layer_capability: (
+    type: Symbol | String,
+    ?aliases: Array[Symbol | String] aliases,
+    ?params: Hash[Symbol | String, String] params,
+    ?mappable_params: Array[Symbol | String] mappable_params,
+    ?description: String? description
+  ) -> Vizcore::LayerCatalog::Capability
 end
 
 module Vizcore::LayerCatalog
@@ -25,6 +33,15 @@ module Vizcore::LayerCatalog
   def self.supported_types: () -> Array[Symbol]
   def self.params_for: (untyped type) -> Hash[Symbol, String]
   def self.mappable_params_for: (untyped type) -> Array[Symbol]
+  def self.register_layer_capability: (
+    type: Symbol | String,
+    ?aliases: Array[Symbol | String] aliases,
+    ?params: Hash[Symbol | String, String] params,
+    ?mappable_params: Array[Symbol | String] mappable_params,
+    ?description: String? description
+  ) -> Capability
+  def self.reset_plugin_capabilities!: () -> Array[Capability]
+  def self.plugin_capabilities: () -> Array[Capability]
 end
 
 module Vizcore::CLISupport
@@ -179,6 +196,15 @@ module Vizcore::DSL
     def evaluate: () ?{ () -> void } -> LayerGroupBuilder
     def layer: (Symbol | String name) ?{ () -> void } -> void
     def blend: (Symbol | String value) -> Symbol
+    def opacity: (Numeric value) -> Float
+    def effect: (Symbol | String value) -> Symbol
+    def effect_intensity: (Numeric value) -> Float
+    def vj_effect: (Symbol | String value) -> Symbol
+    def geometry: (Symbol | String value) -> Symbol
+    def material: (Symbol | String value) -> Symbol
+    def scale: (Numeric value) -> Float
+    def deform: (Numeric value) -> Float
+    def color_shift: (Numeric value) -> Float
     def palette: (*untyped colors) -> Array[String]
     def use_style: (Symbol | String name) -> Hash[Symbol, untyped]
     def to_a: () -> Array[layer]
@@ -216,6 +242,15 @@ module Vizcore::DSL
     def stroke: (?untyped value, ?width: Numeric? width, ?color: String? color) -> Hash[Symbol, untyped]
     def shadow: (?color: String? color, ?blur: Numeric? blur) -> Hash[Symbol, untyped]
     def blend: (Symbol | String value) -> Symbol
+    def opacity: (Numeric value) -> Float
+    def effect: (Symbol | String value) -> Symbol
+    def effect_intensity: (Numeric value) -> Float
+    def vj_effect: (Symbol | String value) -> Symbol
+    def geometry: (Symbol | String value) -> Symbol
+    def material: (Symbol | String value) -> Symbol
+    def scale: (Numeric value) -> Float
+    def deform: (Numeric value) -> Float
+    def color_shift: (Numeric value) -> Float
     def palette: (*untyped colors) -> Array[String]
     def use_style: (Symbol | String name) -> Hash[Symbol, untyped]
     def param: (

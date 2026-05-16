@@ -9,8 +9,6 @@ module Vizcore
   module CLISupport
     # Validates scene DSL files without starting the realtime server.
     class SceneValidator
-      SUPPORTED_LAYER_TYPES = Vizcore::LayerCatalog.supported_types
-
       BUILTIN_SHADERS = Vizcore::LayerCatalog::BUILTIN_SHADERS
 
       MAPPING_SOURCE_KINDS = %i[
@@ -102,7 +100,7 @@ module Vizcore
       def validate_layer(layer, scene_name, issues)
         layer_name = layer[:name] || "(unnamed)"
         type = layer[:type]&.to_sym || :geometry
-        unless SUPPORTED_LAYER_TYPES.include?(type)
+        unless supported_layer_types.include?(type)
           issues << error("scene #{scene_name} layer #{layer_name} has unsupported type: #{type}")
         end
 
@@ -130,6 +128,10 @@ module Vizcore
         params = layer[:params] || {}
         validate_effect_name(params[:effect], SUPPORTED_POST_EFFECTS, "effect", scene_name, layer_name, issues)
         validate_effect_name(params[:vj_effect], SUPPORTED_VJ_EFFECTS, "vj_effect", scene_name, layer_name, issues)
+      end
+
+      def supported_layer_types
+        Vizcore::LayerCatalog.supported_types
       end
 
       def validate_effect_name(value, supported, field, scene_name, layer_name, issues)

@@ -35,4 +35,30 @@ module Vizcore
   def self.define(&block)
     DSL::Engine.define(&block)
   end
+
+  # Load a Vizcore plugin by Ruby require path.
+  #
+  # @param name [String, Symbol] require path for the plugin
+  # @return [true]
+  def self.plugin(name)
+    require name.to_s
+  end
+
+  # Register a plugin-provided layer capability for validation and docs.
+  #
+  # @param type [Symbol, String] primary layer type
+  # @param aliases [Array<Symbol, String>] supported aliases
+  # @param params [Hash] layer parameter metadata
+  # @param mappable_params [Array<Symbol, String>] params that can be mapped
+  # @param description [String, nil] human-readable docs text
+  # @return [Vizcore::LayerCatalog::Capability]
+  def self.register_layer_capability(type:, aliases: [], params: {}, mappable_params: [], description: nil)
+    LayerCatalog.register_layer_capability(
+      type: type,
+      aliases: aliases,
+      params: params,
+      mappable_params: mappable_params,
+      description: description
+    )
+  end
 end

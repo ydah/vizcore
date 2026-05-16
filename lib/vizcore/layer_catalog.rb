@@ -192,7 +192,7 @@ module Vizcore
     module_function
 
     def capabilities
-      CAPABILITIES
+      (CAPABILITIES + plugin_capabilities).freeze
     end
 
     def capability_for(type)
@@ -213,6 +213,61 @@ module Vizcore
 
     def mappable_params_for(type)
       capability_for(type)&.mappable_params || []
+    end
+
+    def register_layer_capability(type:, aliases: [], params: {}, mappable_params: [], description: nil)
+      capability = Capability.new(
+        type: normalize_type!(type),
+        aliases: normalize_symbols(aliases),
+        params: COMMON_PARAMS.merge(normalize_param_types(params)),
+        mappable_params: normalize_symbols(mappable_params),
+        description: normalize_description(description)
+      )
+      validate_plugin_capability!(capability)
+      plugin_capabilities.reject! { |entry| entry.type == capability.type }
+      plugin_capabilities << capability
+      capability
+    end
+
+    def reset_plugin_capabilities!
+      plugin_capabilities.clear
+    end
+
+    def plugin_capabilities
+      @plugin_capabilities ||= []
+    end
+
+    def normalize_type!(type)
+      value = type.to_s.strip
+      raise ArgumentError, "layer capability type must not be empty" if value.empty?
+
+      value.to_sym
+    end
+
+    def normalize_symbols(values)
+      Array(values).filter_map do |value|
+        symbol = value.to_s.strip
+        symbol.empty? ? nil : symbol.to_sym
+      end.uniq
+    end
+
+    def normalize_param_types(params)
+      Hash(params).to_h do |name, type|
+        [normalize_type!(name), type.to_s]
+      end
+    end
+
+    def normalize_description(description)
+      value = description.to_s.strip
+      value.empty? ? "Plugin layer capability." : value
+    end
+
+    def validate_plugin_capability!(capability)
+      reserved_types = CAPABILITIES.flat_map(&:types)
+      conflicts = capability.types & reserved_types
+      return if conflicts.empty?
+
+      raise ArgumentError, "layer capability conflicts with built-in type: #{conflicts.first}"
     end
   end
 end

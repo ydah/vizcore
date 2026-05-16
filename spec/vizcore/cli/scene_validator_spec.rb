@@ -5,6 +5,12 @@ require "vizcore/cli/scene_inspector"
 require "vizcore/cli/scene_validator"
 
 RSpec.describe Vizcore::CLISupport::SceneValidator do
+  around do |example|
+    Vizcore::LayerCatalog.reset_plugin_capabilities!
+    example.run
+    Vizcore::LayerCatalog.reset_plugin_capabilities!
+  end
+
   it "validates a loadable scene with known layers, mappings, and transitions" do
     with_scene_file(<<~RUBY) do |scene_path|
       Vizcore.define do
@@ -171,6 +177,28 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
           layer(:waterfall) { type :spectrogram_layer }
           layer(:rings) { type :shape_layer }
           layer(:mesh) { type :mesh_layer }
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+
+      expect(result).to be_valid
+    end
+  end
+
+  it "accepts plugin layer capabilities registered after validator load" do
+    Vizcore.register_layer_capability(
+      type: :laser_grid,
+      aliases: %i[laser_layer],
+      params: { intensity: "Float" },
+      mappable_params: %i[intensity],
+      description: "Plugin laser layer."
+    )
+
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :plugin do
+          layer(:laser) { type :laser_layer }
         end
       end
     RUBY

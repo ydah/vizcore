@@ -473,6 +473,27 @@ params that can be surfaced by tooling.
 The browser HUD turns this metadata into per-layer shader parameter sliders, so
 declared params can be adjusted during a live run without editing the scene file.
 
+### Plugin Layer Capabilities
+
+Plugins can register layer capability metadata for validation, docs, and HUD
+tooling without patching Vizcore itself:
+
+```ruby
+# in a plugin file loaded by Ruby
+Vizcore.register_layer_capability(
+  type: :laser_grid,
+  aliases: %i[laser_layer],
+  params: { beam_count: "Integer", intensity: "Float" },
+  mappable_params: %i[intensity opacity],
+  description: "Plugin laser renderer."
+)
+```
+
+Load a plugin with `Vizcore.plugin "vizcore-laser-grid"` before defining
+scenes. A plugin-provided browser renderer or shader still needs to handle the
+custom layer type at runtime; the capability API keeps Ruby validation and docs
+aware of the extension.
+
 ### MIDI Scene Switching
 
 ```ruby
