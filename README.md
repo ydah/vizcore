@@ -678,6 +678,22 @@ Run `vizcore gallery` to open a browser gallery of bundled examples with scene c
 | `examples/custom_shader.rb` | Custom GLSL shader with audio mapping |
 | `examples/unyo_liquid.rb` | Organic liquid wobble scene with FFT blob and particles |
 
+### VJ Set Examples
+
+Ready-to-run scenes grouped by genre / mood. Each accepts live mic input or any
+audio file, including the bundled `examples/assets/complex_demo_loop.wav`.
+
+| File | Genre / Mood | BPM | Scenes | Notes |
+|------|--------------|-----|--------|-------|
+| `examples/vj_techno_warehouse.rb` | Techno / Warehouse | 128-140 | 4 | wireframe + particles |
+| `examples/vj_dnb_jungle.rb` | Drum & Bass / Jungle | 170-180 | 3 | kick/snare/hihat split |
+| `examples/vj_ambient_chill_room.rb` | Ambient / Chill | 60-90 | 2 | beatless, drone-friendly |
+| `examples/vj_hiphop_cipher.rb` | HipHop / Cipher | 85-100 | 3 | text-forward |
+| `examples/vj_jpop_idol_live.rb` | J-POP / Idol | 130-180 | 4 | color fields + tap tempo |
+| `examples/vj_synthwave_retro.rb` | Synthwave / Retro | 100-120 | 3 | circle and line primitives |
+| `examples/vj_glitch_industrial.rb` | Glitch / Industrial | n/a | 3 | feedback + difference blend |
+| `examples/vj_festival_mainstage.rb` | EDM / Mainstage | 124-132 | 5 | uses `extends:` and `group` |
+
 ## Development
 
 ```bash

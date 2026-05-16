@@ -40,7 +40,15 @@ RSpec.describe "example scenes" do
     "examples/midi_controller_show.rb" => { expected_scene: "midi_warmup" },
     "examples/kansai_rubykaigi_visual.rb" => { expected_scene: "kansai_rubykaigi" },
     "examples/custom_shader.rb" => { expected_scene: "shader_art", expect_glsl_source: true },
-    "examples/unyo_liquid.rb" => { expected_scene: "unyo" }
+    "examples/unyo_liquid.rb" => { expected_scene: "unyo" },
+    "examples/vj_techno_warehouse.rb" => { expected_scene: "loop" },
+    "examples/vj_dnb_jungle.rb" => { expected_scene: "rollers" },
+    "examples/vj_ambient_chill_room.rb" => { expected_scene: "bloom" },
+    "examples/vj_hiphop_cipher.rb" => { expected_scene: "intro" },
+    "examples/vj_jpop_idol_live.rb" => { expected_scene: "verse" },
+    "examples/vj_synthwave_retro.rb" => { expected_scene: "sunset" },
+    "examples/vj_glitch_industrial.rb" => { expected_scene: "scan" },
+    "examples/vj_festival_mainstage.rb" => { expected_scene: "opener" }
   }.each do |path, expectation|
     it "loads and serializes #{path}" do
       definition = Vizcore::DSL::Engine.load_file(path)
