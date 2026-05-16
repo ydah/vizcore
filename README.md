@@ -494,6 +494,12 @@ scenes. A plugin-provided browser renderer or shader still needs to handle the
 custom layer type at runtime; the capability API keeps Ruby validation and docs
 aware of the extension.
 
+`vizcore plugin new laser-grid` creates a small plugin scaffold with a Ruby
+capability file, a browser renderer that registers with
+`globalThis.VizcorePlugins`, and an example scene. Browser plugin renderers can
+return `{ kind: "lines", points: [...], color: [r, g, b] }`; Vizcore composites
+the result using the layer's normal `opacity`, `blend`, and palette behavior.
+
 ### MIDI Scene Switching
 
 ```ruby

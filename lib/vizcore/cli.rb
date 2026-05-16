@@ -96,6 +96,13 @@ module Vizcore
       }
     }.freeze
 
+    PLUGIN_SCAFFOLD_FILES = [
+      ["plugin_readme.md", "README.md"],
+      ["plugin_layer.rb", "lib/{{plugin_name}}.rb"],
+      ["plugin_renderer.js", "frontend/{{plugin_name}}-renderer.js"],
+      ["plugin_scene.rb", "examples/{{plugin_name}}_scene.rb"]
+    ].freeze
+
     desc "start SCENE_FILE", "Start vizcore HTTP/WebSocket server"
     option :host, type: :string, default: Config::DEFAULT_HOST, desc: "Bind host"
     option :port, type: :numeric, default: Config::DEFAULT_PORT, desc: "Bind port"
@@ -306,6 +313,25 @@ module Vizcore
       raise Thor::Error, e.message
     end
 
+    desc "plugin COMMAND [NAME]", "Manage Vizcore plugin helpers"
+    option :out, type: :string, desc: "Output directory for `plugin new`"
+    # Run plugin helper commands.
+    #
+    # @param command [String, nil]
+    # @param name [String, nil]
+    # @raise [Thor::Error] when the subcommand or arguments are invalid
+    # @return [void]
+    def plugin(command = nil, name = nil)
+      case command.to_s
+      when "new"
+        create_plugin_scaffold(name)
+      else
+        raise Thor::Error, "Unknown plugin command: #{command || '(nil)'}. Use `vizcore plugin new NAME`."
+      end
+    rescue ArgumentError => e
+      raise Thor::Error, e.message
+    end
+
     desc "snapshot SCENE_FILE", "Render one scene frame to a PNG snapshot"
     option :audio_source, type: :string, default: "dummy", desc: "Audio source: dummy, file, mic"
     option :audio_file, type: :string, desc: "Path to audio file used when --audio-source file"
@@ -457,9 +483,14 @@ module Vizcore
       say("Shader template written: #{path}")
     end
 
-    def write_template(template_name, destination, project_name:)
+    def write_template(template_name, destination, project_name: nil, replacements: {})
       template_path = Vizcore.templates_root.join(template_name)
-      body = template_path.read.gsub("{{project_name}}", project_name)
+      values = replacements.transform_keys(&:to_s)
+      values["{{project_name}}"] = project_name if project_name
+      body = template_path.read
+      values.each do |placeholder, value|
+        body = body.gsub(placeholder, value.to_s)
+      end
       FileUtils.mkdir_p(destination.dirname)
       destination.write(body)
     end
@@ -501,6 +532,56 @@ module Vizcore
     def render_video_message(result)
       "Video written: #{result[:path]} " \
         "(scene=#{result[:scene]}, frames=#{result[:frames]}, fps=#{result[:fps]}, #{result[:width]}x#{result[:height]})"
+    end
+
+    def create_plugin_scaffold(name)
+      metadata = plugin_scaffold_metadata(name)
+      root = Pathname.new(options[:out] || metadata.fetch(:plugin_name)).expand_path
+      replacements = metadata.transform_keys { |key| "{{#{key}}}" }
+
+      FileUtils.mkdir_p(root)
+      PLUGIN_SCAFFOLD_FILES.each do |template_name, destination|
+        rendered_destination = destination.dup
+        replacements.each do |placeholder, value|
+          rendered_destination = rendered_destination.gsub(placeholder, value.to_s)
+        end
+        write_template(template_name, root.join(rendered_destination), replacements: replacements)
+      end
+
+      say("Created plugin scaffold: #{root}")
+      say("Next: require_relative \"#{root.basename}/lib/#{metadata.fetch(:plugin_name)}\" in your scene")
+    end
+
+    def plugin_scaffold_metadata(name)
+      raw_name = name.to_s.strip
+      raise ArgumentError, "plugin name is required" if raw_name.empty?
+
+      plugin_name = normalize_plugin_name(raw_name)
+      raise ArgumentError, "plugin name must contain letters or numbers" if plugin_name.empty?
+
+      module_name = plugin_module_name(plugin_name)
+      {
+        plugin_name: plugin_name,
+        plugin_module: module_name,
+        plugin_renderer: "render#{module_name}",
+        plugin_type: "#{plugin_name}_layer",
+        plugin_title: plugin_name.split("_").map(&:capitalize).join(" ")
+      }
+    end
+
+    def normalize_plugin_name(name)
+      name.gsub(/([a-z\d])([A-Z])/, "\\1_\\2")
+          .tr("- ", "__")
+          .gsub(/[^a-zA-Z0-9_]/, "_")
+          .gsub(/_+/, "_")
+          .downcase
+          .sub(/\A_+/, "")
+          .sub(/_+\z/, "")
+    end
+
+    def plugin_module_name(plugin_name)
+      module_name = plugin_name.split("_").map(&:capitalize).join
+      module_name.match?(/\A[A-Z]/) ? module_name : "Plugin#{module_name}"
     end
 
     def feature_audio_normalize_setting

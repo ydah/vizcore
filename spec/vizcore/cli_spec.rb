@@ -174,6 +174,26 @@ RSpec.describe Vizcore::CLI do
       end
     end
 
+    it "creates a plugin scaffold" do
+      Dir.mktmpdir("vizcore-cli-plugin") do |dir|
+        Dir.chdir(dir) do
+          expect do
+            described_class.start(["plugin", "new", "laser-grid"])
+          end.to output(%r{Created plugin scaffold: .*/laser_grid}).to_stdout
+
+          expect(Pathname("laser_grid/README.md")).to exist
+          expect(Pathname("laser_grid/lib/laser_grid.rb")).to exist
+          expect(Pathname("laser_grid/frontend/laser_grid-renderer.js")).to exist
+          expect(Pathname("laser_grid/examples/laser_grid_scene.rb")).to exist
+          expect(Pathname("laser_grid/lib/laser_grid.rb").read).to include("type: LAYER_TYPE", "LAYER_TYPE = :laser_grid_layer")
+          expect(Pathname("laser_grid/frontend/laser_grid-renderer.js").read).to include(
+            'const layerType = "laser_grid_layer"',
+            "globalThis.VizcorePlugins"
+          )
+        end
+      end
+    end
+
     it "writes a PNG scene snapshot" do
       Dir.mktmpdir("vizcore-cli-snapshot") do |dir|
         out = File.join(dir, "snapshot.png")

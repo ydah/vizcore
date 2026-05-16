@@ -11,6 +11,7 @@ import {
 } from "../visuals/geometry.js";
 import { ImageRenderer } from "../visuals/image-renderer.js";
 import { ParticleSystem } from "../visuals/particle-system.js";
+import { normalizePluginLineOutput, resolveLayerRenderer } from "../plugin-runtime.js";
 import { SpectrogramRenderer } from "../visuals/spectrogram-renderer.js";
 import { TextRenderer } from "../visuals/text-renderer.js";
 import { getVJEffectShader } from "../visuals/vj-effects.js";
@@ -275,7 +276,36 @@ export class LayerManager {
       this.renderShaderLayer(layer, audio, time, resolution, globals, visualSettings);
       return;
     }
+    if (this.renderPluginLayer(layer, audio, time, rotation, resolution, globals, visualSettings, paletteIndex)) {
+      return;
+    }
     this.renderGeometryLayer(layer, audio, rotation, time, paletteIndex);
+  }
+
+  renderPluginLayer(layer, audio, time, rotation, resolution, globals, visualSettings, paletteIndex = 0) {
+    const renderer = resolveLayerRenderer(layer?.type);
+    if (!renderer) {
+      return false;
+    }
+
+    const output = renderer({
+      layer,
+      audio,
+      time,
+      rotation,
+      resolution,
+      globals,
+      visualSettings,
+      paletteIndex
+    });
+    const lines = normalizePluginLineOutput(output);
+    if (!lines) {
+      return false;
+    }
+
+    const fallbackColor = resolveLayerRgbColor(layer?.params || {}, [0.82, 0.92, 1.0], paletteIndex);
+    this.renderLinePoints(lines.points, lines.color || fallbackColor);
+    return true;
   }
 
   renderShaderLayer(layer, audio, time, resolution, globals, visualSettings) {
@@ -501,7 +531,6 @@ export class LayerManager {
   }
 
   renderShapeLayer(layer, audio, paletteIndex = 0) {
-    const gl = this.gl;
     const params = layer?.params || {};
     const points = buildShapeLines({ params });
 
@@ -509,15 +538,19 @@ export class LayerManager {
       return;
     }
 
+    const amplitude = clamp(Number(audio?.amplitude || 0), 0, 1);
+    const fallbackColor = [0.85, 0.50 + amplitude * 0.24, 0.95];
+    const color = resolveLayerRgbColor(params, fallbackColor, paletteIndex);
+    this.renderLinePoints(points, color);
+  }
+
+  renderLinePoints(points, color) {
+    const gl = this.gl;
     gl.useProgram(this.geometryProgram);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.geometryBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(points), gl.DYNAMIC_DRAW);
     gl.enableVertexAttribArray(this.geometryPositionLocation);
     gl.vertexAttribPointer(this.geometryPositionLocation, 2, gl.FLOAT, false, 0, 0);
-
-    const amplitude = clamp(Number(audio?.amplitude || 0), 0, 1);
-    const fallbackColor = [0.85, 0.50 + amplitude * 0.24, 0.95];
-    const color = resolveLayerRgbColor(params, fallbackColor, paletteIndex);
     gl.uniform3f(this.geometryColorLocation, color[0], color[1], color[2]);
     gl.drawArrays(gl.LINES, 0, points.length / 2);
   }
