@@ -39,11 +39,11 @@ vizcore start examples/basic.rb
 Then open `http://127.0.0.1:4567`.
 
 <p align="center">
-  <img src="docs/assets/vizcore-demo.gif" width="640" alt="Animated Vizcore demo with an audio-reactive waveform and wireframe cube" />
+  <img src="docs/assets/vizcore-demo.gif" width="640" alt="Animated Vizcore demo where detected beats expand concentric rings" />
 </p>
 
-This short preview is generated from `examples/intro_drop.rb` with the bundled
-demo audio.
+This short preview is generated from `examples/readme_demo.rb` with the bundled
+demo audio: `beat_pulse -> ring radius`.
 
 
 ## Scene DSL
@@ -671,6 +671,7 @@ Run `vizcore gallery` to open a browser gallery of bundled examples with scene c
 | `examples/club_intro_drop.rb` | Intro, build, and drop flow for rhythmic file input |
 | `examples/shader_playground.rb` | Focused shader scene with declared params |
 | `examples/audio_inspector.rb` | Audio bars and blob for analysis visualization |
+| `examples/readme_demo.rb` | Minimal beat pulse to ring radius demo |
 | `examples/midi_scene_switch.rb` | MIDI-driven scene switching |
 | `examples/midi_controller_show.rb` | MIDI pads for scenes and knobs for global shader intensity/color |
 | `examples/kansai_rubykaigi_visual.rb` | Event showcase with ruby crystal, water ripple, and Kyoto-inspired pattern |

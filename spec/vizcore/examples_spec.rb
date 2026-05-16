@@ -35,6 +35,7 @@ RSpec.describe "example scenes" do
     "examples/club_intro_drop.rb" => { expected_scene: "intro" },
     "examples/shader_playground.rb" => { expected_scene: "shader_playground" },
     "examples/audio_inspector.rb" => { expected_scene: "audio_inspector" },
+    "examples/readme_demo.rb" => { expected_scene: "readme_demo" },
     "examples/midi_scene_switch.rb" => { expected_scene: "warmup" },
     "examples/midi_controller_show.rb" => { expected_scene: "midi_warmup" },
     "examples/kansai_rubykaigi_visual.rb" => { expected_scene: "kansai_rubykaigi" },
