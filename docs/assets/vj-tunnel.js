@@ -12,7 +12,7 @@ if (canvas) {
     reduced: reducedMotionQuery.matches,
     animationFrame: 0
   };
-  const palette = ["#ff2bbd", "#24f6ff", "#caff2e", "#ffe44d", "#ff405d", "#33ff91"];
+  const palette = ["#22c55e", "#38bdf8", "#a3e635", "#facc15", "#fb7185", "#8b5cf6"];
 
   const resize = () => {
     state.ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -115,13 +115,13 @@ if (canvas) {
 
   const draw = (time) => {
     context.clearRect(0, 0, state.width, state.height);
-    context.fillStyle = "rgba(5, 0, 6, 0.72)";
+    context.fillStyle = "rgba(8, 10, 15, 0.76)";
     context.fillRect(0, 0, state.width, state.height);
 
     const gradient = context.createLinearGradient(0, 0, state.width, state.height);
-    gradient.addColorStop(0, "rgba(255, 43, 189, 0.26)");
-    gradient.addColorStop(0.45, "rgba(36, 246, 255, 0.12)");
-    gradient.addColorStop(1, "rgba(202, 255, 46, 0.2)");
+    gradient.addColorStop(0, "rgba(34, 197, 94, 0.24)");
+    gradient.addColorStop(0.45, "rgba(56, 189, 248, 0.14)");
+    gradient.addColorStop(1, "rgba(139, 92, 246, 0.18)");
     context.fillStyle = gradient;
     context.fillRect(0, 0, state.width, state.height);
 
