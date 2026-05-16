@@ -60,11 +60,13 @@ module Vizcore
     private
 
     def value_at(data, *keys)
-      keys.reduce(data) do |current, key|
-        break nil unless current.is_a?(Hash)
+      current = data
+      keys.each do |key|
+        return nil unless current.is_a?(Hash)
 
-        current[key.to_s]
+        current = current[key.to_s]
       end
+      current
     end
 
     def data_for(profile)

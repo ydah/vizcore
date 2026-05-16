@@ -354,12 +354,10 @@ module Vizcore
           apply_osc_global(Regexp.last_match(1), message.arguments.first)
         when %r{\A/vizcore/live/(blackout|freeze)\z}
           apply_osc_live_control(Regexp.last_match(1), message.arguments.first)
-        when "/vizcore/transport/play"
+        when "/vizcore/transport/play", "/vizcore/transport/position"
           apply_osc_transport(broadcaster, playing: true, position_seconds: message.arguments.first)
         when "/vizcore/transport/stop"
           apply_osc_transport(broadcaster, playing: false, position_seconds: message.arguments.first)
-        when "/vizcore/transport/position"
-          apply_osc_transport(broadcaster, playing: true, position_seconds: message.arguments.first)
         end
       rescue StandardError => e
         @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "OSC control message failed"))

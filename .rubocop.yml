@@ -5,6 +5,7 @@ AllCops:
   TargetRubyVersion: 3.2
   Exclude:
     - "frontend/**/*"
+    - "lib/vizcore/templates/*.rb"
     - "spec/fixtures/**/*"
     - "vendor/**/*"
 
