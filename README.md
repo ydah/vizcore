@@ -312,8 +312,9 @@ layer :waterfall do
 end
 ```
 
-Mesh layers render preset 3D wireframes without writing GLSL. The first preset
-is `geometry :icosahedron` with `material :wireframe`:
+Mesh layers render preset 3D wireframes without writing GLSL. Available
+geometry presets are `:cube`, `:tetrahedron`, `:octahedron`, and
+`:icosahedron`; use `material :wireframe`:
 
 ```ruby
 layer :mesh do

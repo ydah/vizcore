@@ -167,7 +167,7 @@ module Vizcore
           color_shift: "Float"
         ),
         mappable_params: %i[scale deform opacity color_shift],
-        description: "Preset 3D wireframe meshes such as an icosahedron."
+        description: "Preset 3D wireframe meshes: cube, tetrahedron, octahedron, and icosahedron."
       )
     ].freeze
 

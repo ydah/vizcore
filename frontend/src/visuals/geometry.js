@@ -15,6 +15,30 @@ const EDGES = [
   [0, 4], [1, 5], [2, 6], [3, 7]
 ];
 
+const TETRAHEDRON_VERTICES = [
+  [1, 1, 1],
+  [-1, -1, 1],
+  [-1, 1, -1],
+  [1, -1, -1]
+].map(([x, y, z]) => [x / Math.sqrt(3), y / Math.sqrt(3), z / Math.sqrt(3)]);
+
+const TETRAHEDRON_EDGES = [
+  [0, 1], [0, 2], [0, 3],
+  [1, 2], [1, 3], [2, 3]
+];
+
+const OCTAHEDRON_VERTICES = [
+  [1, 0, 0], [-1, 0, 0],
+  [0, 1, 0], [0, -1, 0],
+  [0, 0, 1], [0, 0, -1]
+];
+
+const OCTAHEDRON_EDGES = [
+  [0, 2], [0, 3], [0, 4], [0, 5],
+  [1, 2], [1, 3], [1, 4], [1, 5],
+  [2, 4], [2, 5], [3, 4], [3, 5]
+];
+
 const PHI = (1 + Math.sqrt(5)) / 2;
 const ICOSAHEDRON_SCALE = 1 / Math.sqrt(1 + PHI * PHI);
 const ICOSAHEDRON_VERTICES = [
@@ -37,6 +61,9 @@ const ICOSAHEDRON_EDGES = [
 ];
 
 const MESH_PRESETS = {
+  cube: { vertices: BASE_VERTICES.map(([x, y, z]) => [x * 0.62, y * 0.62, z * 0.62]), edges: EDGES },
+  tetrahedron: { vertices: TETRAHEDRON_VERTICES, edges: TETRAHEDRON_EDGES },
+  octahedron: { vertices: OCTAHEDRON_VERTICES, edges: OCTAHEDRON_EDGES },
   icosahedron: { vertices: ICOSAHEDRON_VERTICES, edges: ICOSAHEDRON_EDGES }
 };
 

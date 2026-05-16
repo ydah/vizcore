@@ -38,6 +38,16 @@ test("buildPresetMeshLines returns icosahedron wireframe coordinates", () => {
   assert.ok(points.every((value) => value >= -1 && value <= 1));
 });
 
+test("buildPresetMeshLines supports compact mesh presets", () => {
+  const tetrahedron = buildPresetMeshLines({ params: { geometry: "tetrahedron" } });
+  const octahedron = buildPresetMeshLines({ params: { geometry: "octahedron" } });
+  const cube = buildPresetMeshLines({ params: { geometry: "cube" } });
+
+  assert.equal(tetrahedron.length, 6 * 4);
+  assert.equal(octahedron.length, 12 * 4);
+  assert.equal(cube.length, 12 * 4);
+});
+
 test("estimateDeformFromSpectrum averages numeric spectrum values", () => {
   const deform = estimateDeformFromSpectrum([0.2, 0.4]);
 
