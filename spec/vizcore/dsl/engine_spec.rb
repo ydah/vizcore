@@ -425,6 +425,36 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "stores preset mesh layer params" do
+      definition = described_class.define do
+        scene :mesh_scene do
+          layer :mesh do
+            type :mesh
+            geometry :icosahedron
+            material :wireframe
+            scale 1.1
+            map bass, to: :scale, range: 0.8..1.4
+            map high, to: :deform
+          end
+        end
+      end
+
+      layer = definition[:scenes].first[:layers].first
+      expect(layer[:type]).to eq(:mesh)
+      expect(layer[:params]).to include(geometry: :icosahedron, material: :wireframe, scale: 1.1)
+      expect(layer[:mappings]).to include(
+        {
+          source: { kind: :frequency_band, band: :low },
+          target: :scale,
+          transform: { min: 0.8, max: 1.4 }
+        },
+        {
+          source: { kind: :frequency_band, band: :high },
+          target: :deform
+        }
+      )
+    end
+
     it "stores 2d shape primitives and scoped shape mappings" do
       definition = described_class.define do
         scene :shapes do

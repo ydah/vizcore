@@ -2,6 +2,7 @@ import { getBuiltinShader } from "../shaders/builtins.js";
 import { getPostEffectShader } from "../shaders/post-effects.js";
 import { SHADER_ERROR_EVENT, buildShaderErrorDetail } from "../shader-error-overlay.js";
 import {
+  buildPresetMeshLines,
   buildRadialBlobLines,
   buildShapeLines,
   buildWaveformLines,
@@ -381,13 +382,22 @@ export class LayerManager {
     const colorShift = clamp(Number(params.color_shift || 0), 0, 1);
     const deform = estimateDeformFromSpectrum(params.deform ?? audio?.fft);
     const type = String(layer?.type || "").toLowerCase();
-    const points = type === "radial_blob"
-      ? buildRadialBlobLines({ time, params, audio })
-      : buildWireframeLines({
-          rotationY: rotation,
-          rotationX: rotation * 0.8,
-          deform
-        });
+    let points = buildWireframeLines({
+      rotationY: rotation,
+      rotationX: rotation * 0.8,
+      deform
+    });
+
+    if (type === "radial_blob") {
+      points = buildRadialBlobLines({ time, params, audio });
+    } else if (isMeshLayer(layer)) {
+      points = buildPresetMeshLines({
+        rotationY: rotation,
+        rotationX: rotation * 0.8,
+        deform,
+        params
+      });
+    }
 
     gl.useProgram(this.geometryProgram);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.geometryBuffer);
@@ -758,6 +768,11 @@ const isSpectrogramLayer = (layer) => {
 const isShapeLayer = (layer) => {
   const type = String(layer?.type || "").toLowerCase();
   return type === "shape" || type === "shapes" || type === "shape_layer";
+};
+
+const isMeshLayer = (layer) => {
+  const type = String(layer?.type || "").toLowerCase();
+  return type === "mesh" || type === "mesh_layer" || type === "preset_mesh";
 };
 
 const defaultLayer = (audio) => ({

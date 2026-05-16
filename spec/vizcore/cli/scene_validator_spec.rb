@@ -170,6 +170,7 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
           layer(:scope) { type :waveform_layer }
           layer(:waterfall) { type :spectrogram_layer }
           layer(:rings) { type :shape_layer }
+          layer(:mesh) { type :mesh_layer }
         end
       end
     RUBY

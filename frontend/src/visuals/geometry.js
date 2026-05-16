@@ -15,6 +15,31 @@ const EDGES = [
   [0, 4], [1, 5], [2, 6], [3, 7]
 ];
 
+const PHI = (1 + Math.sqrt(5)) / 2;
+const ICOSAHEDRON_SCALE = 1 / Math.sqrt(1 + PHI * PHI);
+const ICOSAHEDRON_VERTICES = [
+  [-1, PHI, 0], [1, PHI, 0], [-1, -PHI, 0], [1, -PHI, 0],
+  [0, -1, PHI], [0, 1, PHI], [0, -1, -PHI], [0, 1, -PHI],
+  [PHI, 0, -1], [PHI, 0, 1], [-PHI, 0, -1], [-PHI, 0, 1]
+].map(([x, y, z]) => [x * ICOSAHEDRON_SCALE, y * ICOSAHEDRON_SCALE, z * ICOSAHEDRON_SCALE]);
+
+const ICOSAHEDRON_EDGES = [
+  [0, 1], [0, 5], [0, 7], [0, 10], [0, 11],
+  [1, 5], [1, 7], [1, 8], [1, 9],
+  [2, 3], [2, 4], [2, 6], [2, 10], [2, 11],
+  [3, 4], [3, 6], [3, 8], [3, 9],
+  [4, 5], [4, 9], [4, 11],
+  [5, 9], [5, 11],
+  [6, 7], [6, 8], [6, 10],
+  [7, 8], [7, 10],
+  [8, 9],
+  [10, 11]
+];
+
+const MESH_PRESETS = {
+  icosahedron: { vertices: ICOSAHEDRON_VERTICES, edges: ICOSAHEDRON_EDGES }
+};
+
 export const buildWireframeLines = ({ rotationY, rotationX, deform }) => {
   const amount = clamp(Number(deform || 0), 0, 1);
   const projected = BASE_VERTICES.map((vertex) => {
@@ -28,6 +53,34 @@ export const buildWireframeLines = ({ rotationY, rotationX, deform }) => {
 
   const lines = [];
   for (const [start, end] of EDGES) {
+    lines.push(projected[start][0], projected[start][1]);
+    lines.push(projected[end][0], projected[end][1]);
+  }
+  return lines;
+};
+
+export const buildPresetMeshLines = ({ rotationY = 0, rotationX = 0, deform = 0, params = {} } = {}) => {
+  const geometry = normalizeMeshGeometry(params.geometry);
+  const mesh = MESH_PRESETS[geometry] || MESH_PRESETS.icosahedron;
+  const scale = clamp(finiteNumber(params.scale, 1), 0.1, 3.0);
+  const amount = clamp(finiteNumber(deform, 0), 0, 1);
+
+  const projected = mesh.vertices.map((vertex, index) => {
+    const radialPulse = 1 + amount * (0.12 + (index % 3) * 0.05);
+    const twist = Math.sin(index * 1.618 + amount * Math.PI) * amount * 0.08;
+    return projectVertex(
+      [
+        (vertex[0] + vertex[1] * twist) * scale * radialPulse,
+        (vertex[1] + vertex[2] * twist) * scale * (1 + amount * 0.08),
+        (vertex[2] + vertex[0] * twist) * scale * radialPulse
+      ],
+      rotationY,
+      rotationX
+    );
+  });
+
+  const lines = [];
+  for (const [start, end] of mesh.edges) {
     lines.push(projected[start][0], projected[start][1]);
     lines.push(projected[end][0], projected[end][1]);
   }
@@ -217,6 +270,10 @@ const appendRadialPoint = (points, index, segments, baseRadius, wobble, bass, mi
     + organic * wobble * 0.035;
 
   points.push(Math.cos(angle) * radius, Math.sin(angle) * radius);
+};
+
+const normalizeMeshGeometry = (value) => {
+  return String(value || "icosahedron").trim().toLowerCase();
 };
 
 const projectVertex = (vertex, angleY, angleX) => {

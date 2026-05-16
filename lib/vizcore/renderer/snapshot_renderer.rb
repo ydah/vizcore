@@ -56,6 +56,8 @@ module Vizcore
           render_spectrogram_layer(canvas, layer, audio, color)
         when "shape", "shapes", "shape_layer"
           render_shape_layer(canvas, layer, audio, color)
+        when "mesh", "mesh_layer", "preset_mesh"
+          render_mesh_layer(canvas, layer, audio, color, index)
         else
           render_geometry_layer(canvas, audio, color, index)
         end
@@ -189,6 +191,38 @@ module Vizcore
         x2 = Float(shape[:x2] || shape["x2"] || width * 0.8)
         y2 = Float(shape[:y2] || shape["y2"] || height * 0.5)
         canvas.draw_line(x1, y1, x2, y2, color, alpha: alpha)
+      end
+
+      def render_mesh_layer(canvas, layer, audio, color, index)
+        params = Hash(layer[:params] || layer["params"] || {})
+        amplitude = clamp(audio[:amplitude])
+        high = audio.dig(:bands, :high) || audio.dig("bands", "high")
+        deform = clamp(params[:deform] || params["deform"] || high || amplitude)
+        scale = Float(params[:scale] || params["scale"] || 1).clamp(0.1, 3.0)
+        radius = [width, height].min * (0.20 + amplitude * 0.08 + deform * 0.08) * scale
+        cx = width * (0.5 + (index - 1) * 0.06)
+        cy = height * 0.48
+        top = [cx, cy - radius * 0.62]
+        bottom = [cx, cy + radius * 0.62]
+        ring = 6.times.map do |point_index|
+          angle = (point_index.to_f / 6) * Math::PI * 2 + Math::PI / 6
+          [cx + Math.cos(angle) * radius * 0.72, cy + Math.sin(angle) * radius * 0.36]
+        end
+
+        ring.each_with_index do |point, point_index|
+          next_point = ring[(point_index + 1) % ring.length]
+          canvas.draw_line(point[0], point[1], next_point[0], next_point[1], color, alpha: 0.62)
+          canvas.draw_line(top[0], top[1], point[0], point[1], color, alpha: 0.54)
+          canvas.draw_line(bottom[0], bottom[1], next_point[0], next_point[1], color, alpha: 0.42)
+        end
+
+        3.times do |point_index|
+          from = ring[point_index]
+          to = ring[point_index + 3]
+          canvas.draw_line(from[0], from[1], to[0], to[1], color, alpha: 0.32 + deform * 0.2)
+        end
+      rescue ArgumentError, TypeError
+        nil
       end
 
       def render_geometry_layer(canvas, audio, color, index)

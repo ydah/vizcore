@@ -27,10 +27,13 @@ RSpec.describe Vizcore::LayerCatalog do
       :spectrogram_layer,
       :shape,
       :shapes,
-      :shape_layer
+      :shape_layer,
+      :mesh,
+      :mesh_layer,
+      :preset_mesh
     )
     expect(described_class).to be_supported_type(:particle)
-    expect(described_class).not_to be_supported_type(:mesh)
+    expect(described_class).to be_supported_type(:mesh)
   end
 
   it "returns params and mappable params for a layer family" do
@@ -44,5 +47,6 @@ RSpec.describe Vizcore::LayerCatalog do
     expect(described_class.mappable_params_for(:waveform)).to include(:height, :opacity, :color_shift)
     expect(described_class.mappable_params_for(:spectrogram)).to include(:gain, :opacity)
     expect(described_class.mappable_params_for(:shape)).to include(:color_shift, :opacity)
+    expect(described_class.mappable_params_for(:mesh)).to include(:scale, :deform, :opacity, :color_shift)
   end
 end

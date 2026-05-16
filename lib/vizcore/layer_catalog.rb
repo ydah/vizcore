@@ -155,6 +155,19 @@ module Vizcore
         ),
         mappable_params: %i[color_shift opacity],
         description: "Declarative 2D circle and line primitives rendered by the browser."
+      ),
+      Capability.new(
+        type: :mesh,
+        aliases: %i[mesh_layer preset_mesh],
+        params: COMMON_PARAMS.merge(
+          geometry: "Symbol",
+          material: "Symbol",
+          scale: "Float",
+          deform: "Float",
+          color_shift: "Float"
+        ),
+        mappable_params: %i[scale deform opacity color_shift],
+        description: "Preset 3D wireframe meshes such as an icosahedron."
       )
     ].freeze
 

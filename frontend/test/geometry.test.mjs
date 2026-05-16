@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildPresetMeshLines,
   buildRadialBlobLines,
   buildShapeLines,
   buildWaveformLines,
@@ -22,6 +23,19 @@ test("buildRadialBlobLines returns line segment coordinates", () => {
 
   assert.equal(points.length, 32 * 4);
   assert.ok(points.every((value) => Number.isFinite(value)));
+});
+
+test("buildPresetMeshLines returns icosahedron wireframe coordinates", () => {
+  const points = buildPresetMeshLines({
+    rotationY: 0.25,
+    rotationX: 0.15,
+    deform: 0.4,
+    params: { geometry: "icosahedron", scale: 1.2 },
+  });
+
+  assert.equal(points.length, 30 * 4);
+  assert.ok(points.every((value) => Number.isFinite(value)));
+  assert.ok(points.every((value) => value >= -1 && value <= 1));
 });
 
 test("estimateDeformFromSpectrum averages numeric spectrum values", () => {

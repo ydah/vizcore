@@ -75,6 +75,14 @@ Vizcore.define do
       map amplitude, to: :gain, range: 0.8..3.0
     end
 
+    layer :mesh do
+      type :mesh
+      geometry :icosahedron
+      material :wireframe
+      map bass, to: :scale, range: 0.8..1.4
+      map high, to: :deform
+    end
+
     layer :rings do
       circle count: 8 do
         radius 100
@@ -301,6 +309,19 @@ layer :waterfall do
   bins 96
   history 128
   map amplitude, to: :gain, range: 0.8..3.0
+end
+```
+
+Mesh layers render preset 3D wireframes without writing GLSL. The first preset
+is `geometry :icosahedron` with `material :wireframe`:
+
+```ruby
+layer :mesh do
+  type :mesh
+  geometry :icosahedron
+  material :wireframe
+  map bass, to: :scale, range: 0.8..1.4
+  map high, to: :deform
 end
 ```
 
