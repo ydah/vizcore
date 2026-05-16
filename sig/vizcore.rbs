@@ -68,6 +68,30 @@ module Vizcore::CLISupport
   end
 end
 
+module Vizcore::Sync
+  class OscMessage
+    attr_reader address: String
+    attr_reader arguments: Array[untyped]
+
+    def self.parse: (String data) -> OscMessage?
+    def initialize: (address: String, ?arguments: Array[untyped] arguments) -> void
+  end
+
+  class OscReceiver
+    DEFAULT_HOST: String
+    MAX_PACKET_SIZE: Integer
+
+    def initialize: (
+      port: Integer port,
+      ?host: String host,
+      handler: untyped handler,
+      ?error_reporter: untyped? error_reporter
+    ) -> void
+    def start: () -> OscReceiver
+    def stop: () -> nil
+  end
+end
+
 module Vizcore::Analysis
   class FeatureRecorder
     VERSION: String

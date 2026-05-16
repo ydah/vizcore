@@ -5,6 +5,7 @@ require_relative "../config"
 require_relative "../control_preset"
 require_relative "../dsl"
 require_relative "../errors"
+require_relative "../sync/osc_receiver"
 require_relative "frame_broadcaster"
 require_relative "rack_app"
 require_relative "scene_dependency_watcher"
@@ -75,6 +76,7 @@ module Vizcore
         broadcaster.start
         register_client_message_handler(broadcaster)
         midi_runtime = start_midi_runtime(definition, broadcaster)
+        osc_runtime = start_osc_runtime(broadcaster)
         watcher = if @config.reload?
                     start_scene_watcher(broadcaster, definition: definition) do |updated_definition|
                       midi_runtime = refresh_midi_runtime(midi_runtime, updated_definition, broadcaster)
@@ -88,11 +90,13 @@ module Vizcore
         @output.puts("Hot reload: #{@config.reload? ? 'enabled' : 'disabled'}")
         @output.puts("Audio playback: http://#{@config.host}:#{@config.port}/audio-file") if file_transport_enabled?
         @output.puts("Feature replay: #{@config.feature_file}") if feature_replay?
+        @output.puts("OSC sync: udp://#{@config.host}:#{@config.osc_port}") if osc_runtime
         @output.puts("Press Ctrl+C to stop.")
 
         wait_for_interrupt
       ensure
         Vizcore::Server::WebSocketHandler.clear_message_handler
+        stop_osc_runtime(osc_runtime)
         stop_midi_runtime(midi_runtime)
         watcher&.stop
         broadcaster&.stop
@@ -297,6 +301,41 @@ module Vizcore
         nil
       end
 
+      def start_osc_runtime(broadcaster)
+        return nil unless @config.osc_port
+
+        receiver = Vizcore::Sync::OscReceiver.new(
+          host: @config.host,
+          port: @config.osc_port,
+          handler: ->(message) { handle_osc_message(message, broadcaster) },
+          error_reporter: ->(message) { @output.puts(message) }
+        )
+        receiver.start
+      rescue StandardError => e
+        @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "OSC runtime disabled"))
+        receiver&.stop
+        nil
+      end
+
+      def stop_osc_runtime(runtime)
+        runtime&.stop
+        nil
+      rescue StandardError => e
+        @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "OSC runtime shutdown failed"))
+        nil
+      end
+
+      def handle_osc_message(message, broadcaster)
+        case message.address
+        when "/vizcore/scene"
+          switch_scene_from_client(message.arguments.first, broadcaster, source: "osc")
+        when "/vizcore/tap"
+          apply_tap_tempo({ "client_tapped_at_ms" => wall_clock_ms }, broadcaster)
+        end
+      rescue StandardError => e
+        @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "OSC control message failed"))
+      end
+
       def handle_midi_event(executor, event, broadcaster)
         actions = executor.handle_event(event)
         actions.each do |action|
@@ -479,7 +518,7 @@ module Vizcore
         )
       end
 
-      def switch_scene_from_client(target_name, broadcaster)
+      def switch_scene_from_client(target_name, broadcaster, source: "ui")
         requested = target_name.to_s.strip
         return if requested.empty?
 
@@ -495,7 +534,7 @@ module Vizcore
             from: from_scene.to_s,
             to: target_scene[:name].to_s,
             effect: nil,
-            source: "ui"
+            source: source
           }
         )
       end

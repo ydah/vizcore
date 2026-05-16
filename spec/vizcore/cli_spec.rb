@@ -372,6 +372,8 @@ RSpec.describe Vizcore::CLI do
           "features.json",
           "--control-preset",
           "controls.json",
+          "--osc-port",
+          "9000",
           "--no-reload",
           "--projector"
         ]
@@ -386,6 +388,7 @@ RSpec.describe Vizcore::CLI do
         expect(config.bpm_lock?).to eq(true)
         expect(config.feature_file.to_s).to end_with("features.json")
         expect(config.control_preset.to_s).to end_with("controls.json")
+        expect(config.osc_port).to eq(9000)
         expect(config.reload?).to eq(false)
         expect(config.projector_mode).to eq(true)
       end
@@ -406,6 +409,7 @@ RSpec.describe Vizcore::CLI do
               source: file
               file: audio/show.wav
             control_preset: controls/live.json
+            osc_port: 9001
           YAML
         )
 
@@ -416,6 +420,7 @@ RSpec.describe Vizcore::CLI do
           expect(config.audio_source).to eq(:file)
           expect(config.audio_file.to_s).to eq(Pathname.new(dir).join("audio/show.wav").expand_path.to_s)
           expect(config.control_preset.to_s).to eq(Pathname.new(control_path).expand_path.to_s)
+          expect(config.osc_port).to eq(9001)
         end
       end
     end

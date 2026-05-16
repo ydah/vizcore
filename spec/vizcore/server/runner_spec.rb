@@ -50,6 +50,7 @@ RSpec.describe Vizcore::Server::Runner do
         tap_tempo_key: nil,
         key_mappings: [],
         globals: {},
+        control_preset: nil,
         projector_mode: false
       )
       expect(Puma::Server).to have_received(:new).with(rack_app, nil, min_threads: 0, max_threads: 4)
@@ -121,6 +122,7 @@ RSpec.describe Vizcore::Server::Runner do
         tap_tempo_key: nil,
         key_mappings: [],
         globals: {},
+        control_preset: nil,
         projector_mode: false
       )
       expect(broadcaster).to have_received(:sync_transport).with(playing: false, position_seconds: 0.0)
@@ -271,6 +273,59 @@ RSpec.describe Vizcore::Server::Runner do
           to: "drop",
           source: "ui"
         )
+      )
+    end
+
+    it "switches scene from OSC message" do
+      runner = described_class.new(config, output: output)
+      broadcaster = instance_double(
+        Vizcore::Server::FrameBroadcaster,
+        current_scene_snapshot: { name: "build", layers: [] },
+        update_scene: nil
+      )
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+      runner.send(
+        :replace_scene_catalog,
+        [
+          { name: :build, layers: [{ name: :a }] },
+          { name: :drop, layers: [{ name: :b }] }
+        ]
+      )
+
+      runner.send(
+        :handle_osc_message,
+        Vizcore::Sync::OscMessage.new(address: "/vizcore/scene", arguments: ["drop"]),
+        broadcaster
+      )
+
+      expect(broadcaster).to have_received(:update_scene).with(
+        scene_name: :drop,
+        scene_layers: [hash_including(name: :b)]
+      )
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "scene_change",
+        payload: hash_including(source: "osc", to: "drop")
+      )
+    end
+
+    it "applies OSC tap tempo messages" do
+      runner = described_class.new(config, output: output)
+      broadcaster = instance_double(Vizcore::Server::FrameBroadcaster)
+      runner.instance_variable_set(:@tap_tempo_key, "t")
+      allow(runner).to receive(:wall_clock_ms).and_return(2_500.0)
+      allow(broadcaster).to receive(:tap_tempo).and_return(121.0)
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+
+      runner.send(
+        :handle_osc_message,
+        Vizcore::Sync::OscMessage.new(address: "/vizcore/tap"),
+        broadcaster
+      )
+
+      expect(broadcaster).to have_received(:tap_tempo).with(timestamp_ms: 2_500.0)
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "config_update",
+        payload: hash_including(bpm: 121.0, bpm_lock: true)
       )
     end
 

@@ -116,6 +116,7 @@ module Vizcore
     option :noise_gate, type: :numeric, default: Config::DEFAULT_NOISE_GATE, desc: "RMS level below which audio is treated as silence"
     option :bpm, type: :numeric, desc: "Fixed BPM value used with --bpm-lock"
     option :bpm_lock, type: :boolean, default: false, desc: "Lock analysis BPM output to --bpm"
+    option :osc_port, type: :numeric, desc: "UDP port for OSC sync (/vizcore/scene, /vizcore/tap)"
     option :reload, type: :boolean, default: Config::DEFAULT_RELOAD, desc: "Reload the scene file when it changes"
     option :projector, type: :boolean, default: false, desc: "Hide browser operator UI for projection output"
     # Start the Vizcore server with the given scene file.
@@ -139,6 +140,7 @@ module Vizcore
         noise_gate: options.fetch(:noise_gate),
         bpm: options[:bpm],
         bpm_lock: options.fetch(:bpm_lock),
+        osc_port: options[:osc_port] || defaults[:osc_port],
         reload: options.fetch(:reload),
         projector_mode: options.fetch(:projector)
       )
@@ -154,6 +156,7 @@ module Vizcore
     option :bpm, type: :numeric, desc: "Fixed BPM value used with --bpm-lock"
     option :bpm_lock, type: :boolean, default: false, desc: "Lock analysis BPM output to --bpm"
     option :control_preset, type: :string, desc: "Control preset JSON for browser HUD and MIDI learn"
+    option :osc_port, type: :numeric, desc: "UDP port for OSC sync (/vizcore/scene, /vizcore/tap)"
     option :projector, type: :boolean, default: false, desc: "Hide browser operator UI for projection output"
     # Start a bundled scene with bundled audio for first-run verification.
     #
@@ -169,6 +172,7 @@ module Vizcore
         bpm: options[:bpm],
         bpm_lock: options.fetch(:bpm_lock),
         control_preset: options[:control_preset],
+        osc_port: options[:osc_port],
         projector_mode: options.fetch(:projector)
       )
       Server::Runner.new(config).run

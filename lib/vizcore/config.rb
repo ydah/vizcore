@@ -18,7 +18,7 @@ module Vizcore
     # Supported CLI audio source values.
     SUPPORTED_AUDIO_SOURCES = %i[mic file dummy].freeze
 
-    attr_reader :host, :port, :scene_file, :audio_source, :audio_file, :audio_device, :feature_file, :control_preset, :noise_gate, :bpm, :projector_mode
+    attr_reader :host, :port, :scene_file, :audio_source, :audio_file, :audio_device, :feature_file, :control_preset, :noise_gate, :bpm, :osc_port, :projector_mode
 
     # @param scene_file [String, Pathname] scene DSL file path
     # @param host [String] bind host
@@ -31,6 +31,7 @@ module Vizcore
     # @param noise_gate [Numeric] RMS threshold below which live input is treated as silence
     # @param bpm [Numeric, nil] fixed BPM value used when BPM lock is enabled
     # @param bpm_lock [Boolean] true when the analysis output BPM should stay fixed
+    # @param osc_port [Integer, nil] UDP port for OSC control sync
     # @param reload [Boolean] true when scene file changes should be reloaded while running
     # @param projector_mode [Boolean] true when the browser should hide operator UI by default
     def initialize(
@@ -45,6 +46,7 @@ module Vizcore
       noise_gate: DEFAULT_NOISE_GATE,
       bpm: nil,
       bpm_lock: false,
+      osc_port: nil,
       reload: DEFAULT_RELOAD,
       projector_mode: false
     )
@@ -59,6 +61,7 @@ module Vizcore
       @noise_gate = normalize_noise_gate(noise_gate)
       @bpm = normalize_bpm(bpm)
       @bpm_lock = !!bpm_lock
+      @osc_port = normalize_optional_port(osc_port)
       @reload = !!reload
       @projector_mode = !!projector_mode
     end
@@ -116,6 +119,17 @@ module Vizcore
       numeric
     rescue ArgumentError, TypeError
       raise ArgumentError, "BPM must be a positive number"
+    end
+
+    def normalize_optional_port(value)
+      return nil if value.nil?
+
+      port_value = Integer(value)
+      raise ArgumentError, "OSC port must be between 1 and 65535" unless port_value.between?(1, 65_535)
+
+      port_value
+    rescue ArgumentError, TypeError
+      raise ArgumentError, "OSC port must be between 1 and 65535"
     end
   end
 end

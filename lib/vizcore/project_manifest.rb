@@ -33,7 +33,8 @@ module Vizcore
         audio_file: expand_path(value_at("audio_file") || value_at("audio", "file")),
         audio_device: value_at("audio_device") || value_at("audio", "device"),
         feature_file: expand_path(value_at("feature_file") || value_at("features")),
-        control_preset: expand_path(value_at("control_preset") || value_at("controlPreset"))
+        control_preset: expand_path(value_at("control_preset") || value_at("controlPreset")),
+        osc_port: value_at("osc_port") || value_at("sync", "osc_port") || value_at("sync", "osc", "port")
       }.compact
     end
 

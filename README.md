@@ -528,8 +528,8 @@ end
 ## CLI
 
 ```bash
-vizcore start [SCENE_FILE] [--manifest vizcore.yml] [--host 127.0.0.1] [--port 4567] [--audio-source mic|file|dummy] [--audio-file PATH] [--audio-device INDEX_OR_NAME] [--feature-file features.json] [--control-preset controls.json] [--noise-gate RMS] [--bpm BPM --bpm-lock] [--reload|--no-reload] [--projector]
-vizcore demo [--host 127.0.0.1] [--port 4567] [--control-preset controls.json] [--projector]
+vizcore start [SCENE_FILE] [--manifest vizcore.yml] [--host 127.0.0.1] [--port 4567] [--audio-source mic|file|dummy] [--audio-file PATH] [--audio-device INDEX_OR_NAME] [--feature-file features.json] [--control-preset controls.json] [--osc-port 9000] [--noise-gate RMS] [--bpm BPM --bpm-lock] [--reload|--no-reload] [--projector]
+vizcore demo [--host 127.0.0.1] [--port 4567] [--control-preset controls.json] [--osc-port 9000] [--projector]
 vizcore doctor
 vizcore validate SCENE_FILE
 vizcore inspect SCENE_FILE
@@ -590,6 +590,9 @@ audio:
   source: file
   file: audio/set.wav
 control_preset: controls/live.json
+sync:
+  osc:
+    port: 9000
 plugins:
   - vizcore-laser-grid
 ```
@@ -597,6 +600,8 @@ plugins:
 Start it with `vizcore start --manifest vizcore.yml`. A control preset JSON can
 include `visual_settings` and `midi_learn_bindings`; Vizcore sends it through
 `/runtime` and the browser applies it to HUD reactivity and MIDI Learn state.
+Set `--osc-port` or `sync.osc.port` to receive OSC controls:
+`/vizcore/scene` with a string scene name and `/vizcore/tap` for tap tempo.
 
 `vizcore demo` starts a bundled scene with bundled audio, so it is the quickest way to verify a fresh installation.
 

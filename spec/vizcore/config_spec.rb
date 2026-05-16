@@ -50,6 +50,12 @@ RSpec.describe Vizcore::Config do
     expect(config.bpm_lock?).to eq(true)
   end
 
+  it "parses optional OSC sync port" do
+    config = described_class.new(scene_file: scene_file, osc_port: "9000")
+
+    expect(config.osc_port).to eq(9000)
+  end
+
   it "parses projector mode" do
     config = described_class.new(scene_file: scene_file, projector_mode: true)
 

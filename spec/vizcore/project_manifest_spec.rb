@@ -15,6 +15,9 @@ RSpec.describe Vizcore::ProjectManifest do
             source: file
             file: audio/show.wav
           control_preset: controls/live.json
+          sync:
+            osc:
+              port: 9000
           plugins:
             - vizcore-laser-grid
         YAML
@@ -26,7 +29,8 @@ RSpec.describe Vizcore::ProjectManifest do
         scene_file: Pathname.new(dir).join("scenes/show.rb").expand_path,
         audio_source: "file",
         audio_file: Pathname.new(dir).join("audio/show.wav").expand_path,
-        control_preset: Pathname.new(dir).join("controls/live.json").expand_path
+        control_preset: Pathname.new(dir).join("controls/live.json").expand_path,
+        osc_port: 9000
       )
       expect(manifest.plugins).to eq(["vizcore-laser-grid"])
     end
