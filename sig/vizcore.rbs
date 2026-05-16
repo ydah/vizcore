@@ -47,8 +47,10 @@ end
 module Vizcore
   class ControlPreset
     def self.load: (String | Pathname path) -> Hash[String, untyped]
+    def self.write: (String | Pathname path, Hash[untyped, untyped] payload) -> Hash[String, untyped]
     def initialize: (String | Pathname path) -> void
     def load: () -> Hash[String, untyped]
+    def write: (Hash[untyped, untyped] payload) -> Hash[String, untyped]
   end
 
   class ProjectManifest

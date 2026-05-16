@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "fileutils"
 require "json"
 require "pathname"
 
@@ -10,6 +11,13 @@ module Vizcore
     # @return [Hash]
     def self.load(path)
       new(path).load
+    end
+
+    # @param path [String, Pathname]
+    # @param payload [Hash]
+    # @return [Hash]
+    def self.write(path, payload)
+      new(path).write(payload)
     end
 
     # @param path [String, Pathname]
@@ -25,6 +33,15 @@ module Vizcore
       normalize_payload(parsed)
     rescue JSON::ParserError => e
       raise ArgumentError, "Invalid control preset JSON #{@path}: #{e.message}"
+    end
+
+    # @param payload [Hash]
+    # @return [Hash]
+    def write(payload)
+      normalized = normalize_payload(payload)
+      FileUtils.mkdir_p(@path.dirname)
+      @path.write(JSON.pretty_generate(normalized) << "\n")
+      normalized
     end
 
     private

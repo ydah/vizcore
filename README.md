@@ -580,7 +580,7 @@ vizcore start scene.rb --feature-file features.json
 
 When using file source, the HUD exposes **Play Audio** / **Pause Audio** controls and shows BPM, Beat, and Beat Count.
 
-The browser HUD also includes an Audio Inspector with amplitude, sub/low/mid/high meters, FFT preview bars, a performance monitor for FPS/frame/latency/drop/audio/shader/reconnect health, shader compile error overlay, emergency Blackout/Freeze controls, and Visual Gain, Bass Boost, Smoothing, Beat Hold, and Wobble controls for adapting visual response to different tracks and input levels. Reactivity controls can be saved, loaded, imported, and exported for repeatable HUD presets. MIDI Learn can bind Web MIDI note/CC/program messages to the current scene, Blackout/Freeze, or reactivity controls. Scene launcher entries can be selected with `1`-`9`, and scene-defined `key` mappings can switch scenes or toggle live controls. Use `--projector` or open `/projector` when the browser output should hide operator UI, and open `/control` for a separate operator panel.
+The browser HUD also includes an Audio Inspector with amplitude, sub/low/mid/high meters, FFT preview bars, a performance monitor for FPS/frame/latency/drop/audio/shader/reconnect health, shader compile error overlay, emergency Blackout/Freeze controls, and Visual Gain, Bass Boost, Smoothing, Beat Hold, and Wobble controls for adapting visual response to different tracks and input levels. Reactivity controls can be saved, loaded, imported, and exported for repeatable HUD presets. When `--control-preset` or manifest `control_preset` is writable, the HUD also shows **Save Project** to write the current reactivity and MIDI Learn bindings back to that JSON file. MIDI Learn can bind Web MIDI note/CC/program messages to the current scene, Blackout/Freeze, or reactivity controls. Scene launcher entries can be selected with `1`-`9`, and scene-defined `key` mappings can switch scenes or toggle live controls. Use `--projector` or open `/projector` when the browser output should hide operator UI, and open `/control` for a separate operator panel.
 
 Project manifests keep show startup repeatable:
 
@@ -613,7 +613,10 @@ RackApp and loaded before `/src/main.js`. A control preset JSON can include
 `visual_settings` and `midi_learn_bindings`; Vizcore sends it through `/runtime`
 and the browser applies it to HUD reactivity and MIDI Learn state.
 Set `--osc-port` or `sync.osc.port` to receive OSC controls:
-`/vizcore/scene` with a string scene name and `/vizcore/tap` for tap tempo.
+`/vizcore/scene` with a string scene name, `/vizcore/tap`,
+`/vizcore/bpm`, `/vizcore/bpm_unlock`, `/vizcore/global/<name>`,
+`/vizcore/live/blackout`, `/vizcore/live/freeze`, and
+`/vizcore/transport/play` or `/vizcore/transport/stop` for file transport.
 
 `vizcore demo` starts a bundled scene with bundled audio, so it is the quickest way to verify a fresh installation.
 

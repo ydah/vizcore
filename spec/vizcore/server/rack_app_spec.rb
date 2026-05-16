@@ -39,6 +39,7 @@ RSpec.describe Vizcore::Server::RackApp do
     expect(response.body).to include("\"scene_names\":[]")
     expect(response.body).to include("\"key_mappings\":[]")
     expect(response.body).to include("\"control_preset\":{}")
+    expect(response.body).to include("\"control_preset_writable\":false")
     expect(response.body).to include("\"projector_mode\":false")
   end
 
@@ -134,6 +135,32 @@ RSpec.describe Vizcore::Server::RackApp do
     expect(response.status).to eq(200)
     expect(response.body).to include("\"visual_settings\":{\"visualGain\":3.25}")
     expect(response.body).to include("\"midi_learn_bindings\":{\"cc:1:7\":{\"type\":\"live_control\",\"control\":\"freeze\"}}")
+  end
+
+  it "persists writable control presets" do
+    Dir.mktmpdir("vizcore-control-preset-rack") do |dir|
+      preset_path = Pathname.new(dir).join("controls", "live.json")
+      runtime_app = described_class.new(
+        frontend_root: Vizcore.frontend_root,
+        control_preset_path: preset_path
+      )
+      body = JSON.generate(
+        visual_settings: { visualGain: 4.2 },
+        midi_learn_bindings: { "cc:1:7" => { type: "live_control", control: "freeze" } }
+      )
+
+      response = Rack::MockRequest.new(runtime_app).put(
+        "/control-preset",
+        "CONTENT_TYPE" => "application/json",
+        input: body
+      )
+      runtime = Rack::MockRequest.new(runtime_app).get("/runtime")
+
+      expect(response.status).to eq(200)
+      expect(JSON.parse(preset_path.read)).to include("visual_settings", "midi_learn_bindings")
+      expect(runtime.body).to include("\"control_preset_writable\":true")
+      expect(runtime.body).to include("\"visual_settings\":{\"visualGain\":4.2}")
+    end
   end
 
   it "injects and serves configured plugin assets" do

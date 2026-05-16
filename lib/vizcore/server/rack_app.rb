@@ -3,6 +3,7 @@
 require "json"
 require "pathname"
 require "rack"
+require_relative "../control_preset"
 require_relative "websocket_handler"
 
 module Vizcore
@@ -11,6 +12,7 @@ module Vizcore
     class RackApp
       AUDIO_FILE_PATH = "/audio-file"
       CONTROL_PATH = "/control"
+      CONTROL_PRESET_PATH = "/control-preset"
       PLUGIN_ASSET_PREFIX = "/plugins/"
       PROJECTOR_PATH = "/projector"
       RUNTIME_PATH = "/runtime"
@@ -24,6 +26,7 @@ module Vizcore
       # @param key_mappings [Array<Hash>, nil]
       # @param globals [Hash, nil]
       # @param control_preset [Hash, nil]
+      # @param control_preset_path [String, Pathname, nil]
       # @param plugin_assets [Array<String, Pathname>, nil]
       # @param projector_mode [Boolean]
       def initialize(
@@ -36,6 +39,7 @@ module Vizcore
         key_mappings: nil,
         globals: nil,
         control_preset: nil,
+        control_preset_path: nil,
         plugin_assets: nil,
         projector_mode: false
       )
@@ -48,6 +52,7 @@ module Vizcore
         @key_mappings = normalize_key_mappings(key_mappings)
         @globals = normalize_globals(globals)
         @control_preset = normalize_control_preset(control_preset)
+        @control_preset_path = control_preset_path ? Pathname.new(control_preset_path).expand_path : nil
         @plugin_assets = normalize_plugin_assets(plugin_assets)
         @projector_mode = !!projector_mode
       end
@@ -60,6 +65,7 @@ module Vizcore
         return WebSocketHandler.call(env) if request.path_info == @websocket_path
         return health_response if request.path_info == "/health"
         return runtime_response if request.path_info == RUNTIME_PATH
+        return control_preset_response(request) if request.path_info == CONTROL_PRESET_PATH
         return audio_file_response(request) if request.path_info == AUDIO_FILE_PATH
         return plugin_asset_response(request.path_info) if request.path_info.start_with?(PLUGIN_ASSET_PREFIX)
         return serve_index(display_mode: root_display_mode) if request.path_info == "/"
@@ -87,6 +93,8 @@ module Vizcore
           key_mappings: @key_mappings,
           globals: @globals,
           control_preset: @control_preset,
+          control_preset_writable: !!@control_preset_path,
+          control_preset_url: @control_preset_path ? CONTROL_PRESET_PATH : nil,
           plugin_assets: @plugin_assets.map { |asset| asset.fetch(:url) },
           projector_mode: @projector_mode
         }
@@ -120,6 +128,22 @@ module Vizcore
 
         body = File.binread(@audio_file)
         [200, audio_headers(content_length: body.bytesize), [body]]
+      end
+
+      def control_preset_response(request)
+        return not_found_response unless @control_preset_path
+        return method_not_allowed_response unless request.put? || request.post?
+
+        payload = JSON.parse(request.body.read)
+        @control_preset = Vizcore::ControlPreset.write(@control_preset_path, payload)
+        body = JSON.generate(status: "ok", control_preset: @control_preset)
+        [200, json_headers.merge("content-length" => body.bytesize.to_s), [body]]
+      rescue JSON::ParserError => e
+        body = JSON.generate(status: "error", error: "Invalid control preset JSON: #{e.message}")
+        [400, json_headers.merge("content-length" => body.bytesize.to_s), [body]]
+      rescue ArgumentError => e
+        body = JSON.generate(status: "error", error: e.message)
+        [400, json_headers.merge("content-length" => body.bytesize.to_s), [body]]
       end
 
       def serve_static(path_info)
@@ -174,6 +198,10 @@ module Vizcore
 
       def not_found_response
         [404, text_headers.merge("content-length" => "9"), ["Not Found"]]
+      end
+
+      def method_not_allowed_response
+        [405, text_headers.merge("allow" => "PUT, POST", "content-length" => "18"), ["Method Not Allowed"]]
       end
 
       def text_headers

@@ -187,6 +187,29 @@ module Vizcore
         bpm
       end
 
+      # Lock analysis BPM from an external sync source.
+      #
+      # @param bpm [Numeric]
+      # @return [Float, nil]
+      def lock_bpm(bpm)
+        numeric = Float(bpm)
+        return nil unless numeric.finite? && numeric.positive?
+        return numeric unless @analysis_pipeline.respond_to?(:bpm_lock=)
+
+        @analysis_pipeline.bpm_lock = { bpm: numeric, locked: true }
+        numeric
+      rescue ArgumentError, TypeError
+        nil
+      end
+
+      # Unlock analysis BPM after an external sync lock.
+      #
+      # @return [Boolean]
+      def unlock_bpm
+        @analysis_pipeline.bpm_lock = { bpm: nil, locked: false } if @analysis_pipeline.respond_to?(:bpm_lock=)
+        true
+      end
+
       # Build one frame payload for transport to frontend.
       #
       # @param _elapsed_seconds [Float]

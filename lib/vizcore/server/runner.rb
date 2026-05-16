@@ -23,6 +23,9 @@ module Vizcore
         @shader_source_resolver = Vizcore::DSL::ShaderSourceResolver.new
         @scene_catalog_mutex = Mutex.new
         @scene_catalog = []
+        @runtime_globals_mutex = Mutex.new
+        @runtime_globals = {}
+        @live_controls = { "blackout" => false, "freeze" => false }
       end
 
       # Run server lifecycle until interrupted.
@@ -38,6 +41,7 @@ module Vizcore
         validate_audio_settings!
         definition = load_definition!
         control_preset = load_control_preset
+        replace_runtime_globals(globals_for(definition))
         @tap_tempo_key = tap_tempo_key(definition)
         scene = first_scene(definition) || fallback_scene
 
@@ -48,8 +52,9 @@ module Vizcore
           scene_names: scene_names_for(definition),
           tap_tempo_key: @tap_tempo_key,
           key_mappings: key_mappings_for(definition),
-          globals: globals_for(definition),
+          globals: runtime_globals_snapshot,
           control_preset: control_preset,
+          control_preset_path: @config.control_preset,
           plugin_assets: @config.plugin_assets,
           projector_mode: @config.projector_mode
         )
@@ -210,6 +215,7 @@ module Vizcore
         watcher = Vizcore::Server::SceneDependencyWatcher.new(scene_file: @config.scene_file.to_s, definition: definition) do |definition, _changed_path|
           definition = resolve_shader_sources(definition)
           replace_scene_catalog(definition[:scenes])
+          replace_runtime_globals(globals_for(definition))
           @tap_tempo_key = tap_tempo_key(definition)
           scene = first_scene(definition) || fallback_scene
           broadcaster.update_transition_definition(
@@ -230,7 +236,7 @@ module Vizcore
               scenes: scene_names_for(definition),
               tap_tempo_key: @tap_tempo_key,
               key_mappings: key_mappings_for(definition),
-              globals: globals_for(definition)
+              globals: runtime_globals_snapshot
             }
           )
           @output.puts("Scene reloaded: #{scene[:name]}")
@@ -340,6 +346,20 @@ module Vizcore
           switch_scene_from_client(message.arguments.first, broadcaster, source: "osc")
         when "/vizcore/tap"
           apply_tap_tempo({ "client_tapped_at_ms" => wall_clock_ms }, broadcaster)
+        when "/vizcore/bpm"
+          apply_osc_bpm(message.arguments.first, broadcaster)
+        when "/vizcore/bpm_unlock"
+          apply_osc_bpm_unlock(broadcaster)
+        when %r{\A/vizcore/global/([^/]+)\z}
+          apply_osc_global(Regexp.last_match(1), message.arguments.first)
+        when %r{\A/vizcore/live/(blackout|freeze)\z}
+          apply_osc_live_control(Regexp.last_match(1), message.arguments.first)
+        when "/vizcore/transport/play"
+          apply_osc_transport(broadcaster, playing: true, position_seconds: message.arguments.first)
+        when "/vizcore/transport/stop"
+          apply_osc_transport(broadcaster, playing: false, position_seconds: message.arguments.first)
+        when "/vizcore/transport/position"
+          apply_osc_transport(broadcaster, playing: true, position_seconds: message.arguments.first)
         end
       rescue StandardError => e
         @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "OSC control message failed"))
@@ -446,6 +466,35 @@ module Vizcore
         {}
       end
 
+      def replace_runtime_globals(values)
+        @runtime_globals_mutex.synchronize do
+          @runtime_globals = normalize_runtime_globals(values)
+        end
+      end
+
+      def set_runtime_global(name, value)
+        key = name.to_s.strip
+        return runtime_globals_snapshot if key.empty?
+
+        @runtime_globals_mutex.synchronize do
+          @runtime_globals[key] = value
+          @runtime_globals.dup
+        end
+      end
+
+      def runtime_globals_snapshot
+        @runtime_globals_mutex.synchronize { @runtime_globals.dup }
+      end
+
+      def normalize_runtime_globals(values)
+        Hash(values || {}).each_with_object({}) do |(key, value), output|
+          name = key.to_s.strip
+          output[name] = value unless name.empty?
+        end
+      rescue StandardError
+        {}
+      end
+
       def key_mappings_for(definition)
         Array(definition[:key_mappings]).map do |mapping|
           key = mapping[:key] || mapping["key"]
@@ -525,6 +574,83 @@ module Vizcore
             source: "tap_tempo"
           }
         )
+      end
+
+      def apply_osc_bpm(value, broadcaster)
+        bpm = finite_float(value)
+        return unless bpm&.positive?
+        return unless broadcaster.respond_to?(:lock_bpm)
+
+        locked_bpm = broadcaster.lock_bpm(bpm)
+        return unless locked_bpm
+
+        WebSocketHandler.broadcast(
+          type: "config_update",
+          payload: {
+            bpm: locked_bpm,
+            bpm_lock: true,
+            source: "osc"
+          }
+        )
+      end
+
+      def apply_osc_bpm_unlock(broadcaster)
+        return unless broadcaster.respond_to?(:unlock_bpm)
+
+        broadcaster.unlock_bpm
+        WebSocketHandler.broadcast(
+          type: "config_update",
+          payload: {
+            bpm_lock: false,
+            source: "osc"
+          }
+        )
+      end
+
+      def apply_osc_global(name, value)
+        globals = set_runtime_global(name, normalize_osc_value(value))
+        WebSocketHandler.broadcast(
+          type: "config_update",
+          payload: {
+            globals: globals,
+            source: "osc"
+          }
+        )
+      end
+
+      def apply_osc_live_control(control, value)
+        @live_controls[control] = osc_truthy?(value)
+        WebSocketHandler.broadcast(
+          type: "config_update",
+          payload: {
+            live_controls: @live_controls.dup,
+            source: "osc"
+          }
+        )
+      end
+
+      def apply_osc_transport(broadcaster, playing:, position_seconds:)
+        return unless file_transport_enabled?
+
+        broadcaster.sync_transport(
+          playing: playing,
+          position_seconds: finite_float(position_seconds) || 0.0
+        )
+      end
+
+      def normalize_osc_value(value)
+        numeric = finite_float(value)
+        numeric.nil? ? value : numeric
+      end
+
+      def osc_truthy?(value)
+        return true if value.nil?
+        return value if value == true || value == false
+
+        numeric = finite_float(value)
+        return numeric.positive? unless numeric.nil?
+
+        %w[true on yes 1].include?(value.to_s.strip.downcase)
       end
 
       def switch_scene_from_client(target_name, broadcaster, source: "ui")

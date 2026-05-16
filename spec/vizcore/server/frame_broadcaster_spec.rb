@@ -174,6 +174,18 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
       expect(broadcaster.tap_tempo(timestamp_ms: 1_500.0)).to eq(120.0)
       expect(pipeline).to have_received(:bpm_lock=).with({ bpm: 120.0, locked: true })
     end
+
+    it "locks and unlocks BPM from external sync" do
+      pipeline = instance_double(Vizcore::Analysis::Pipeline, call: {})
+      allow(pipeline).to receive(:bpm_lock=)
+
+      broadcaster = described_class.new(analysis_pipeline: pipeline)
+
+      expect(broadcaster.lock_bpm(128)).to eq(128.0)
+      expect(broadcaster.unlock_bpm).to eq(true)
+      expect(pipeline).to have_received(:bpm_lock=).with({ bpm: 128.0, locked: true })
+      expect(pipeline).to have_received(:bpm_lock=).with({ bpm: nil, locked: false })
+    end
   end
 
   describe "#tick" do

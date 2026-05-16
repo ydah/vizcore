@@ -51,6 +51,7 @@ RSpec.describe Vizcore::Server::Runner do
         key_mappings: [],
         globals: {},
         control_preset: nil,
+        control_preset_path: nil,
         plugin_assets: [],
         projector_mode: false
       )
@@ -124,6 +125,7 @@ RSpec.describe Vizcore::Server::Runner do
         key_mappings: [],
         globals: {},
         control_preset: nil,
+        control_preset_path: nil,
         plugin_assets: [],
         projector_mode: false
       )
@@ -355,6 +357,71 @@ RSpec.describe Vizcore::Server::Runner do
         type: "config_update",
         payload: hash_including(bpm: 121.0, bpm_lock: true)
       )
+    end
+
+    it "applies OSC BPM lock messages" do
+      runner = described_class.new(config, output: output)
+      broadcaster = instance_double(Vizcore::Server::FrameBroadcaster, lock_bpm: 128.0)
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+
+      runner.send(
+        :handle_osc_message,
+        Vizcore::Sync::OscMessage.new(address: "/vizcore/bpm", arguments: [128.0]),
+        broadcaster
+      )
+
+      expect(broadcaster).to have_received(:lock_bpm).with(128.0)
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "config_update",
+        payload: hash_including(bpm: 128.0, bpm_lock: true, source: "osc")
+      )
+    end
+
+    it "applies OSC global and live control messages" do
+      runner = described_class.new(config, output: output)
+      broadcaster = instance_double(Vizcore::Server::FrameBroadcaster)
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+
+      runner.send(
+        :handle_osc_message,
+        Vizcore::Sync::OscMessage.new(address: "/vizcore/global/intensity", arguments: [0.75]),
+        broadcaster
+      )
+      runner.send(
+        :handle_osc_message,
+        Vizcore::Sync::OscMessage.new(address: "/vizcore/live/blackout", arguments: [1]),
+        broadcaster
+      )
+
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "config_update",
+        payload: hash_including(globals: { "intensity" => 0.75 }, source: "osc")
+      )
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "config_update",
+        payload: hash_including(live_controls: { "blackout" => true, "freeze" => false }, source: "osc")
+      )
+    end
+
+    it "applies OSC transport messages for file input" do
+      fixture = Vizcore.root.join("spec", "fixtures", "audio", "pulse16_mono.wav")
+      file_config = Vizcore::Config.new(
+        scene_file: scene_file.to_s,
+        host: "127.0.0.1",
+        port: 4567,
+        audio_source: :file,
+        audio_file: fixture.to_s
+      )
+      runner = described_class.new(file_config, output: output)
+      broadcaster = instance_double(Vizcore::Server::FrameBroadcaster, sync_transport: nil)
+
+      runner.send(
+        :handle_osc_message,
+        Vizcore::Sync::OscMessage.new(address: "/vizcore/transport/play", arguments: [12.5]),
+        broadcaster
+      )
+
+      expect(broadcaster).to have_received(:sync_transport).with(playing: true, position_seconds: 12.5)
     end
 
     it "responds to client latency probes on the source socket" do

@@ -82,6 +82,7 @@ const beatHoldControl = document.querySelector("#beat-hold-control");
 const wobbleControl = document.querySelector("#wobble-control");
 const reactivitySaveButton = document.querySelector("#reactivity-save");
 const reactivityLoadButton = document.querySelector("#reactivity-load");
+const reactivityProjectSaveButton = document.querySelector("#reactivity-project-save");
 const reactivityExportButton = document.querySelector("#reactivity-export");
 const reactivityImportButton = document.querySelector("#reactivity-import");
 const reactivityStatusElement = document.querySelector("#reactivity-status");
@@ -137,6 +138,7 @@ let pendingSceneRequestedAt = 0;
 let tapTempoKey = null;
 let runtimeGlobalsReceived = false;
 let runtimeControlPresetApplied = false;
+let controlPresetSaveUrl = null;
 let shaderParamOverrides = {};
 let shaderParamControlsSignature = "";
 let midiAccess = null;
@@ -215,6 +217,12 @@ const client = new WebSocketClient(websocketUrl, {
       runtimeGlobalsReceived = true;
       applyRuntimeGlobals(payload?.globals);
     }
+    if (Object.prototype.hasOwnProperty.call(payload || {}, "live_controls")) {
+      applyLiveControls({
+        ...liveControls,
+        ...normalizeLiveControls(payload?.live_controls),
+      });
+    }
   },
   onLatencyProbe: (payload) => {
     updatePerformanceMonitor(recordLatencyProbe(performanceMonitor, payload, Date.now()));
@@ -272,6 +280,7 @@ function applyRuntime(runtime) {
   updateAvailableScenes(runtime?.scene_names);
   updateTapTempoKey(runtime?.tap_tempo_key);
   updateKeyboardMappings(runtime?.key_mappings);
+  updateControlPresetPersistence(runtime);
   if (!runtimeGlobalsReceived) {
     applyRuntimeGlobals(runtime?.globals);
   }
@@ -293,6 +302,14 @@ function applyRuntime(runtime) {
 
 function applyRuntimeGlobals(globals) {
   engine.setRuntimeGlobals(globals);
+}
+
+function updateControlPresetPersistence(runtime) {
+  const url = String(runtime?.control_preset_url || "").trim();
+  controlPresetSaveUrl = runtime?.control_preset_writable && url ? url : null;
+  if (reactivityProjectSaveButton) {
+    reactivityProjectSaveButton.hidden = !controlPresetSaveUrl;
+  }
 }
 
 function applyRuntimeControlPreset(value) {
@@ -588,6 +605,14 @@ function applyLiveControls(nextState) {
   renderLiveControlStatus();
 }
 
+function normalizeLiveControls(value) {
+  const input = value && typeof value === "object" ? value : {};
+  return {
+    blackout: !!input.blackout,
+    freeze: !!input.freeze,
+  };
+}
+
 function renderLiveControlStatus() {
   if (liveControlStatusElement) {
     liveControlStatusElement.textContent = liveControlStatusText(liveControls);
@@ -729,6 +754,18 @@ function bindVisualPresetControls() {
     });
   }
 
+  if (reactivityProjectSaveButton) {
+    reactivityProjectSaveButton.addEventListener("click", async () => {
+      if (!controlPresetSaveUrl) {
+        renderReactivityStatus("Project save unavailable");
+        return;
+      }
+
+      const saved = await saveProjectControlPreset();
+      renderReactivityStatus(saved ? "Project saved" : "Project save failed");
+    });
+  }
+
   if (reactivityExportButton) {
     reactivityExportButton.addEventListener("click", async () => {
       const payload = exportVisualSettingsPreset(visualSettings);
@@ -759,6 +796,22 @@ function bindVisualPresetControls() {
       engine.setVisualSettings(visualSettings);
       renderReactivityStatus("Imported");
     });
+  }
+}
+
+async function saveProjectControlPreset() {
+  try {
+    const response = await fetch(controlPresetSaveUrl, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        visual_settings: visualSettings,
+        midi_learn_bindings: midiLearnBindings,
+      }),
+    });
+    return response.ok;
+  } catch {
+    return false;
   }
 }
 
