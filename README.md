@@ -535,6 +535,7 @@ vizcore validate SCENE_FILE
 vizcore inspect SCENE_FILE
 vizcore snapshot SCENE_FILE [--audio-source dummy|file|mic] [--audio-file PATH] [--out screenshot.png]
 vizcore render SCENE_FILE [--audio-source dummy|file|mic] [--audio-file PATH] [--out frames|movie.mp4] [--frames 60] [--fps 30]
+vizcore browser-capture http://127.0.0.1:4567/projector [--out browser-capture.png]
 vizcore record-features AUDIO_FILE [--out features.json] [--frames 300] [--fps 30]
 vizcore gallery [--host 127.0.0.1] [--port 4568]
 vizcore layers
@@ -605,6 +606,10 @@ include `visual_settings` and `midi_learn_bindings`; Vizcore sends it through
 Use `vizcore snapshot scene.rb --audio-source dummy --out screenshot.png` to create a software-rendered PNG preview for README, social cards, or quick visual checks without starting the browser.
 
 Use `vizcore render scene.rb --audio-source file --audio-file track.wav --out frames --frames 120 --fps 30` to write a software-rendered PNG image sequence, or `--out movie.mp4` to encode the frames to MP4 with `ffmpeg`.
+
+Use `vizcore browser-capture http://127.0.0.1:4567/projector --out browser.png`
+when you need a PNG from the actual browser/WebGL renderer. It requires
+Playwright in the local Node environment.
 
 Use `vizcore record-features track.wav --out features.json --frames 300 --fps 30` to capture the same audio analysis values as JSON for debugging mappings or comparing tracks. Replay the file with `vizcore start scene.rb --feature-file features.json` when you want deterministic visual behavior without live audio input.
 

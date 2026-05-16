@@ -341,6 +341,39 @@ module Vizcore
       raise Thor::Error, e.message
     end
 
+    map "browser-capture" => :browser_capture
+    desc "browser-capture URL", "Capture a browser-rendered Vizcore canvas to PNG"
+    option :out, type: :string, default: "browser-capture.png", desc: "Output PNG path"
+    option :selector, type: :string, default: "#vizcore-canvas", desc: "Element selector to capture"
+    option :wait, type: :numeric, default: 1000, desc: "Milliseconds to wait after page load"
+    option :width, type: :numeric, default: 1280, desc: "Browser viewport width"
+    option :height, type: :numeric, default: 720, desc: "Browser viewport height"
+    # Capture browser-rendered output from a running Vizcore server.
+    #
+    # @param url [String]
+    # @raise [Thor::Error] when Playwright capture fails
+    # @return [void]
+    def browser_capture(url)
+      script = Vizcore.root.join("scripts", "browser_capture.mjs")
+      command = [
+        "node",
+        script.to_s,
+        url.to_s,
+        "--out",
+        options.fetch(:out).to_s,
+        "--selector",
+        options.fetch(:selector).to_s,
+        "--wait",
+        options.fetch(:wait).to_s,
+        "--width",
+        options.fetch(:width).to_s,
+        "--height",
+        options.fetch(:height).to_s
+      ]
+      success = Kernel.system(*command)
+      raise Thor::Error, "browser capture failed" unless success
+    end
+
     desc "snapshot SCENE_FILE", "Render one scene frame to a PNG snapshot"
     option :audio_source, type: :string, default: "dummy", desc: "Audio source: dummy, file, mic"
     option :audio_file, type: :string, desc: "Path to audio file used when --audio-source file"

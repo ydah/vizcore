@@ -195,6 +195,39 @@ RSpec.describe Vizcore::CLI do
       end
     end
 
+    it "runs browser capture helper" do
+      expect(Kernel).to receive(:system).with(
+        "node",
+        Vizcore.root.join("scripts", "browser_capture.mjs").to_s,
+        "http://127.0.0.1:4567/projector",
+        "--out",
+        "browser.png",
+        "--selector",
+        "#vizcore-canvas",
+        "--wait",
+        "250",
+        "--width",
+        "640",
+        "--height",
+        "360"
+      ).and_return(true)
+
+      described_class.start(
+        [
+          "browser-capture",
+          "http://127.0.0.1:4567/projector",
+          "--out",
+          "browser.png",
+          "--wait",
+          "250",
+          "--width",
+          "640",
+          "--height",
+          "360"
+        ]
+      )
+    end
+
     it "writes a PNG scene snapshot" do
       Dir.mktmpdir("vizcore-cli-snapshot") do |dir|
         out = File.join(dir, "snapshot.png")

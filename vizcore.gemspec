@@ -32,6 +32,7 @@ Gem::Specification.new do |spec|
     frontend/index.html
     frontend/src/
     examples/
+    scripts/browser_capture.mjs
     sig/
     docs/
     README.md
