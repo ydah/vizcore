@@ -176,11 +176,13 @@
 
     .reactivity-actions {
       display: flex;
+      flex-wrap: wrap;
       gap: 0.45rem;
       margin-top: 0.45rem;
     }
 
-    .reactivity-actions button {
+    .reactivity-actions button,
+    .midi-learn button {
       border: 1px solid rgba(148, 163, 184, 0.28);
       border-radius: 6px;
       background: rgba(15, 23, 42, 0.68);
@@ -190,9 +192,29 @@
       padding: 0.28rem 0.62rem;
     }
 
-    .reactivity-actions button:hover {
+    .reactivity-actions button:hover,
+    .midi-learn button:hover {
       border-color: rgba(130, 255, 196, 0.55);
       color: #d9ffe8;
+    }
+
+    .midi-learn {
+      margin-top: 0.55rem;
+      padding-top: 0.55rem;
+      border-top: 1px solid rgba(153, 195, 255, 0.16);
+    }
+
+    .midi-learn__actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.35rem;
+      margin-top: 0.4rem;
+    }
+
+    .midi-learn button {
+      margin-top: 0;
+      width: 100%;
+      font-size: 0.76rem;
     }
 
     .audio-inspector {
@@ -467,8 +489,21 @@
         <div class="reactivity-actions" aria-label="Reactivity preset controls">
           <button id="reactivity-save" type="button">Save</button>
           <button id="reactivity-load" type="button">Load</button>
+          <button id="reactivity-export" type="button">Export</button>
+          <button id="reactivity-import" type="button">Import</button>
         </div>
         <p id="reactivity-status">Visual Gain: 2.5x | Bass: 1.4x | Smooth: 0.25 | Beat Hold: 180ms | Wobble: 1.00x</p>
+      </div>
+      <div class="midi-learn" aria-label="MIDI learn controls">
+        <p id="midi-learn-status">MIDI Learn: idle | Bindings: 0</p>
+        <div class="midi-learn__actions">
+          <button type="button" data-midi-learn-action="current-scene">Learn Scene</button>
+          <button type="button" data-midi-learn-action="blackout">Learn Blackout</button>
+          <button type="button" data-midi-learn-action="freeze">Learn Freeze</button>
+          <button type="button" data-midi-learn-action="visual:visualGain">Learn Gain</button>
+          <button type="button" data-midi-learn-action="visual:bassBoost">Learn Bass</button>
+          <button type="button" data-midi-learn-action="visual:wobbleAmount">Learn Wobble</button>
+        </div>
       </div>
       <div id="shader-param-controls" class="shader-param-controls" hidden aria-label="Shader parameter controls"></div>
       <div id="scene-switcher" class="scene-switcher" hidden aria-label="Scene switcher"></div>

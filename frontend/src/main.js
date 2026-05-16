@@ -18,6 +18,16 @@ import {
   recordShaderCompile,
   recordSocketFrame,
 } from "./performance-monitor.js";
+import {
+  loadMidiLearnBindings,
+  midiLearnActionLabel,
+  midiMessageActive,
+  midiMessageSignature,
+  midiMessageUnitValue,
+  midiSignatureLabel,
+  saveMidiLearnBindings,
+  upsertMidiLearnBinding,
+} from "./midi-learn.js";
 import { applyProjectorMode, resolveProjectorMode } from "./projector-mode.js";
 import { Engine } from "./renderer/engine.js";
 import { SHADER_COMPILE_EVENT } from "./renderer/shader-manager.js";
@@ -27,8 +37,11 @@ import {
 } from "./shader-param-controls.js";
 import { SHADER_ERROR_EVENT, formatShaderErrorMessage, formatShaderErrorTitle } from "./shader-error-overlay.js";
 import {
+  exportVisualSettingsPreset,
+  importVisualSettingsPreset,
   loadVisualSettingsPreset,
-  saveVisualSettingsPreset
+  saveVisualSettingsPreset,
+  visualSettingFromUnit
 } from "./visual-settings-preset.js";
 import { WebSocketClient } from "./websocket-client.js";
 
@@ -68,7 +81,11 @@ const beatHoldControl = document.querySelector("#beat-hold-control");
 const wobbleControl = document.querySelector("#wobble-control");
 const reactivitySaveButton = document.querySelector("#reactivity-save");
 const reactivityLoadButton = document.querySelector("#reactivity-load");
+const reactivityExportButton = document.querySelector("#reactivity-export");
+const reactivityImportButton = document.querySelector("#reactivity-import");
 const reactivityStatusElement = document.querySelector("#reactivity-status");
+const midiLearnStatusElement = document.querySelector("#midi-learn-status");
+const midiLearnButtons = Array.from(document.querySelectorAll("[data-midi-learn-action]"));
 const shaderParamControlsElement = document.querySelector("#shader-param-controls");
 const shaderErrorOverlay = document.querySelector("#shader-error-overlay");
 const shaderErrorTitleElement = document.querySelector("#shader-error-title");
@@ -77,6 +94,7 @@ const shaderErrorCloseButton = document.querySelector("#shader-error-close");
 const LATENCY_PROBE_INTERVAL_MS = 3000;
 
 const visualSettings = loadVisualSettingsPreset(browserStorage());
+let midiLearnBindings = loadMidiLearnBindings(browserStorage());
 const liveControls = createLiveControlState();
 const performanceMonitor = createPerformanceMonitorState();
 let projectorMode = resolveProjectorMode({ body: document.body, location: window.location });
@@ -93,10 +111,12 @@ bindVisualControl(smoothingControl, "smoothing");
 bindVisualControl(beatHoldControl, "beatHoldMs");
 bindVisualControl(wobbleControl, "wobbleAmount");
 bindVisualPresetControls();
+bindMidiLearnControls();
 renderLiveControlStatus();
 renderPerformanceMonitor();
 syncVisualControls();
 renderReactivityStatus();
+renderMidiLearnStatus();
 bindShaderErrorOverlay();
 const fftBars = initializeFftPreview(fftPreviewElement);
 engine.start();
@@ -117,6 +137,8 @@ let tapTempoKey = null;
 let runtimeGlobalsReceived = false;
 let shaderParamOverrides = {};
 let shaderParamControlsSignature = "";
+let midiAccess = null;
+let pendingMidiLearnAction = null;
 
 const websocketUrl = buildWebSocketUrl();
 const client = new WebSocketClient(websocketUrl, {
@@ -678,6 +700,152 @@ function bindVisualPresetControls() {
       renderReactivityStatus("Loaded");
     });
   }
+
+  if (reactivityExportButton) {
+    reactivityExportButton.addEventListener("click", async () => {
+      const payload = exportVisualSettingsPreset(visualSettings);
+      const copied = await writeClipboardText(payload);
+      if (!copied && typeof window.prompt === "function") {
+        window.prompt("Visual preset JSON", payload);
+      }
+      renderReactivityStatus(copied ? "Exported" : "Export ready");
+    });
+  }
+
+  if (reactivityImportButton) {
+    reactivityImportButton.addEventListener("click", () => {
+      if (typeof window.prompt !== "function") {
+        renderReactivityStatus("Import unavailable");
+        return;
+      }
+
+      const payload = window.prompt("Paste visual preset JSON");
+      if (!payload) {
+        renderReactivityStatus();
+        return;
+      }
+
+      Object.assign(visualSettings, importVisualSettingsPreset(payload, { fallback: visualSettings }));
+      Object.assign(visualSettings, saveVisualSettingsPreset(browserStorage(), visualSettings));
+      syncVisualControls();
+      engine.setVisualSettings(visualSettings);
+      renderReactivityStatus("Imported");
+    });
+  }
+}
+
+function bindMidiLearnControls() {
+  midiLearnButtons.forEach((button) => {
+    button.addEventListener("click", async () => {
+      const action = midiLearnActionForButton(button);
+      if (!action) {
+        renderMidiLearnStatus("No action selected");
+        return;
+      }
+
+      const ready = await ensureMidiAccess();
+      if (!ready) {
+        renderMidiLearnStatus("Web MIDI unavailable");
+        return;
+      }
+
+      pendingMidiLearnAction = action;
+      renderMidiLearnStatus(`Move a MIDI control for ${midiLearnActionLabel(action)}`);
+    });
+  });
+}
+
+function midiLearnActionForButton(button) {
+  const action = String(button?.dataset?.midiLearnAction || "");
+  if (action === "current-scene") {
+    return currentSceneName && currentSceneName !== "unknown"
+      ? { type: "switch_scene", scene: currentSceneName }
+      : null;
+  }
+  if (action === "blackout" || action === "freeze") {
+    return { type: "live_control", control: action };
+  }
+  if (action.startsWith("visual:")) {
+    return { type: "visual_setting", key: action.slice(7) };
+  }
+  return null;
+}
+
+async function ensureMidiAccess() {
+  if (midiAccess) {
+    return true;
+  }
+
+  const requestMIDIAccess = typeof navigator === "undefined" ? null : navigator.requestMIDIAccess;
+  if (typeof requestMIDIAccess !== "function") {
+    return false;
+  }
+
+  try {
+    midiAccess = await requestMIDIAccess.call(navigator);
+    bindMidiInputs(midiAccess.inputs);
+    midiAccess.onstatechange = () => {
+      bindMidiInputs(midiAccess.inputs);
+      renderMidiLearnStatus();
+    };
+    return true;
+  } catch {
+    midiAccess = null;
+    return false;
+  }
+}
+
+function bindMidiInputs(inputs) {
+  for (const input of inputs.values()) {
+    input.onmidimessage = handleMidiMessage;
+  }
+}
+
+function handleMidiMessage(event) {
+  const signature = midiMessageSignature(event?.data);
+  if (!signature) {
+    return;
+  }
+
+  if (pendingMidiLearnAction && midiMessageActive(event?.data)) {
+    midiLearnBindings = upsertMidiLearnBinding(midiLearnBindings, signature, pendingMidiLearnAction);
+    midiLearnBindings = saveMidiLearnBindings(browserStorage(), midiLearnBindings);
+    renderMidiLearnStatus(`Learned ${midiSignatureLabel(signature)} -> ${midiLearnActionLabel(pendingMidiLearnAction)}`);
+    pendingMidiLearnAction = null;
+    return;
+  }
+
+  const action = midiLearnBindings[signature];
+  if (!action) {
+    return;
+  }
+
+  applyMidiLearnAction(action, midiMessageUnitValue(event?.data), midiMessageActive(event?.data));
+}
+
+function applyMidiLearnAction(action, unitValue, active) {
+  if (action.type === "visual_setting") {
+    visualSettings[action.key] = visualSettingFromUnit(action.key, unitValue, visualSettings[action.key]);
+    syncVisualControls();
+    engine.setVisualSettings(visualSettings);
+    renderReactivityStatus("MIDI");
+    return;
+  }
+
+  if (!active || unitValue <= 0) {
+    return;
+  }
+
+  if (action.type === "switch_scene") {
+    requestSceneSwitch(action.scene);
+    renderMidiLearnStatus(`MIDI: ${midiLearnActionLabel(action)}`);
+    return;
+  }
+
+  if (action.type === "live_control") {
+    applyLiveControls(toggleLiveControl(liveControls, action.control));
+    renderMidiLearnStatus(`MIDI: ${midiLearnActionLabel(action)}`);
+  }
 }
 
 function syncVisualControls() {
@@ -702,6 +870,19 @@ function browserStorage() {
   }
 }
 
+async function writeClipboardText(value) {
+  try {
+    const clipboard = typeof navigator === "undefined" ? null : navigator.clipboard;
+    if (!clipboard?.writeText) {
+      return false;
+    }
+    await clipboard.writeText(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function renderReactivityStatus(prefix = null) {
   if (!reactivityStatusElement) {
     return;
@@ -716,6 +897,16 @@ function renderReactivityStatus(prefix = null) {
   ].join(" | ");
 
   reactivityStatusElement.textContent = prefix ? `${prefix} | ${values}` : values;
+}
+
+function renderMidiLearnStatus(prefix = null) {
+  if (!midiLearnStatusElement) {
+    return;
+  }
+
+  const bindingCount = Object.keys(midiLearnBindings).length;
+  const accessState = midiAccess ? "ready" : "idle";
+  midiLearnStatusElement.textContent = prefix || `MIDI Learn: ${accessState} | Bindings: ${bindingCount}`;
 }
 
 function bindShaderErrorOverlay() {

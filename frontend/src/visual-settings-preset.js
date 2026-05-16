@@ -1,4 +1,5 @@
 export const VISUAL_SETTINGS_PRESET_KEY = "vizcore.visualSettings.v1";
+export const VISUAL_SETTINGS_PRESET_VERSION = 1;
 
 export const DEFAULT_VISUAL_SETTINGS = Object.freeze({
   visualGain: 2.5,
@@ -8,7 +9,7 @@ export const DEFAULT_VISUAL_SETTINGS = Object.freeze({
   wobbleAmount: 1.0,
 });
 
-const SETTING_LIMITS = Object.freeze({
+export const VISUAL_SETTING_LIMITS = Object.freeze({
   visualGain: [1, 8],
   bassBoost: [0, 4],
   smoothing: [0, 0.9],
@@ -21,7 +22,7 @@ export const normalizeVisualSettings = (value, fallback = DEFAULT_VISUAL_SETTING
 
   return Object.fromEntries(
     Object.entries(DEFAULT_VISUAL_SETTINGS).map(([key, defaultValue]) => {
-      const [min, max] = SETTING_LIMITS[key];
+      const [min, max] = VISUAL_SETTING_LIMITS[key];
       const fallbackValue = Number(fallback?.[key] ?? defaultValue);
       return [key, clampNumber(input[key], min, max, fallbackValue)];
     })
@@ -61,6 +62,36 @@ export const saveVisualSettingsPreset = (storage, settings, {
     // Ignore storage failures; the active in-memory settings still apply.
   }
   return normalized;
+};
+
+export const exportVisualSettingsPreset = (settings) => {
+  return JSON.stringify({
+    version: VISUAL_SETTINGS_PRESET_VERSION,
+    visual_settings: normalizeVisualSettings(settings),
+  }, null, 2);
+};
+
+export const importVisualSettingsPreset = (rawValue, {
+  fallback = DEFAULT_VISUAL_SETTINGS,
+} = {}) => {
+  try {
+    const parsed = typeof rawValue === "string" ? JSON.parse(rawValue) : rawValue;
+    const settings = parsed?.visual_settings || parsed?.settings || parsed;
+    return normalizeVisualSettings(settings, fallback);
+  } catch {
+    return normalizeVisualSettings(fallback);
+  }
+};
+
+export const visualSettingFromUnit = (key, unitValue, fallback = DEFAULT_VISUAL_SETTINGS[key]) => {
+  const limits = VISUAL_SETTING_LIMITS[key];
+  if (!limits) {
+    return Number(fallback ?? 0);
+  }
+
+  const [min, max] = limits;
+  const amount = clampNumber(unitValue, 0, 1, 0);
+  return clampNumber(min + (max - min) * amount, min, max, fallback);
 };
 
 const clampNumber = (value, min, max, fallback) => {
