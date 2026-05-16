@@ -519,6 +519,96 @@
     </section>
   </div>
 
-  <script type="module" src="/src/main.js"></script>
+  <script>
+    window.__vizcoreMainStarted = false;
+    (function () {
+      var protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      var websocketUrl = protocol + "//" + window.location.host + "/ws";
+      var fallbackTimer = window.setTimeout(function () {
+        if (window.__vizcoreMainStarted) return;
+
+        var wsStatus = document.getElementById("ws-status");
+        var sceneStatus = document.getElementById("scene-status");
+        var frameStatus = document.getElementById("frame-status");
+        var bpmStatus = document.getElementById("bpm-status");
+        var beatStatus = document.getElementById("beat-status");
+        var audioSourceStatus = document.getElementById("audio-source-status");
+        var peakStatus = document.getElementById("inspector-peak");
+        var ampValue = document.getElementById("inspector-amplitude-value");
+        var ampFill = document.getElementById("inspector-amplitude-fill");
+        var bands = ["sub", "low", "mid", "high"];
+
+        function setText(element, text) {
+          if (element) element.textContent = text;
+        }
+
+        function setMeter(id, value) {
+          var fill = document.getElementById("inspector-band-" + id + "-fill");
+          var label = document.getElementById("inspector-band-" + id + "-value");
+          if (fill) fill.style.setProperty("--meter-value", value.toFixed(4));
+          if (label) label.textContent = value.toFixed(2);
+        }
+
+        setText(wsStatus, "WebSocket: fallback connecting (" + websocketUrl + ")");
+        window.fetch("/runtime", { cache: "no-store" })
+          .then(function (response) { return response.ok ? response.json() : null; })
+          .then(function (runtime) {
+            if (runtime && audioSourceStatus) {
+              audioSourceStatus.textContent = "Audio Source: " + runtime.audio_source;
+            }
+          })
+          .catch(function () {});
+
+        var socket = new WebSocket(websocketUrl);
+        socket.addEventListener("open", function () {
+          setText(wsStatus, "WebSocket: fallback connected (" + websocketUrl + ")");
+        });
+        socket.addEventListener("error", function () {
+          setText(wsStatus, "WebSocket: fallback error (" + websocketUrl + ")");
+        });
+        socket.addEventListener("close", function () {
+          setText(wsStatus, "WebSocket: fallback closed (" + websocketUrl + ")");
+        });
+        socket.addEventListener("message", function (event) {
+          var message;
+          try {
+            message = JSON.parse(event.data);
+          } catch (_error) {
+            return;
+          }
+          if (!message || message.type !== "audio_frame" || !message.payload) return;
+
+          var payload = message.payload;
+          var audio = payload.audio || {};
+          var scene = payload.scene || {};
+          var amplitude = Math.max(0, Math.min(1, Number(audio.amplitude || 0)));
+          var bpm = Number(audio.bpm || 0);
+          var beat = !!audio.beat;
+          var beatCount = Math.max(0, Number(audio.beat_count || 0) || 0);
+
+          setText(sceneStatus, "Scene: " + (scene.name || "unknown"));
+          setText(frameStatus, "Amplitude: " + amplitude.toFixed(4));
+          setText(bpmStatus, "BPM: " + (bpm > 0 ? bpm.toFixed(1) : "--"));
+          setText(beatStatus, "Beat: " + (beat ? "ON" : "off") + " | Count: " + beatCount);
+          if (ampValue) ampValue.textContent = amplitude.toFixed(3);
+          if (ampFill) ampFill.style.setProperty("--meter-value", amplitude.toFixed(4));
+          if (peakStatus) {
+            var peak = Number(audio.peak_frequency || 0);
+            peakStatus.textContent = peak > 0 ? "Peak: " + Math.round(peak) + " Hz" : "Peak: --";
+          }
+
+          var audioBands = audio.bands || {};
+          bands.forEach(function (key) {
+            setMeter(key, Math.max(0, Math.min(1, Number(audioBands[key] || 0))));
+          });
+        });
+      }, 1200);
+
+      window.addEventListener("beforeunload", function () {
+        window.clearTimeout(fallbackTimer);
+      });
+    })();
+  </script>
+  <script type="module" src="/src/main.js?v=20260516d"></script>
 </body>
 </html>

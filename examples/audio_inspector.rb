@@ -2,6 +2,8 @@
 
 # Visualizes the same audio features shown in the HUD inspector.
 Vizcore.define do
+  audio_normalize mode: :adaptive, window: 2.0, target: 0.85, floor: 0.001
+
   scene :audio_inspector do
     layer :bars do
       shader :audio_bars

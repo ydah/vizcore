@@ -266,8 +266,8 @@ void main() {
   barColor *= 0.65 + 0.75 * (lowW * u_bass + midW * u_mid + highW * u_high + u_amplitude * 0.35);
   barColor += vec3(0.9, 0.95, 1.0) * topGlow;
 
-  float active = barMask * fill;
-  vec3 color = bg + barColor * active;
+  float barFill = barMask * fill;
+  vec3 color = bg + barColor * barFill;
   color += barColor * barMask * topGlow * 0.45;
 
   outColor = vec4(color, 1.0);

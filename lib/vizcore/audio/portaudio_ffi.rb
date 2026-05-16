@@ -6,6 +6,8 @@ module Vizcore
     module PortAudioFFI
       # Runtime wrapper for an opened PortAudio input stream.
       class Stream
+        PA_INPUT_OVERFLOWED = -9981
+
         # @param mod [Module] ffi-bound PortAudio module
         # @param pointer [FFI::Pointer] native stream pointer
         # @param channels [Integer] input channel count
@@ -37,7 +39,7 @@ module Vizcore
 
           buffer = ffi_module::MemoryPointer.new(:float, frames * @channels)
           result = @mod.Pa_ReadStream(@pointer, buffer, frames)
-          return Array.new(frames, 0.0) unless ok?(result)
+          return Array.new(frames, 0.0) unless readable_result?(result)
 
           samples = buffer.read_array_of_float(frames * @channels)
           return samples if @channels == 1
@@ -83,6 +85,10 @@ module Vizcore
           result == self.class.pa_no_error
         end
 
+        def readable_result?(result)
+          ok?(result) || result == self.class.pa_input_overflowed
+        end
+
         def ffi_module
           self.class.ffi_module
         end
@@ -97,6 +103,12 @@ module Vizcore
           # @return [Integer]
           def pa_no_error
             0
+          end
+
+          # PortAudio returns this when input data was dropped before this read,
+          # but the current read buffer can still contain usable samples.
+          def pa_input_overflowed
+            PA_INPUT_OVERFLOWED
           end
         end
       end

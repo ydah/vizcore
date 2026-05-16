@@ -329,7 +329,7 @@ module Vizcore
         scripts = @plugin_assets.map do |asset|
           %(<script type="module" src="#{asset.fetch(:url)}"></script>)
         end.join("\n  ")
-        body.sub(%(<script type="module" src="/src/main.js"></script>), "#{scripts}\n  \\0")
+        body.sub(%(<script type="module" src="/src/main.js?v=20260516d"></script>), "#{scripts}\n  \\0")
       end
 
       def rack_escape_path(value)

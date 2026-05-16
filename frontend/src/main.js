@@ -46,6 +46,8 @@ import {
 } from "./visual-settings-preset.js";
 import { WebSocketClient } from "./websocket-client.js";
 
+window.__vizcoreMainStarted = true;
+
 const canvas = document.querySelector("#vizcore-canvas");
 const wsStatusElement = document.querySelector("#ws-status");
 const sceneStatusElement = document.querySelector("#scene-status");
@@ -100,30 +102,6 @@ let midiLearnBindings = loadMidiLearnBindings(browserStorage());
 const liveControls = createLiveControlState();
 const performanceMonitor = createPerformanceMonitorState();
 let projectorMode = resolveProjectorMode({ body: document.body, location: window.location });
-applyProjectorMode(document.body, projectorMode);
-const engine = new Engine(canvas);
-bindShaderCompileMetrics();
-engine.init();
-engine.setVisualSettings(visualSettings);
-engine.setLiveControls(liveControls);
-bindLiveControls();
-bindVisualControl(visualGainControl, "visualGain");
-bindVisualControl(bassBoostControl, "bassBoost");
-bindVisualControl(smoothingControl, "smoothing");
-bindVisualControl(beatHoldControl, "beatHoldMs");
-bindVisualControl(wobbleControl, "wobbleAmount");
-bindVisualPresetControls();
-bindMidiLearnControls();
-renderLiveControlStatus();
-renderPerformanceMonitor();
-syncVisualControls();
-renderReactivityStatus();
-renderMidiLearnStatus();
-bindShaderErrorOverlay();
-const fftBars = initializeFftPreview(fftPreviewElement);
-engine.start();
-startPerformanceMonitorLoop();
-
 let currentSceneName = "unknown";
 let audioElement = null;
 let frameCount = 0;
@@ -143,6 +121,41 @@ let shaderParamOverrides = {};
 let shaderParamControlsSignature = "";
 let midiAccess = null;
 let pendingMidiLearnAction = null;
+applyProjectorMode(document.body, projectorMode);
+const engine = new Engine(canvas);
+let rendererReady = false;
+bindShaderCompileMetrics();
+try {
+  engine.init();
+  rendererReady = true;
+} catch (error) {
+  renderShaderError({
+    layer: "renderer",
+    shader: "webgl2",
+    message: error instanceof Error ? error.message : String(error)
+  });
+}
+engine.setVisualSettings(visualSettings);
+engine.setLiveControls(liveControls);
+bindLiveControls();
+bindVisualControl(visualGainControl, "visualGain");
+bindVisualControl(bassBoostControl, "bassBoost");
+bindVisualControl(smoothingControl, "smoothing");
+bindVisualControl(beatHoldControl, "beatHoldMs");
+bindVisualControl(wobbleControl, "wobbleAmount");
+bindVisualPresetControls();
+bindMidiLearnControls();
+renderLiveControlStatus();
+renderPerformanceMonitor();
+syncVisualControls();
+renderReactivityStatus();
+renderMidiLearnStatus();
+bindShaderErrorOverlay();
+const fftBars = initializeFftPreview(fftPreviewElement);
+if (rendererReady) {
+  engine.start();
+}
+startPerformanceMonitorLoop();
 
 const websocketUrl = buildWebSocketUrl();
 const client = new WebSocketClient(websocketUrl, {
@@ -242,7 +255,7 @@ const client = new WebSocketClient(websocketUrl, {
       renderSceneButtons();
     }
     const connectedAt = lastConnectedAt ? ` | Last connected: ${formatClock(lastConnectedAt)}` : "";
-    wsStatusElement.textContent = `WebSocket: ${status}${connectedAt}`;
+    wsStatusElement.textContent = `WebSocket: ${status} (${websocketUrl})${connectedAt}`;
   }
 });
 

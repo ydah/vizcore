@@ -570,14 +570,14 @@ vizcore devices [audio|midi]
 
 ```bash
 # Microphone
-vizcore start scene.rb --audio-source mic
+vizcore start examples/audio_inspector.rb --audio-source mic
 
 # Specific microphone device
 vizcore devices audio
-vizcore start scene.rb --audio-source mic --audio-device 5
+vizcore start examples/audio_inspector.rb --audio-source mic --audio-device 5
 
-# Raise this if a quiet room still moves the visual
-vizcore start scene.rb --audio-source mic --audio-device 5 --noise-gate 0.03
+# Lower this when the selected input is too quiet to move the visual
+vizcore start examples/audio_inspector.rb --audio-source mic --audio-device 5 --noise-gate 0.001
 
 # WAV file
 vizcore start scene.rb --audio-source file --audio-file track.wav

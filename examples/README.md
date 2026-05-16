@@ -10,7 +10,8 @@ Most examples also work directly:
 
 ```bash
 vizcore start examples/basic.rb
-vizcore start examples/vj_techno_warehouse.rb --audio-source mic
+vizcore start examples/audio_inspector.rb --audio-source mic
+vizcore start examples/audio_inspector.rb --audio-source mic --noise-gate 0.001
 vizcore start examples/vj_techno_warehouse.rb --audio-source file --audio-file examples/assets/complex_demo_loop.wav
 ```
 
