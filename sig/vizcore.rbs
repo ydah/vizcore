@@ -202,6 +202,9 @@ module Vizcore::DSL
     def shader: (Symbol | String value, ?reload: bool? reload) -> Symbol
     def glsl: (String | Pathname path) -> String
     def file: (String | Pathname path) -> String
+    def circle: (**untyped options) ?{ () -> void } -> Hash[Symbol, untyped]
+    def line: (**untyped options) ?{ () -> void } -> Hash[Symbol, untyped]
+    def draw: () { () -> void } -> Array[Hash[Symbol, untyped]]
     def source: (Symbol | String value, **untyped options) -> (Symbol | source)
     def count: (Integer value) -> Integer
     def content: (String value) -> String
@@ -210,7 +213,7 @@ module Vizcore::DSL
     def align: (Symbol | String value) -> Symbol
     def font: (String value) -> String
     def fill: (String value) -> String
-    def stroke: (?width: Numeric? width, ?color: String? color) -> Hash[Symbol, untyped]
+    def stroke: (?untyped value, ?width: Numeric? width, ?color: String? color) -> Hash[Symbol, untyped]
     def shadow: (?color: String? color, ?blur: Numeric? blur) -> Hash[Symbol, untyped]
     def blend: (Symbol | String value) -> Symbol
     def palette: (*untyped colors) -> Array[String]

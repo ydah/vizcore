@@ -272,5 +272,31 @@ RSpec.describe Vizcore::DSL::MappingResolver do
 
       expect(resolved[0][:params][:spectrum]).to eq([0.6, 1.0, 0.0, 0.0])
     end
+
+    it "applies mappings to nested shape params" do
+      resolver = described_class.new
+      scene_layers = [
+        {
+          name: :rings,
+          type: :shape,
+          params: {
+            shapes: [
+              { kind: :circle, radius: 100 }
+            ]
+          },
+          mappings: [
+            {
+              source: { kind: :frequency_band, band: :low },
+              target: :"shapes.0.radius",
+              transform: { min: 40.0, max: 180.0 }
+            }
+          ]
+        }
+      ]
+
+      resolved = resolver.resolve_layers(scene_layers: scene_layers, audio: { bands: { low: 0.8 } })
+
+      expect(resolved[0][:params][:shapes][0][:radius]).to eq(40.0)
+    end
   end
 end

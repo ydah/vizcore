@@ -145,6 +145,16 @@ module Vizcore
         ),
         mappable_params: %i[gain opacity],
         description: "Scrolling FFT heatmap rendered by the browser."
+      ),
+      Capability.new(
+        type: :shape,
+        aliases: %i[shapes shape_layer],
+        params: COMMON_PARAMS.merge(
+          shapes: "Array<Hash>",
+          color_shift: "Float"
+        ),
+        mappable_params: %i[color_shift opacity],
+        description: "Declarative 2D circle and line primitives rendered by the browser."
       )
     ].freeze
 

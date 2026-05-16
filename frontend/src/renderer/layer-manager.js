@@ -3,6 +3,7 @@ import { getPostEffectShader } from "../shaders/post-effects.js";
 import { SHADER_ERROR_EVENT, buildShaderErrorDetail } from "../shader-error-overlay.js";
 import {
   buildRadialBlobLines,
+  buildShapeLines,
   buildWaveformLines,
   buildWireframeLines,
   estimateDeformFromSpectrum
@@ -265,6 +266,10 @@ export class LayerManager {
       this.renderSpectrogramLayer(layer, audio);
       return;
     }
+    if (isShapeLayer(layer)) {
+      this.renderShapeLayer(layer, audio, paletteIndex);
+      return;
+    }
     if (isShaderLayer(layer)) {
       this.renderShaderLayer(layer, audio, time, resolution, globals, visualSettings);
       return;
@@ -483,6 +488,28 @@ export class LayerManager {
       audio,
       params: layer?.params || {}
     });
+  }
+
+  renderShapeLayer(layer, audio, paletteIndex = 0) {
+    const gl = this.gl;
+    const params = layer?.params || {};
+    const points = buildShapeLines({ params });
+
+    if (points.length === 0) {
+      return;
+    }
+
+    gl.useProgram(this.geometryProgram);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.geometryBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(points), gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(this.geometryPositionLocation);
+    gl.vertexAttribPointer(this.geometryPositionLocation, 2, gl.FLOAT, false, 0, 0);
+
+    const amplitude = clamp(Number(audio?.amplitude || 0), 0, 1);
+    const fallbackColor = [0.85, 0.50 + amplitude * 0.24, 0.95];
+    const color = resolveLayerRgbColor(params, fallbackColor, paletteIndex);
+    gl.uniform3f(this.geometryColorLocation, color[0], color[1], color[2]);
+    gl.drawArrays(gl.LINES, 0, points.length / 2);
   }
 
   compositeLayer(layer, { audio, time, resolution }) {
@@ -726,6 +753,11 @@ const isWaveformLayer = (layer) => {
 const isSpectrogramLayer = (layer) => {
   const type = String(layer?.type || "").toLowerCase();
   return type === "spectrogram" || type === "spectrogram_layer";
+};
+
+const isShapeLayer = (layer) => {
+  const type = String(layer?.type || "").toLowerCase();
+  return type === "shape" || type === "shapes" || type === "shape_layer";
 };
 
 const defaultLayer = (audio) => ({

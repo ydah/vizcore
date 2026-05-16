@@ -132,6 +132,13 @@
       map amplitude, to: :gain
     end
 
+    layer :rings do
+      circle count: 8 do
+        radius 100
+        map bass, to: :radius
+      end
+    end
+
     layer :footage do
       type :video
       file "assets/loop.mp4"

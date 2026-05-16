@@ -103,6 +103,22 @@ export const buildWaveformLines = ({ time = 0, params = {}, audio = {} } = {}) =
   return points;
 };
 
+export const buildShapeLines = ({ params = {} } = {}) => {
+  const shapes = Array.isArray(params.shapes) ? params.shapes : [];
+  const points = [];
+
+  shapes.forEach((shape) => {
+    const kind = String(shape?.kind || shape?.type || "").toLowerCase();
+    if (kind === "circle") {
+      appendCircleShape(points, shape);
+    } else if (kind === "line") {
+      appendLineShape(points, shape);
+    }
+  });
+
+  return points;
+};
+
 const buildWaveformSamples = ({ detail, height, amplitude, spectrum, time }) => {
   const samples = [];
   const safeTime = finiteNumber(time, 0);
@@ -125,6 +141,58 @@ const appendLineSegments = (points, samples) => {
   for (let index = 1; index < samples.length; index += 1) {
     points.push(samples[index - 1][0], samples[index - 1][1], samples[index][0], samples[index][1]);
   }
+};
+
+const appendCircleShape = (points, shape) => {
+  const count = clampInt(shape.count || 1, 1, 64);
+  const segments = clampInt(shape.segments || 96, 12, 256);
+  const radius = normalizeShapeRadius(shape.radius ?? 100);
+  const x = normalizeShapeCoordinate(shape.x ?? 0, "x");
+  const y = normalizeShapeCoordinate(shape.y ?? 0, "y");
+
+  for (let ring = 0; ring < count; ring += 1) {
+    const ringRadius = radius * ((ring + 1) / count);
+    for (let index = 0; index < segments; index += 1) {
+      appendCirclePoint(points, x, y, ringRadius, index, segments);
+      appendCirclePoint(points, x, y, ringRadius, index + 1, segments);
+    }
+  }
+};
+
+const appendCirclePoint = (points, x, y, radius, index, segments) => {
+  const angle = (index / segments) * Math.PI * 2;
+  points.push(
+    clamp(x + Math.cos(angle) * radius, -1.2, 1.2),
+    clamp(y + Math.sin(angle) * radius, -1.2, 1.2)
+  );
+};
+
+const appendLineShape = (points, shape) => {
+  points.push(
+    normalizeShapeCoordinate(shape.x1 ?? -0.8, "x"),
+    normalizeShapeCoordinate(shape.y1 ?? 0, "y"),
+    normalizeShapeCoordinate(shape.x2 ?? 0.8, "x"),
+    normalizeShapeCoordinate(shape.y2 ?? 0, "y")
+  );
+};
+
+const normalizeShapeRadius = (value) => {
+  const numeric = finiteNumber(value, 100);
+  const radius = Math.abs(numeric) <= 2 ? Math.abs(numeric) : Math.abs(numeric) / 360;
+  return clamp(radius, 0.005, 1.4);
+};
+
+const normalizeShapeCoordinate = (value, axis) => {
+  const numeric = finiteNumber(value, 0);
+  if (Math.abs(numeric) <= 1.5) {
+    return clamp(numeric, -1.2, 1.2);
+  }
+
+  if (axis === "y") {
+    return clamp(1 - numeric / 360, -1.2, 1.2);
+  }
+
+  return clamp(numeric / 640 - 1, -1.2, 1.2);
 };
 
 const sampleSpectrum = (spectrum, progress) => {

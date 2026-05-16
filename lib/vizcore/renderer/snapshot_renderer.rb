@@ -54,6 +54,8 @@ module Vizcore
           render_waveform_layer(canvas, layer, audio, color)
         when "spectrogram", "spectrogram_layer"
           render_spectrogram_layer(canvas, layer, audio, color)
+        when "shape", "shapes", "shape_layer"
+          render_shape_layer(canvas, layer, audio, color)
         else
           render_geometry_layer(canvas, audio, color, index)
         end
@@ -147,6 +149,46 @@ module Vizcore
         end
       rescue ArgumentError, TypeError
         nil
+      end
+
+      def render_shape_layer(canvas, layer, audio, color)
+        params = Hash(layer[:params] || layer["params"] || {})
+        shapes = Array(params[:shapes] || params["shapes"])
+        pulse = clamp(audio[:beat_pulse])
+        alpha = 0.58 + pulse * 0.24
+
+        shapes.each do |shape|
+          shape_hash = Hash(shape)
+          case (shape_hash[:kind] || shape_hash["kind"]).to_s
+          when "circle"
+            render_circle_shape(canvas, shape_hash, color, alpha)
+          when "line"
+            render_line_shape(canvas, shape_hash, color, alpha)
+          end
+        end
+      rescue ArgumentError, TypeError
+        nil
+      end
+
+      def render_circle_shape(canvas, shape, color, alpha)
+        count = [[Integer(shape[:count] || shape["count"] || 1), 1].max, 32].min
+        radius = Float(shape[:radius] || shape["radius"] || 100).abs
+        x = Float(shape[:x] || shape["x"] || width * 0.5)
+        y = Float(shape[:y] || shape["y"] || height * 0.5)
+        x = width * 0.5 if x.abs <= 1.5
+        y = height * 0.5 if y.abs <= 1.5
+
+        count.times do |index|
+          canvas.draw_circle_outline(x, y, radius * ((index + 1).to_f / count), color, alpha: alpha)
+        end
+      end
+
+      def render_line_shape(canvas, shape, color, alpha)
+        x1 = Float(shape[:x1] || shape["x1"] || width * 0.2)
+        y1 = Float(shape[:y1] || shape["y1"] || height * 0.5)
+        x2 = Float(shape[:x2] || shape["x2"] || width * 0.8)
+        y2 = Float(shape[:y2] || shape["y2"] || height * 0.5)
+        canvas.draw_line(x1, y1, x2, y2, color, alpha: alpha)
       end
 
       def render_geometry_layer(canvas, audio, color, index)
@@ -272,6 +314,17 @@ module Vizcore
           draw_line(x + rect_width, y, x + rect_width, y + rect_height, color, alpha: alpha)
           draw_line(x + rect_width, y + rect_height, x, y + rect_height, color, alpha: alpha)
           draw_line(x, y + rect_height, x, y, color, alpha: alpha)
+        end
+
+        def draw_circle_outline(cx, cy, radius, color, alpha:)
+          segments = 96
+          previous = nil
+          (0..segments).each do |index|
+            angle = (index.to_f / segments) * Math::PI * 2
+            point = [cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius]
+            draw_line(previous[0], previous[1], point[0], point[1], color, alpha: alpha) if previous
+            previous = point
+          end
         end
 
         def fill_rect(x, y, rect_width, rect_height, color, alpha:)

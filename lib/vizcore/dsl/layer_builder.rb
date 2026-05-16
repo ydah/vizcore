@@ -67,6 +67,34 @@ module Vizcore
         @params[:file] = path.to_s
       end
 
+      # Declare a 2D circle/ring primitive for a shape layer.
+      #
+      # @param options [Hash] shape params such as `count`, `radius`, `x`, and `y`
+      # @yield optional block evaluated in the shape context
+      # @return [Hash]
+      def circle(**options, &block)
+        build_shape(:circle, options, &block)
+      end
+
+      # Declare a 2D line primitive for a shape layer.
+      #
+      # @param options [Hash] shape params such as `x1`, `y1`, `x2`, and `y2`
+      # @yield optional block evaluated in the shape context
+      # @return [Hash]
+      def line(**options, &block)
+        build_shape(:line, options, &block)
+      end
+
+      # Group shape primitives in a block for readability.
+      #
+      # @yield shape declarations
+      # @return [Array<Hash>]
+      def draw(&block)
+        @type ||= :shape
+        instance_eval(&block) if block
+        @params[:shapes] || []
+      end
+
       # @param value [Symbol, String] input source for media-like layers
       # @return [Symbol, Hash]
       def source(value, **options)
@@ -124,7 +152,14 @@ module Vizcore
       # @param width [Numeric, nil] text stroke width in pixels
       # @param color [String, nil] text stroke color
       # @return [Hash]
-      def stroke(width: nil, color: nil)
+      def stroke(value = NO_ARGUMENT, width: nil, color: nil)
+        if @current_shape
+          @current_shape[:stroke] = normalize_non_negative_param_number(value, :stroke) unless value.equal?(NO_ARGUMENT)
+          @current_shape[:stroke_width] = normalize_non_negative_param_number(width, :stroke_width) unless width.nil?
+          @current_shape[:stroke_color] = color.to_s unless color.nil?
+          return @current_shape
+        end
+
         @params[:stroke_width] = normalize_non_negative_param_number(width, :stroke_width) unless width.nil?
         @params[:stroke_color] = color.to_s unless color.nil?
         @params
@@ -197,6 +232,8 @@ module Vizcore
       # @raise [ArgumentError] when the mapping is empty or invalid
       # @return [void]
       def map(definition = nil, **options, &block)
+        definition, options = normalize_shape_mapping(definition, options) if @shape_target_prefix
+
         if options.key?(:to)
           transform_options = options.dup
           to = transform_options.delete(:to)
@@ -363,6 +400,11 @@ module Vizcore
       # Stores dynamic one-argument setters into `params`.
       # @api private
       def method_missing(method_name, *args, &block)
+        if @current_shape && block.nil? && args.length == 1
+          @current_shape[method_name.to_sym] = args.first
+          return args.first
+        end
+
         if block.nil? && args.length == 1
           @params[method_name.to_sym] = args.first
           return args.first
@@ -376,6 +418,65 @@ module Vizcore
       end
 
       private
+
+      def build_shape(kind, options, &block)
+        @type ||= :shape
+        shape = normalize_shape(kind, options)
+        @params[:shapes] ||= []
+        shape_index = @params[:shapes].length
+        @params[:shapes] << shape
+
+        with_shape_context(shape, shape_index) do
+          instance_eval(&block) if block
+        end
+
+        shape
+      end
+
+      def normalize_shape(kind, options)
+        shape = { kind: kind.to_sym }
+        options.each do |key, value|
+          shape[key.to_sym] = value
+        end
+        shape
+      end
+
+      def with_shape_context(shape, shape_index)
+        previous_shape = @current_shape
+        previous_prefix = @shape_target_prefix
+        @current_shape = shape
+        @shape_target_prefix = "shapes.#{shape_index}"
+        yield
+      ensure
+        @current_shape = previous_shape
+        @shape_target_prefix = previous_prefix
+      end
+
+      def normalize_shape_mapping(definition, options)
+        if options.key?(:to)
+          prefixed_options = options.dup
+          prefixed_options[:to] = prefixed_shape_target(prefixed_options[:to])
+          return [definition, prefixed_options]
+        end
+
+        mapping = definition.nil? ? options : Hash(definition)
+        prefixed_mapping = mapping.each_with_object({}) do |(source, target), output|
+          output[source] = prefix_shape_target_value(target)
+        end
+        [prefixed_mapping, {}]
+      end
+
+      def prefix_shape_target_value(target)
+        return prefixed_shape_target(target) unless target.is_a?(Hash)
+
+        target.merge(to: prefixed_shape_target(target.fetch(:to)))
+      rescue KeyError
+        target
+      end
+
+      def prefixed_shape_target(target)
+        :"#{@shape_target_prefix}.#{target}"
+      end
 
       def resolved_type
         return @type if @type

@@ -21,7 +21,7 @@ module Vizcore
 
       def resolve_layer(layer, audio)
         params = (layer[:params] || {}).dup
-        params.merge!(resolve_mappings(layer[:mappings], audio, layer_name: layer[:name]))
+        merge_resolved_mappings!(params, resolve_mappings(layer[:mappings], audio, layer_name: layer[:name]))
 
         output = {
           name: layer.fetch(:name).to_s,
@@ -43,8 +43,50 @@ module Vizcore
 
           value = resolve_source_value(source, audio)
           value = apply_transform(value, mapping[:transform], state_key: [layer_name, target, source])
-          resolved[target.to_sym] = value unless value.nil?
+          resolved[target.to_s] = value unless value.nil?
         end
+      end
+
+      def merge_resolved_mappings!(params, mappings)
+        mappings.each do |target, value|
+          if target.include?(".")
+            assign_nested_param(params, target.split("."), value)
+          else
+            params[target.to_sym] = value
+          end
+        end
+      end
+
+      def assign_nested_param(container, path, value)
+        key = path.shift
+        if path.empty?
+          assign_nested_value(container, key, value)
+          return
+        end
+
+        next_container = nested_value(container, key)
+        return unless next_container
+
+        assign_nested_param(next_container, path, value)
+      end
+
+      def nested_value(container, key)
+        return container[key.to_i] if container.is_a?(Array) && integer_key?(key)
+        return container[key.to_sym] if container.is_a?(Hash)
+
+        nil
+      end
+
+      def assign_nested_value(container, key, value)
+        if container.is_a?(Array) && integer_key?(key)
+          container[key.to_i] = value
+        elsif container.is_a?(Hash)
+          container[key.to_sym] = value
+        end
+      end
+
+      def integer_key?(value)
+        value.match?(/\A\d+\z/)
       end
 
       def resolve_source_value(source, audio)

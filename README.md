@@ -75,6 +75,14 @@ Vizcore.define do
       map amplitude, to: :gain, range: 0.8..3.0
     end
 
+    layer :rings do
+      circle count: 8 do
+        radius 100
+        stroke 2
+        map bass, to: :radius, range: 40..180
+      end
+    end
+
     layer :title do
       type :text
       content "DROP\nNOW"
@@ -293,6 +301,23 @@ layer :waterfall do
   bins 96
   history 128
   map amplitude, to: :gain, range: 0.8..3.0
+end
+```
+
+Shape layers provide declarative circles and lines for scenes that do not need
+custom GLSL. Shape-local mappings target the primitive inside the block:
+
+```ruby
+layer :rings do
+  circle count: 8 do
+    radius 100
+    stroke 2
+    map bass, to: :radius, range: 40..180
+  end
+
+  draw do
+    line x1: 0, y1: 360, x2: 1280, y2: 360
+  end
 end
 ```
 

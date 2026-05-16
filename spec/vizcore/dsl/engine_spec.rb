@@ -425,6 +425,38 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "stores 2d shape primitives and scoped shape mappings" do
+      definition = described_class.define do
+        scene :shapes do
+          layer :rings do
+            circle count: 8 do
+              radius 100
+              stroke 2
+              map bass, to: :radius, range: 40..180
+            end
+
+            draw do
+              line x1: 0, y1: 360, x2: 1280, y2: 360
+            end
+          end
+        end
+      end
+
+      layer = definition[:scenes].first[:layers].first
+      expect(layer[:type]).to eq(:shape)
+      expect(layer[:params][:shapes]).to eq(
+        [
+          { kind: :circle, count: 8, radius: 100, stroke: 2 },
+          { kind: :line, x1: 0, y1: 360, x2: 1280, y2: 360 }
+        ]
+      )
+      expect(layer[:mappings]).to include(
+        source: { kind: :frequency_band, band: :low },
+        target: :"shapes.0.radius",
+        transform: { min: 40, max: 180 }
+      )
+    end
+
     it "builds scenes from inherited layers" do
       definition = described_class.define do
         scene :base do

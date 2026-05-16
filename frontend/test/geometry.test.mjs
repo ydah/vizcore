@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   buildRadialBlobLines,
+  buildShapeLines,
   buildWaveformLines,
   estimateDeformFromSpectrum,
   normalizeWaveformStyle,
@@ -61,4 +62,22 @@ test("normalizeWaveformStyle resolves supported styles", () => {
   assert.equal(normalizeWaveformStyle("mirror"), "mirror");
   assert.equal(normalizeWaveformStyle("ribbon"), "ribbon");
   assert.equal(normalizeWaveformStyle("unknown"), "line");
+});
+
+test("buildShapeLines returns circle and line coordinates", () => {
+  const points = buildShapeLines({
+    params: {
+      shapes: [
+        { kind: "circle", count: 2, radius: 120, segments: 24 },
+        { kind: "line", x1: 0, y1: 360, x2: 1280, y2: 360 },
+      ],
+    },
+  });
+
+  assert.equal(points.length, (2 * 24 * 4) + 4);
+  assert.ok(points.every((value) => Number.isFinite(value)));
+});
+
+test("buildShapeLines ignores unknown shapes", () => {
+  assert.deepEqual(buildShapeLines({ params: { shapes: [{ kind: "triangle" }] } }), []);
 });
