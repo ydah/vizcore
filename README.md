@@ -45,7 +45,6 @@ Then open `http://127.0.0.1:4567`.
 This short preview is generated from `examples/readme_demo.rb` with the bundled
 demo audio: `beat_pulse -> ring radius`.
 
-
 ## Scene DSL
 
 Scenes are written in plain Ruby. Layers map audio analysis values to visual parameters:
@@ -631,7 +630,6 @@ Set `--osc-port` or `sync.osc.port` to receive OSC controls:
 `/vizcore/transport/play` or `/vizcore/transport/stop` for file transport.
 
 `vizcore demo` starts a bundled scene with bundled audio, so it is the quickest way to verify a fresh installation.
-
 
 `vizcore start scene.rb --reload` watches the scene file and pushes changes to connected browsers without restarting the server. Hot reload is enabled by default; use `--no-reload` when you want a fixed scene for a show.
 
