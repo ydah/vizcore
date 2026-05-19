@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Vizcore Ruby wasm playground for editing Ruby scene DSL and previewing audio-reactive visuals in the browser." />
+  <meta name="theme-color" content="#08110f" />
+  <link rel="canonical" href="https://ydah.github.io/vizcore/playground.html" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Vizcore Playground" />
+  <meta property="og:description" content="Edit Vizcore Ruby DSL and preview audio-reactive scenes in the browser." />
+  <meta property="og:url" content="https://ydah.github.io/vizcore/playground.html" />
+  <meta property="og:image" content="https://ydah.github.io/vizcore/assets/vizcore-poster.png" />
+  <title>Vizcore Playground</title>
+  <link rel="stylesheet" href="assets/playground.css" />
+</head>
+<body>
+  <a class="skip-link" href="#editor">Skip to editor</a>
+
+  <header class="topbar" aria-label="Playground header">
+    <a class="brand" href="index.html">Vizcore</a>
+    <nav class="topbar-nav" aria-label="Playground navigation">
+      <a href="index.html">Home</a>
+      <a href="https://github.com/ydah/vizcore">GitHub</a>
+    </nav>
+  </header>
+
+  <main class="playground-shell">
+    <section class="editor-panel" aria-labelledby="editor-title">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Ruby wasm</p>
+          <h1 id="editor-title">Playground</h1>
+        </div>
+        <div class="toolbar">
+          <label class="preset-label" for="preset-select">Preset</label>
+          <select id="preset-select" class="preset-select"></select>
+          <button id="run-button" class="button primary" type="button">Run</button>
+          <button id="reset-button" class="button secondary" type="button">Reset</button>
+        </div>
+      </div>
+
+      <textarea id="editor" class="code-editor" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+
+      <div class="output-row">
+        <div class="status-line" aria-live="polite">
+          <span id="ruby-status">Ruby wasm idle</span>
+          <span id="compile-status">Waiting</span>
+        </div>
+        <details class="json-output">
+          <summary>Scene JSON</summary>
+          <pre id="json-output">{}</pre>
+        </details>
+      </div>
+    </section>
+
+    <section class="preview-panel" aria-labelledby="preview-title">
+      <div class="preview-header">
+        <div>
+          <p class="eyebrow">Canvas preview</p>
+          <h2 id="preview-title">Output</h2>
+        </div>
+        <div id="scene-tabs" class="scene-tabs" aria-label="Scenes"></div>
+      </div>
+
+      <div class="canvas-wrap">
+        <canvas id="preview-canvas" width="1280" height="720" aria-label="Vizcore visual preview"></canvas>
+        <div class="preview-meter" aria-live="polite">
+          <span id="scene-stat">Scene: --</span>
+          <span id="audio-stat">Amplitude: --</span>
+          <span id="beat-stat">Beat: --</span>
+        </div>
+      </div>
+
+      <div id="error-output" class="error-output" role="alert" hidden></div>
+    </section>
+  </main>
+
+  <script type="module" src="assets/playground.js"></script>
+</body>
+</html>
