@@ -6,6 +6,8 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-05-20
+
 ### Added
 
 - Expanded the Ruby DSL for musical timing, scene sequencing, reusable styles/themes, scene inheritance, layer styling, blending, and source-driven reactivity.
@@ -18,7 +20,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 ### Improved
 
 - Improved live reliability and diagnostics with WebSocket protocol versioning, latency probes, dropped-frame visibility, stale audio-frame backpressure handling, and repeatable audio fixtures.
-- Improved scene validation and packaging coverage for examples, browser assets, docs, and RBS files.
+- Improved installed gem contents so examples, browser assets, docs, and RBS files are available after installation.
 
 ## 0.1.0 (2026-02-23)
 
