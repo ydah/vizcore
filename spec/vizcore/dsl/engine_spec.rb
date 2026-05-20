@@ -773,6 +773,32 @@ RSpec.describe Vizcore::DSL::Engine do
           end
         end
       end.to raise_error(ArgumentError, /Invalid path `empty`: commands must not be empty/)
+
+      expect do
+        described_class.define do
+          scene :invalid_shape_scene do
+            layer :bad do
+              path :busy, detail: 8, max_segments: 4 do
+                move_to 0, 0
+                cubic_to 20, 80, 80, -80, 100, 0
+              end
+            end
+          end
+        end
+      end.to raise_error(ArgumentError, /Invalid path `busy`: max_segments exceeded \(8 > 4\)/)
+
+      expect do
+        described_class.define do
+          scene :invalid_shape_scene do
+            layer :bad do
+              path :invalid_budget, max_segments: 0 do
+                move_to 0, 0
+                line_to 10, 0
+              end
+            end
+          end
+        end
+      end.to raise_error(ArgumentError, /Invalid path `invalid_budget`: max_segments must be a positive integer/)
     end
 
     it "builds scenes from inherited layers" do

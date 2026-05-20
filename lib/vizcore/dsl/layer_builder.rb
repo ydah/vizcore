@@ -13,6 +13,10 @@ module Vizcore
       MAPPING_SOURCE_KINDS = %i[
         amplitude frequency_band fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
       ].freeze
+      PATH_DEFAULT_DETAIL = 32
+      PATH_MIN_DETAIL = 4
+      PATH_MAX_DETAIL = 128
+      PATH_DEFAULT_MAX_SEGMENTS = 4096
       SHAPE_TARGET_ALIASES = {
         "translate_x" => "transform.translate.x",
         "translate_y" => "transform.translate.y",
@@ -1000,7 +1004,69 @@ module Vizcore
         when :polyline
           validate_shape_points!(shape, minimum: 2)
         when :path
-          raise ArgumentError, "Invalid path#{shape_label(shape)}: commands must not be empty" if Array(shape[:commands]).empty?
+          validate_path_shape!(shape)
+        end
+      end
+
+      def validate_path_shape!(shape)
+        commands = Array(shape[:commands])
+        raise ArgumentError, "Invalid path#{shape_label(shape)}: commands must not be empty" if commands.empty?
+
+        detail = normalized_path_integer(shape, :detail, PATH_DEFAULT_DETAIL).clamp(PATH_MIN_DETAIL, PATH_MAX_DETAIL)
+        max_segments = normalized_path_integer(shape, :max_segments, PATH_DEFAULT_MAX_SEGMENTS)
+        validate_path_tolerance!(shape)
+
+        segment_count = estimated_path_segments(commands, detail)
+        return if segment_count <= max_segments
+
+        raise ArgumentError,
+              "Invalid path#{shape_label(shape)}: max_segments exceeded (#{segment_count} > #{max_segments})"
+      end
+
+      def normalized_path_integer(shape, key, default)
+        value = shape.key?(key) ? shape[key] : default
+        numeric = Integer(value)
+        raise ArgumentError if numeric <= 0
+
+        numeric
+      rescue ArgumentError, TypeError
+        raise ArgumentError, "Invalid path#{shape_label(shape)}: #{key} must be a positive integer"
+      end
+
+      def validate_path_tolerance!(shape)
+        return unless shape.key?(:tolerance)
+
+        value = normalize_param_number(shape[:tolerance], :tolerance)
+        return unless value.negative?
+
+        raise ArgumentError, "Invalid path#{shape_label(shape)}: tolerance must be non-negative"
+      end
+
+      def estimated_path_segments(commands, detail)
+        current = false
+        subpath_start = false
+        commands.sum do |entry|
+          command, *values = Array(entry)
+          case command.to_s.upcase
+          when "M"
+            current = values.length >= 2
+            subpath_start = current
+            0
+          when "L"
+            current && values.length >= 2 ? 1 : 0
+          when "H", "V"
+            current && values.length >= 1 ? 1 : 0
+          when "Q"
+            current && values.length >= 4 ? detail : 0
+          when "C"
+            current && values.length >= 6 ? detail : 0
+          when "A"
+            current && values.length >= 7 ? detail : 0
+          when "Z"
+            current && subpath_start ? 1 : 0
+          else
+            0
+          end
         end
       end
 

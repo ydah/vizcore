@@ -31,7 +31,7 @@ Supported primitives:
 - `rect id = nil, x: 0, y: 0, width:, height:, radius: 0`
 - `polygon id = nil, points: [[x, y], ...], closed: true`
 - `polyline id = nil, points: [[x, y], ...]`
-- `path id = nil, detail: 32 do ... end`
+- `path id = nil, detail: 32, max_segments: 4096 do ... end`
 - `bezier id = nil, from:, control:, to:` for quadratic curves
 - `bezier id = nil, from:, c1:, c2:, to:` for cubic curves
 - `star id = nil, points: 5, radius: 100, inner_radius: 50`
@@ -57,6 +57,9 @@ end
 Commands are serialized as `M`, `L`, `Q`, `C`, `H`, `V`, `A`, and `Z`. The
 Canvas2D renderer draws `arc_to` as an SVG-style elliptical arc, and the line
 fallback/snapshot renderer flattens curves and arcs to line segments.
+`detail` controls the curve/arc subdivision count. `max_segments` caps the
+number of flattened line segments per path; the DSL raises when the estimated
+flattened path would exceed that budget.
 
 ## Style And Transform
 
@@ -229,6 +232,7 @@ The DSL raises early for malformed primitives:
 - `polygon` with fewer than 3 points
 - `polyline` with fewer than 2 points
 - `path` without commands
+- `path` whose estimated flattened segment count exceeds `max_segments`
 - unknown `custom_shape`
 - custom shapes that return unsupported primitive kinds
 

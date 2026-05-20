@@ -8,6 +8,8 @@ module Vizcore
     class SnapshotRenderer
       DEFAULT_WIDTH = 1280
       DEFAULT_HEIGHT = 720
+      PATH_DEFAULT_MAX_SEGMENTS = 4096
+      PATH_HARD_MAX_SEGMENTS = 65_536
       PALETTE = [
         [56, 189, 248],
         [225, 29, 72],
@@ -239,6 +241,7 @@ module Vizcore
 
       def render_path_shape(canvas, shape, color, alpha, context)
         detail = [[Integer(shape[:detail] || shape["detail"] || 32), 4].max, 128].min
+        segment_budget = { remaining: path_segment_limit(shape) }
         current = nil
         subpath_start = nil
         Array(shape[:commands] || shape["commands"]).each do |entry|
@@ -251,29 +254,31 @@ module Vizcore
           when "L"
             next unless current && values.length >= 2
 
-            current = draw_raw_path_segment(canvas, current, values.first(2), shape, color, alpha, context)
+            current = draw_raw_path_segment(canvas, current, values.first(2), shape, color, alpha, context, segment_budget)
           when "H"
             next unless current && values.length >= 1
 
-            current = draw_raw_path_segment(canvas, current, [values[0], current[1]], shape, color, alpha, context)
+            current = draw_raw_path_segment(canvas, current, [values[0], current[1]], shape, color, alpha, context, segment_budget)
           when "V"
             next unless current && values.length >= 1
 
-            current = draw_raw_path_segment(canvas, current, [current[0], values[0]], shape, color, alpha, context)
+            current = draw_raw_path_segment(canvas, current, [current[0], values[0]], shape, color, alpha, context, segment_budget)
           when "Q"
             next unless current && values.length >= 4
 
-            current = draw_quadratic_path(canvas, current, values, detail, shape, color, alpha, context)
+            current = draw_quadratic_path(canvas, current, values, detail, shape, color, alpha, context, segment_budget)
           when "C"
             next unless current && values.length >= 6
 
-            current = draw_cubic_path(canvas, current, values, detail, shape, color, alpha, context)
+            current = draw_cubic_path(canvas, current, values, detail, shape, color, alpha, context, segment_budget)
           when "A"
             next unless current && values.length >= 7
 
-            current = draw_arc_path(canvas, current, values, detail, shape, color, alpha, context)
+            current = draw_arc_path(canvas, current, values, detail, shape, color, alpha, context, segment_budget)
           when "Z"
-            current = draw_raw_path_segment(canvas, current, subpath_start, shape, color, alpha, context) if current && subpath_start
+            if current && subpath_start
+              current = draw_raw_path_segment(canvas, current, subpath_start, shape, color, alpha, context, segment_budget)
+            end
           end
         end
       end
@@ -285,45 +290,52 @@ module Vizcore
         draw_shape_segment(canvas, points.last, points.first, shape, color, alpha, context) if closed && points.length > 2
       end
 
-      def draw_raw_path_segment(canvas, from, to, shape, color, alpha, context)
+      def draw_raw_path_segment(canvas, from, to, shape, color, alpha, context, segment_budget = nil)
+        return to if segment_budget && segment_budget[:remaining] <= 0
+
         draw_shape_segment(canvas, shape_point(from[0], from[1], context), shape_point(to[0], to[1], context), shape, color, alpha, context)
+        segment_budget[:remaining] -= 1 if segment_budget
         to
       end
 
-      def draw_quadratic_path(canvas, current, values, detail, shape, color, alpha, context)
+      def draw_quadratic_path(canvas, current, values, detail, shape, color, alpha, context, segment_budget = nil)
         previous = current
         control = values.first(2)
         endpoint = values.last(2)
         1.upto(detail) do |step|
+          break if segment_budget && segment_budget[:remaining] <= 0
+
           t = step.to_f / detail
           point = [
             quadratic_point(current[0], control[0], endpoint[0], t),
             quadratic_point(current[1], control[1], endpoint[1], t)
           ]
-          draw_raw_path_segment(canvas, previous, point, shape, color, alpha, context)
+          draw_raw_path_segment(canvas, previous, point, shape, color, alpha, context, segment_budget)
           previous = point
         end
         endpoint
       end
 
-      def draw_cubic_path(canvas, current, values, detail, shape, color, alpha, context)
+      def draw_cubic_path(canvas, current, values, detail, shape, color, alpha, context, segment_budget = nil)
         previous = current
         c1 = values[0, 2]
         c2 = values[2, 2]
         endpoint = values[4, 2]
         1.upto(detail) do |step|
+          break if segment_budget && segment_budget[:remaining] <= 0
+
           t = step.to_f / detail
           point = [
             cubic_point(current[0], c1[0], c2[0], endpoint[0], t),
             cubic_point(current[1], c1[1], c2[1], endpoint[1], t)
           ]
-          draw_raw_path_segment(canvas, previous, point, shape, color, alpha, context)
+          draw_raw_path_segment(canvas, previous, point, shape, color, alpha, context, segment_budget)
           previous = point
         end
         endpoint
       end
 
-      def draw_arc_path(canvas, current, values, detail, shape, color, alpha, context)
+      def draw_arc_path(canvas, current, values, detail, shape, color, alpha, context, segment_budget = nil)
         endpoint = values[5, 2]
         arc = svg_arc_description(
           from: current,
@@ -334,16 +346,27 @@ module Vizcore
           large_arc: arc_flag(values[3]),
           sweep: arc_flag(values[4])
         )
-        return draw_raw_path_segment(canvas, current, endpoint, shape, color, alpha, context) unless arc
+        unless arc
+          return draw_raw_path_segment(canvas, current, endpoint, shape, color, alpha, context, segment_budget)
+        end
 
         previous = current
         segments = svg_arc_segment_count(arc, detail)
         1.upto(segments) do |step|
+          break if segment_budget && segment_budget[:remaining] <= 0
+
           point = svg_arc_point(arc, step.to_f / segments)
-          draw_raw_path_segment(canvas, previous, point, shape, color, alpha, context)
+          draw_raw_path_segment(canvas, previous, point, shape, color, alpha, context, segment_budget)
           previous = point
         end
         endpoint
+      end
+
+      def path_segment_limit(shape)
+        raw_value = shape[:max_segments] || shape["max_segments"] || PATH_DEFAULT_MAX_SEGMENTS
+        [[Integer(raw_value), 1].max, PATH_HARD_MAX_SEGMENTS].min
+      rescue ArgumentError, TypeError
+        PATH_DEFAULT_MAX_SEGMENTS
       end
 
       def draw_shape_segment(canvas, from, to, shape, color, alpha, context)

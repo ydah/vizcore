@@ -136,6 +136,25 @@ test("buildShapeLines flattens arc path commands", () => {
   assert.notEqual(points[3], 0);
 });
 
+test("buildShapeLines respects path max_segments", () => {
+  const points = buildShapeLines({
+    params: {
+      shape_schema_version: 2,
+      shapes: [
+        {
+          kind: "path",
+          detail: 16,
+          max_segments: 3,
+          commands: [["M", 0, 0], ["C", 20, 80, 80, -80, 100, 0], ["L", 120, 0]],
+        },
+      ],
+    },
+  });
+
+  assert.equal(points.length, 12);
+  assert.ok(points.every((value) => Number.isFinite(value)));
+});
+
 test("buildShapeLines ignores unknown shapes", () => {
   assert.deepEqual(buildShapeLines({ params: { shapes: [{ kind: "triangle" }] } }), []);
 });

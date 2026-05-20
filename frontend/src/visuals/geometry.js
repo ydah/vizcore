@@ -70,6 +70,8 @@ const MESH_PRESETS = {
 };
 const SHAPE_HALF_WIDTH = 640;
 const SHAPE_HALF_HEIGHT = 360;
+const PATH_DEFAULT_MAX_SEGMENTS = 4096;
+const PATH_HARD_MAX_SEGMENTS = 65536;
 
 export const buildWireframeLines = ({ rotationY, rotationX, deform }) => {
   const amount = clamp(Number(deform || 0), 0, 1);
@@ -315,6 +317,7 @@ const appendStarShape = (points, shape, context) => {
 const appendPathShape = (points, shape, context) => {
   const commands = Array.isArray(shape.commands) ? shape.commands : [];
   const detail = clampInt(shape.detail || 32, 4, 128);
+  const budget = pathSegmentBudget(shape);
   let current = null;
   let subpathStart = null;
 
@@ -327,30 +330,30 @@ const appendPathShape = (points, shape, context) => {
       subpathStart = current;
     } else if (command === "L" && current && values.length >= 2) {
       const next = [values[0], values[1]];
-      appendRawSegment(points, current, next, shape, context);
+      appendRawSegment(points, current, next, shape, context, budget);
       current = next;
     } else if (command === "H" && current && values.length >= 1) {
       const next = [values[0], current[1]];
-      appendRawSegment(points, current, next, shape, context);
+      appendRawSegment(points, current, next, shape, context, budget);
       current = next;
     } else if (command === "V" && current && values.length >= 1) {
       const next = [current[0], values[0]];
-      appendRawSegment(points, current, next, shape, context);
+      appendRawSegment(points, current, next, shape, context, budget);
       current = next;
     } else if (command === "Q" && current && values.length >= 4) {
-      current = appendQuadraticPath(points, current, values, detail, shape, context);
+      current = appendQuadraticPath(points, current, values, detail, shape, context, budget);
     } else if (command === "C" && current && values.length >= 6) {
-      current = appendCubicPath(points, current, values, detail, shape, context);
+      current = appendCubicPath(points, current, values, detail, shape, context, budget);
     } else if (command === "A" && current && values.length >= 7) {
-      current = appendArcPath(points, current, values, detail, shape, context);
+      current = appendArcPath(points, current, values, detail, shape, context, budget);
     } else if (command === "Z" && current && subpathStart) {
-      appendRawSegment(points, current, subpathStart, shape, context);
+      appendRawSegment(points, current, subpathStart, shape, context, budget);
       current = subpathStart;
     }
   });
 };
 
-const appendQuadraticPath = (points, current, values, detail, shape, context) => {
+const appendQuadraticPath = (points, current, values, detail, shape, context, budget) => {
   let previous = current;
   const control = [values[0], values[1]];
   const end = [values[2], values[3]];
@@ -361,14 +364,14 @@ const appendQuadraticPath = (points, current, values, detail, shape, context) =>
       quadraticPoint(current[0], control[0], end[0], t),
       quadraticPoint(current[1], control[1], end[1], t)
     ];
-    appendRawSegment(points, previous, next, shape, context);
+    if (!appendRawSegment(points, previous, next, shape, context, budget)) break;
     previous = next;
   }
 
   return end;
 };
 
-const appendCubicPath = (points, current, values, detail, shape, context) => {
+const appendCubicPath = (points, current, values, detail, shape, context, budget) => {
   let previous = current;
   const c1 = [values[0], values[1]];
   const c2 = [values[2], values[3]];
@@ -380,14 +383,14 @@ const appendCubicPath = (points, current, values, detail, shape, context) => {
       cubicPoint(current[0], c1[0], c2[0], end[0], t),
       cubicPoint(current[1], c1[1], c2[1], end[1], t)
     ];
-    appendRawSegment(points, previous, next, shape, context);
+    if (!appendRawSegment(points, previous, next, shape, context, budget)) break;
     previous = next;
   }
 
   return end;
 };
 
-const appendArcPath = (points, current, values, detail, shape, context) => {
+const appendArcPath = (points, current, values, detail, shape, context, budget) => {
   const end = [values[5], values[6]];
   const arc = describeSvgArc({
     from: current,
@@ -400,7 +403,7 @@ const appendArcPath = (points, current, values, detail, shape, context) => {
   });
 
   if (!arc) {
-    appendRawSegment(points, current, end, shape, context);
+    appendRawSegment(points, current, end, shape, context, budget);
     return end;
   }
 
@@ -408,15 +411,23 @@ const appendArcPath = (points, current, values, detail, shape, context) => {
   const segments = svgArcSegmentCount(arc, detail);
   for (let step = 1; step <= segments; step += 1) {
     const next = svgArcPoint(arc, step / segments);
-    appendRawSegment(points, previous, next, shape, context);
+    if (!appendRawSegment(points, previous, next, shape, context, budget)) break;
     previous = next;
   }
 
   return end;
 };
 
-const appendRawSegment = (points, from, to, shape, context) => {
+const appendRawSegment = (points, from, to, shape, context, budget) => {
+  if (budget && budget.remaining <= 0) {
+    return false;
+  }
+
   appendSegment(points, normalizeShapePoint(from[0], from[1], context), normalizeShapePoint(to[0], to[1], context), shape, context);
+  if (budget) {
+    budget.remaining -= 1;
+  }
+  return true;
 };
 
 const appendPolylineSegments = (points, vertices, shape, context, closed) => {
@@ -580,6 +591,11 @@ const logicalShapeUnits = (value) => ["logical", "center", "center_origin", "px"
 const screenShapeUnits = (value) => ["screen", "canvas", "viewport"].includes(value);
 
 const radiusToRawHalf = (value) => finiteNumber(value, 100) * 0.5;
+
+const pathSegmentBudget = (shape) => {
+  const value = shape.max_segments ?? shape.maxSegments ?? PATH_DEFAULT_MAX_SEGMENTS;
+  return { remaining: clampInt(value, 1, PATH_HARD_MAX_SEGMENTS) };
+};
 
 const quadraticPoint = (from, control, to, t) => {
   const inv = 1 - t;
