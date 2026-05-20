@@ -192,7 +192,9 @@ end
 
 `draw(ctx)` may return a primitive hash, an array of primitive hashes, or build
 primitives with `ctx.draw`, `ctx.circle`, `ctx.rect`, `ctx.path`, and the other
-shape methods.
+shape methods. Values declared with `param` are validated against their
+`min`/`max` metadata before `draw(ctx)` runs, and dynamic custom shape
+descriptors include the same schema for editor tooling.
 
 By default, custom shapes are expanded when the DSL is evaluated. Use
 `dynamic: true` when the generator needs mapped params, `ctx.time`, `ctx.frame`,

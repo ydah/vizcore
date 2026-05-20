@@ -852,6 +852,8 @@ module Vizcore
           transform: {},
           dynamic: true
         }
+        param_schema = custom_shape_param_schema(definition.renderer)
+        descriptor[:param_schema] = param_schema unless param_schema.empty?
         descriptor[:shape_id] = shape_id.to_sym if shape_id
         descriptor_index = @params[:custom_shapes].length
         @params[:custom_shapes] << descriptor
@@ -1108,6 +1110,12 @@ module Vizcore
         return Vizcore::Shape::Definition.new(name: nil, renderer: renderer) unless renderer.is_a?(Symbol) || renderer.is_a?(String)
 
         Vizcore.resolve_shape(renderer) || raise(ArgumentError, "Unknown custom shape: #{renderer.inspect}. Register it with `Vizcore.register_shape #{renderer.inspect}, ShapeClass`.")
+      end
+
+      def custom_shape_param_schema(renderer)
+        return [] unless renderer.respond_to?(:shape_param_schema)
+
+        renderer.shape_param_schema.values.map(&:dup)
       end
 
       def register_shape_id!(shape, shape_index)

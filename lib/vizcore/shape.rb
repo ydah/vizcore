@@ -207,8 +207,8 @@ module Vizcore
     # Context passed into custom shape draw methods.
     class DrawContext
       def initialize(params:, param_schema: {}, shape_id: nil, layer_name: nil, palette: [], audio: {}, time: 0.0, frame: 0, resolution: [1280, 720], globals: {})
-        @param_schema = param_schema
-        @params = default_params.merge(symbolize_hash(params))
+        @param_schema = symbolize_param_schema(param_schema)
+        @params = normalize_params(default_params.merge(symbolize_hash(params)))
         @shape_id = shape_id&.to_sym
         @layer_name = layer_name
         @palette = Array(palette)
@@ -259,8 +259,57 @@ module Vizcore
         end
       end
 
+      def normalize_params(values)
+        values.each_with_object({}) do |(key, value), output|
+          symbol_key = key.to_sym
+          metadata = @param_schema[symbol_key]
+          output[symbol_key] = metadata ? normalize_param_value(symbol_key, value, metadata) : value
+        end
+      end
+
+      def normalize_param_value(key, value, metadata)
+        return value unless numeric_param?(metadata)
+
+        numeric = numeric_param_value(key, value)
+        min = numeric_metadata(metadata[:min])
+        max = numeric_metadata(metadata[:max])
+        raise ArgumentError, "shape param #{key} must be >= #{min}" if min && numeric < min
+        raise ArgumentError, "shape param #{key} must be <= #{max}" if max && numeric > max
+
+        numeric
+      end
+
+      def numeric_param_value(key, value)
+        Float(value)
+      rescue ArgumentError, TypeError
+        raise ArgumentError, "shape param #{key} must be numeric"
+      end
+
+      def numeric_param?(metadata)
+        %i[default min max step].any? do |key|
+          metadata.key?(key) && numeric_metadata(metadata[key])
+        end
+      end
+
+      def numeric_metadata(value)
+        return nil if value.nil?
+
+        numeric = Float(value)
+        numeric if numeric.finite?
+      rescue ArgumentError, TypeError
+        nil
+      end
+
       def symbolize_hash(value)
         Hash(value).each_with_object({}) { |(key, entry), output| output[key.to_sym] = entry }
+      rescue TypeError
+        {}
+      end
+
+      def symbolize_param_schema(value)
+        Hash(value).each_with_object({}) do |(key, metadata), output|
+          output[key.to_sym] = symbolize_hash(metadata)
+        end
       rescue TypeError
         {}
       end

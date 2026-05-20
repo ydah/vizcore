@@ -657,7 +657,7 @@ RSpec.describe Vizcore::DSL::Engine do
       shape_class = Class.new do
         include Vizcore::Shape
 
-        param :radius, default: 64
+        param :radius, default: 64, min: 10, max: 120, step: 1
 
         def draw(ctx)
           ctx.circle radius: ctx.param(:radius)
@@ -687,6 +687,7 @@ RSpec.describe Vizcore::DSL::Engine do
           params: { radius: 48 },
           style: { fill: "#22d3ee" },
           transform: { rotate: 15.0 },
+          param_schema: [{ name: :radius, default: 64, min: 10, max: 120, step: 1 }],
           dynamic: true
         )
       )
@@ -702,6 +703,29 @@ RSpec.describe Vizcore::DSL::Engine do
           transform: { min: 0.8, max: 1.2 }
         }
       )
+    end
+
+    it "validates custom shape params from declared metadata" do
+      shape_class = Class.new do
+        include Vizcore::Shape
+
+        param :radius, default: 64, min: 10, max: 120
+
+        def draw(ctx)
+          ctx.circle radius: ctx.param(:radius)
+        end
+      end
+      Vizcore.register_shape :engine_spec_validated_shape, shape_class
+
+      expect do
+        described_class.define do
+          scene :custom_shape_scene do
+            layer :generated do
+              custom_shape :engine_spec_validated_shape, radius: 140
+            end
+          end
+        end
+      end.to raise_error(ArgumentError, /shape param radius must be <= 120.0/)
     end
 
     it "raises when a custom shape is unknown" do
