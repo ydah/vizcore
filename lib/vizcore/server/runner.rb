@@ -398,6 +398,8 @@ module Vizcore
           switch_scene_from_client(target_name, broadcaster)
         when "tap_tempo"
           apply_tap_tempo(payload, broadcaster)
+        when "custom_shape_param"
+          apply_custom_shape_param(payload, broadcaster)
         end
       rescue StandardError => e
         @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "Client control message failed"))
@@ -612,6 +614,25 @@ module Vizcore
           payload: {
             globals: globals,
             source: "osc"
+          }
+        )
+      end
+
+      def apply_custom_shape_param(payload, broadcaster)
+        return unless broadcaster.respond_to?(:set_custom_shape_param)
+
+        values = Hash(payload)
+        overrides = broadcaster.set_custom_shape_param(
+          layer_name: values["layer"] || values[:layer] || values["layer_name"] || values[:layer_name],
+          custom_shape_index: values["custom_shape_index"] || values[:custom_shape_index] || values["index"] || values[:index],
+          param: values["param"] || values[:param],
+          value: values["value"] || values[:value]
+        )
+        WebSocketHandler.broadcast(
+          type: "config_update",
+          payload: {
+            custom_shape_params: overrides,
+            source: "ui"
           }
         )
       end

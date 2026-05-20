@@ -67,6 +67,8 @@ module Vizcore
         @error_reporter = error_reporter || ->(_message) {}
         @last_error = nil
         @frame_count = 0
+        @custom_shape_param_overrides = {}
+        @custom_shape_param_mutex = Mutex.new
         @transport_playing = initial_transport_playing_state
         reset_transition_trigger_counters!
         @tap_tempo = Vizcore::Analysis::TapTempo.new
@@ -210,6 +212,23 @@ module Vizcore
         true
       end
 
+      def set_custom_shape_param(layer_name:, custom_shape_index:, param:, value:)
+        layer_key = layer_name.to_s
+        param_key = param.to_s.strip
+        index = Integer(custom_shape_index)
+        numeric = finite_float(value)
+        return custom_shape_param_overrides_snapshot if layer_key.empty? || param_key.empty? || index.negative? || numeric.nil?
+
+        @custom_shape_param_mutex.synchronize do
+          @custom_shape_param_overrides[layer_key] ||= {}
+          @custom_shape_param_overrides[layer_key][index] ||= {}
+          @custom_shape_param_overrides[layer_key][index][param_key] = numeric
+          deep_dup(@custom_shape_param_overrides)
+        end
+      rescue ArgumentError, TypeError
+        custom_shape_param_overrides_snapshot
+      end
+
       # Build one frame payload for transport to frontend.
       #
       # @param _elapsed_seconds [Float]
@@ -296,7 +315,37 @@ module Vizcore
       def build_scene_layers(scene_layers, analyzed, time: 0.0, frame: 0)
         return default_scene_layers(analyzed) if scene_layers.empty?
 
-        @mapping_resolver.resolve_layers(scene_layers: scene_layers, audio: analyzed, time: time, frame: frame)
+        @mapping_resolver.resolve_layers(
+          scene_layers: scene_layers,
+          audio: analyzed,
+          time: time,
+          frame: frame,
+          custom_shape_overrides: custom_shape_param_overrides_snapshot
+        )
+      end
+
+      def custom_shape_param_overrides_snapshot
+        @custom_shape_param_mutex.synchronize { deep_dup(@custom_shape_param_overrides) }
+      end
+
+      def finite_float(value)
+        numeric = Float(value)
+        return nil unless numeric.finite?
+
+        numeric
+      rescue ArgumentError, TypeError
+        nil
+      end
+
+      def deep_dup(value)
+        case value
+        when Hash
+          value.each_with_object({}) { |(key, entry), output| output[key] = deep_dup(entry) }
+        when Array
+          value.map { |entry| deep_dup(entry) }
+        else
+          value
+        end
       end
 
       def default_scene_layers(analyzed)

@@ -368,6 +368,64 @@ RSpec.describe Vizcore::DSL::MappingResolver do
           }
         ]
       )
+      expect(resolved[0][:params][:custom_shape_controls]).to eq(
+        [
+          {
+            index: 0,
+            name: "dynamic_circle",
+            params: { radius: 40.0 },
+            param_schema: [],
+            shape_indices: [0]
+          }
+        ]
+      )
+    end
+
+    it "applies dynamic custom shape param overrides before expansion" do
+      shape_class = Class.new do
+        include Vizcore::Shape
+
+        param :radius, default: 10, min: 1, max: 200
+
+        def draw(ctx)
+          { kind: :circle, radius: ctx.param(:radius) }
+        end
+      end
+      resolver = described_class.new
+      scene_layers = [
+        {
+          name: :generated,
+          type: :shape,
+          params: {
+            custom_shapes: [
+              {
+                name: :dynamic_circle,
+                renderer: shape_class,
+                params: { radius: 10 },
+                param_schema: shape_class.shape_param_schema.values,
+                dynamic: true
+              }
+            ]
+          }
+        }
+      ]
+
+      resolved = resolver.resolve_layers(
+        scene_layers: scene_layers,
+        audio: {},
+        custom_shape_overrides: { "generated" => { 0 => { "radius" => 72 } } }
+      )
+
+      expect(resolved[0][:params][:shapes]).to eq([{ kind: :circle, radius: 72.0 }])
+      expect(resolved[0][:params][:custom_shape_controls]).to contain_exactly(
+        hash_including(
+          index: 0,
+          name: "dynamic_circle",
+          params: { radius: 72 },
+          param_schema: [{ name: :radius, default: 10, min: 1, max: 200 }],
+          shape_indices: [0]
+        )
+      )
     end
   end
 end

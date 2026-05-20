@@ -306,6 +306,43 @@ RSpec.describe Vizcore::Server::Runner do
       )
     end
 
+    it "applies custom shape param messages from the browser" do
+      runner = described_class.new(config, output: output)
+      broadcaster = instance_double(Vizcore::Server::FrameBroadcaster)
+      allow(broadcaster).to receive(:set_custom_shape_param).and_return(
+        "generated" => { 0 => { "radius" => 88.0 } }
+      )
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+
+      runner.send(
+        :handle_client_message,
+        {
+          "type" => "custom_shape_param",
+          "payload" => {
+            "layer" => "generated",
+            "custom_shape_index" => 0,
+            "param" => "radius",
+            "value" => 88
+          }
+        },
+        broadcaster
+      )
+
+      expect(broadcaster).to have_received(:set_custom_shape_param).with(
+        layer_name: "generated",
+        custom_shape_index: 0,
+        param: "radius",
+        value: 88
+      )
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "config_update",
+        payload: {
+          custom_shape_params: { "generated" => { 0 => { "radius" => 88.0 } } },
+          source: "ui"
+        }
+      )
+    end
+
     it "switches scene from OSC message" do
       runner = described_class.new(config, output: output)
       broadcaster = instance_double(

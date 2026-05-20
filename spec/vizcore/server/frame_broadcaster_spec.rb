@@ -136,6 +136,63 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
       expect(frame.dig(:scene, :layers, 0, :type)).to eq("shader")
     end
 
+    it "applies custom shape param overrides to dynamic custom shapes" do
+      shape_class = Class.new do
+        include Vizcore::Shape
+
+        param :radius, default: 10, min: 1, max: 200
+
+        def draw(ctx)
+          { kind: :circle, radius: ctx.param(:radius) }
+        end
+      end
+      input_manager = instance_double(
+        Vizcore::Audio::InputManager,
+        frame_size: 1024,
+        sample_rate: 44_100,
+        capture_frame: Array.new(1024, 0.0),
+        latest_samples: Array.new(1024, 0.0),
+        realtime_capture_size: 735,
+        start: nil,
+        stop: nil
+      )
+      pipeline = instance_double(
+        Vizcore::Analysis::Pipeline,
+        call: { amplitude: 0.0, bands: {}, fft: [], beat: false, beat_count: 0, bpm: 0.0 }
+      )
+      broadcaster = described_class.new(
+        scene_name: "intro",
+        scene_layers: [
+          {
+            name: :generated,
+            type: :shape,
+            params: {
+              custom_shapes: [
+                {
+                  name: :dynamic_circle,
+                  renderer: shape_class,
+                  params: { radius: 10 },
+                  param_schema: shape_class.shape_param_schema.values,
+                  dynamic: true
+                }
+              ]
+            }
+          }
+        ],
+        input_manager: input_manager,
+        analysis_pipeline: pipeline
+      )
+
+      broadcaster.set_custom_shape_param(layer_name: :generated, custom_shape_index: 0, param: :radius, value: 88)
+      frame = broadcaster.build_frame(0.5, Array.new(1024, 0.0))
+
+      layer = frame.dig(:scene, :layers, 0)
+      expect(layer.dig(:params, :shapes)).to eq([{ kind: :circle, radius: 88.0 }])
+      expect(layer.dig(:params, :custom_shape_controls)).to contain_exactly(
+        hash_including(index: 0, name: "dynamic_circle", params: { radius: 88.0 }, shape_indices: [0])
+      )
+    end
+
     it "reports audio capture errors and falls back to silence frame" do
       input_manager = instance_double(
         Vizcore::Audio::InputManager,

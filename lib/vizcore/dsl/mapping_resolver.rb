@@ -13,16 +13,17 @@ module Vizcore
       # @param scene_layers [Array<Hash>]
       # @param audio [Hash]
       # @return [Array<Hash>] normalized layer payloads with resolved params
-      def resolve_layers(scene_layers:, audio:, time: 0.0, frame: 0, resolution: [1280, 720], globals: {})
+      def resolve_layers(scene_layers:, audio:, time: 0.0, frame: 0, resolution: [1280, 720], globals: {}, custom_shape_overrides: {})
         normalize_scene_layers(scene_layers).map do |layer|
-          resolve_layer(layer, audio, time: time, frame: frame, resolution: resolution, globals: globals)
+          resolve_layer(layer, audio, time: time, frame: frame, resolution: resolution, globals: globals, custom_shape_overrides: custom_shape_overrides)
         end
       end
 
       private
 
-      def resolve_layer(layer, audio, time:, frame:, resolution:, globals:)
-        params = (layer[:params] || {}).dup
+      def resolve_layer(layer, audio, time:, frame:, resolution:, globals:, custom_shape_overrides:)
+        params = deep_dup(layer[:params] || {})
+        apply_custom_shape_overrides!(params, layer_name: layer[:name], custom_shape_overrides: custom_shape_overrides)
         merge_resolved_mappings!(params, resolve_mappings(layer[:mappings], audio, layer_name: layer[:name]))
         expand_dynamic_custom_shapes!(params, layer: layer, audio: audio, time: time, frame: frame, resolution: resolution, globals: globals)
 
@@ -61,14 +62,18 @@ module Vizcore
       end
 
       def expand_dynamic_custom_shapes!(params, layer:, audio:, time:, frame:, resolution:, globals:)
-        descriptors = Array(params.delete(:custom_shapes))
+        descriptors = Array(params.delete(:custom_shapes) || params.delete("custom_shapes"))
         return if descriptors.empty?
 
         params[:shapes] = Array(params[:shapes])
-        descriptors.each do |descriptor|
+        controls = []
+        descriptors.each_with_index do |descriptor, index|
+          start_index = params[:shapes].length
           expanded = expand_dynamic_custom_shape(descriptor, layer: layer, palette: params[:palette], audio: audio, time: time, frame: frame, resolution: resolution, globals: globals)
           params[:shapes].concat(expanded)
+          controls << custom_shape_control_descriptor(descriptor, index: index, start_index: start_index, count: expanded.length)
         end
+        params[:custom_shape_controls] = controls unless controls.empty?
       end
 
       def expand_dynamic_custom_shape(descriptor, layer:, palette:, audio:, time:, frame:, resolution:, globals:)
@@ -89,6 +94,44 @@ module Vizcore
           shape_name: shape_name
         )
         primitives.each { |primitive| apply_custom_shape_attributes!(primitive, values) }
+      end
+
+      def custom_shape_control_descriptor(descriptor, index:, start_index:, count:)
+        values = Hash(descriptor)
+        {
+          index: index,
+          name: (values[:name] || values["name"] || "custom_shape").to_s,
+          params: deep_dup(Hash(values[:params] || values["params"] || {})),
+          param_schema: Array(values[:param_schema] || values["param_schema"]).map { |entry| deep_dup(entry) },
+          shape_indices: (start_index...(start_index + count)).to_a
+        }
+      end
+
+      def apply_custom_shape_overrides!(params, layer_name:, custom_shape_overrides:)
+        layer_overrides = custom_shape_layer_overrides(custom_shape_overrides, layer_name)
+        return if layer_overrides.empty?
+
+        descriptors = Array(params[:custom_shapes] || params["custom_shapes"])
+        layer_overrides.each do |index, values|
+          descriptor = descriptors[Integer(index)]
+          next unless descriptor && values.is_a?(Hash)
+
+          descriptor[:params] ||= {}
+          values.each do |param_name, value|
+            key = param_name.to_sym
+            descriptor[:params][key] = value
+          end
+        rescue ArgumentError, TypeError
+          next
+        end
+      end
+
+      def custom_shape_layer_overrides(overrides, layer_name)
+        values = Hash(overrides)
+        name = layer_name.to_s
+        Hash(values[name] || values[layer_name.to_sym] || {})
+      rescue TypeError
+        {}
       end
 
       def apply_custom_shape_attributes!(primitive, descriptor)
