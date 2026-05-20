@@ -1,32 +1,35 @@
 # Vizcore [![Gem Version](https://badge.fury.io/rb/vizcore.svg)](https://badge.fury.io/rb/vizcore) [![CI](https://github.com/ydah/vizcore/actions/workflows/main.yml/badge.svg)](https://github.com/ydah/vizcore/actions/workflows/main.yml)
 
-Vizcore is a Ruby gem for building audio-reactive visuals with a Ruby DSL. Define scenes in Ruby, stream them to the browser, and react to audio, beat, MIDI, OSC, and live operator controls.
+Vizcore is a Ruby gem for audio-reactive VJ visuals. Define scenes in Ruby, stream them to a browser renderer, and map audio analysis, beats, MIDI, OSC, and live controls to visual parameters.
 
-## Installation
+<p align="center">
+  <img src="docs/assets/vizcore-demo.gif" width="640" alt="Animated Vizcore demo where detected beats expand concentric rings" />
+</p>
 
-```bash
-gem install vizcore
-```
+## Install
 
-Or add it to a project:
+Requirements:
 
-```bash
-bundle add vizcore
-```
-
-System dependencies:
+- Ruby `>= 3.2`
+- PortAudio for microphone input
+- ffmpeg for MP3/FLAC input and MP4 output
+- fftw3 optional for faster FFT analysis
 
 ```bash
 # macOS
 brew install portaudio ffmpeg
-brew install fftw # optional, faster FFT
+brew install fftw # optional
 
-# Ubuntu/Debian
+# Ubuntu / Debian
 sudo apt install -y libportaudio2 libportaudio-dev ffmpeg
-sudo apt install -y libfftw3-dev # optional, faster FFT
+sudo apt install -y libfftw3-dev # optional
 ```
 
-`ffmpeg` is only required for MP3/FLAC audio input and MP4 render output. Vizcore falls back to pure-Ruby FFT when `fftw3` is unavailable.
+```bash
+gem install vizcore
+# or
+bundle add vizcore
+```
 
 ## Quick Start
 
@@ -37,165 +40,69 @@ vizcore demo
 
 Open `http://127.0.0.1:4567`.
 
-<p align="center">
-  <img src="docs/assets/vizcore-demo.gif" width="640" alt="Animated Vizcore demo where detected beats expand concentric rings" />
-</p>
+To run a scene file directly:
 
-Start your own scene file:
+```bash
+vizcore start examples/basic.rb
+vizcore start examples/vj_techno_warehouse.rb --audio-source file --audio-file examples/assets/complex_demo_loop.wav
+```
+
+## Minimal Scene
+
+Scenes are plain Ruby files:
+
+```ruby
+Vizcore.define do
+  scene :readme_demo do
+    layer :beat_rings do
+      palette "#24f6ff", "#ff2bbd", "#caff2e"
+
+      circle count: 4 do
+        radius 92
+        stroke 3
+        map beat_pulse,
+            to: :radius,
+            gain: 160.0,
+            min: 56,
+            max: 164,
+            attack: 1.0,
+            release: 0.2
+      end
+    end
+  end
+end
+```
+
+Run it with:
 
 ```bash
 vizcore start scene.rb
 ```
 
-## Scene Example
-
-Scenes are plain Ruby. Layers describe visuals, and mappings connect audio features to visual parameters.
-
-```ruby
-Vizcore.define do
-  scene :intro do
-    layer :rings do
-      shader :spectrum_rings
-      map amplitude, to: :intensity, gain: 2.0, range: 0.1..1.0
-      map bass, to: :scale, range: 0.8..1.4
-      map beat_pulse, to: :flash
-    end
-
-    layer :title do
-      type :text
-      content "VIZCORE"
-      font_size 96
-      fill "#ffffff"
-      map beat?, to: :opacity, range: 0.35..1.0
-    end
-  end
-
-  scene :drop do
-    layer :particles do
-      type :particle_field
-      count 3600
-      blend :screen
-      map bass, to: :size, range: 2.0..8.0, curve: :sqrt
-      map treble, to: :sparkle
-    end
-  end
-
-  transition from: :intro, to: :drop do
-    on_bar 8
-    effect :crossfade, duration: 1.0
-  end
-end
-```
-
-Common audio sources in mappings include `amplitude`, `bass`, `mid`, `treble`, `fft_spectrum`, `beat?`, `beat_pulse`, `beat_confidence`, `onset(:low)`, `kick`, `snare`, and `hihat`.
-
-Mapping options include `gain`, `range`, `min`, `max`, `curve`, `deadzone`, `attack`, and `release`.
-
-## Live Operation
-
-The browser UI includes scene switching, audio meters, FFT preview, shader parameter sliders, performance stats, MIDI Learn, tap tempo, Blackout, Freeze, and projector mode.
-
-Useful routes:
-
-| Route | Use |
-| --- | --- |
-| `/` | Visual output with operator controls |
-| `/projector` | Clean visual output for projection |
-| `/control` | Separate operator panel |
-
-For repeatable show startup, use a manifest:
-
-```yaml
-scene: scenes/show.rb
-audio:
-  source: file
-  file: audio/set.wav
-control_preset: controls/live.json
-sync:
-  osc:
-    port: 9000
-```
+## Useful Commands
 
 ```bash
-vizcore start --manifest vizcore.yml
-```
-
-## CLI
-
-Core commands:
-
-```bash
-vizcore demo
 vizcore start SCENE_FILE
 vizcore start --manifest vizcore.yml
 vizcore gallery
-vizcore doctor
+vizcore validate SCENE_FILE
 vizcore devices audio
 vizcore devices midi
-vizcore validate SCENE_FILE
-vizcore inspect SCENE_FILE
-```
-
-Rendering and capture:
-
-```bash
 vizcore snapshot SCENE_FILE --out screenshot.png
-vizcore render SCENE_FILE --out frames --frames 120 --fps 30
-vizcore render SCENE_FILE --audio-source file --audio-file track.wav --out movie.mp4
-vizcore capture SCENE_FILE --out browser.png
 ```
 
-Reference and scaffolding:
+Use `vizcore help` for the full CLI.
 
-```bash
-vizcore new PROJECT_NAME
-vizcore layers
-vizcore dsl-docs
-vizcore shader new NAME
-vizcore shader-docs
-vizcore plugin new NAME
-```
+Browser routes:
 
-Audio input:
-
-```bash
-# microphone input, default
-vizcore start scene.rb --audio-source mic
-
-# specific microphone device
-vizcore devices audio
-vizcore start scene.rb --audio-source mic --audio-device 5
-
-# audio file input
-vizcore start scene.rb --audio-source file --audio-file track.wav
-
-# deterministic replay of recorded analysis features
-vizcore record-features track.wav --out features.json
-vizcore start scene.rb --feature-file features.json
-```
-
-## Examples
-
-Run the bundled gallery:
-
-```bash
-vizcore gallery
-```
-
-Or start one directly:
-
-```bash
-vizcore start examples/basic.rb
-vizcore start examples/intro_drop.rb
-vizcore start examples/audio_inspector.rb
-vizcore start examples/vj_techno_warehouse.rb --audio-source file --audio-file examples/assets/complex_demo_loop.wav
-```
-
-The full example list is in [examples/README.md](examples/README.md).
+- `/` visual output with operator controls
+- `/projector` clean projection output
+- `/control` separate operator panel
 
 ## Documentation
 
 - Project site: <https://ydah.github.io/vizcore/>
+- Examples: [examples/README.md](examples/README.md)
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 - Runtime layer reference: `vizcore layers`
 - Ruby DSL reference: `vizcore dsl-docs`
@@ -204,17 +111,12 @@ The full example list is in [examples/README.md](examples/README.md).
 ## Development
 
 ```bash
+bundle install
+npm install --prefix frontend
 bundle exec rspec
 npm --prefix frontend test
 bundle exec rake release:verify
 ```
-
-## Requirements
-
-- Ruby `>= 3.2`
-- `portaudio` for microphone input
-- `ffmpeg` for MP3/FLAC input and MP4 output
-- `fftw3` optional for faster FFT
 
 ## License
 
