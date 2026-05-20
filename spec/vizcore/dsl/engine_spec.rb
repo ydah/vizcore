@@ -622,6 +622,37 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "caches static custom shape expansions without sharing mutable primitives" do
+      draw_count = 0
+      shape_class = Class.new do
+        define_singleton_method(:draw) do |ctx|
+          draw_count += 1
+          { kind: :circle, radius: ctx.param(:radius), dash: [4, 2] }
+        end
+      end
+      Vizcore.register_shape :engine_spec_cached_shape, shape_class
+
+      definition = described_class.define do
+        scene :custom_shape_scene do
+          layer :generated do
+            custom_shape :engine_spec_cached_shape, radius: 64, static: true
+            custom_shape :engine_spec_cached_shape, radius: 64, static: true
+          end
+        end
+      end
+
+      shapes = definition[:scenes].first[:layers].first[:params][:shapes]
+      expect(draw_count).to eq(1)
+      expect(shapes).to eq(
+        [
+          { kind: :circle, radius: 64, dash: [4, 2] },
+          { kind: :circle, radius: 64, dash: [4, 2] }
+        ]
+      )
+      expect(shapes[0]).not_to equal(shapes[1])
+      expect(shapes[0][:dash]).not_to equal(shapes[1][:dash])
+    end
+
     it "stores dynamic custom shapes for runtime expansion after mappings" do
       shape_class = Class.new do
         include Vizcore::Shape

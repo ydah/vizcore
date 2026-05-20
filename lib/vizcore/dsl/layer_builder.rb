@@ -216,7 +216,7 @@ module Vizcore
         dynamic = true if static == false
         return append_dynamic_custom_shape(renderer, options, shape_id: shape_id, &block) if dynamic
 
-        primitives = expand_custom_shape(renderer, options, shape_id: shape_id)
+        primitives = expand_custom_shape(renderer, options, shape_id: shape_id, cache: !!static)
         raise ArgumentError, "custom_shape produced no primitives" if primitives.empty?
         raise ArgumentError, "custom_shape id can only be assigned when one primitive is produced" if shape_id && primitives.length > 1
 
@@ -1091,7 +1091,7 @@ module Vizcore
         shape[:id] ? " `#{shape[:id]}`" : ""
       end
 
-      def expand_custom_shape(renderer, options, shape_id:)
+      def expand_custom_shape(renderer, options, shape_id:, cache: false)
         definition = custom_shape_definition(renderer)
         Vizcore::Shape.expand_custom_shape(
           definition.renderer,
@@ -1099,7 +1099,8 @@ module Vizcore
           shape_id: shape_id,
           layer_name: @name,
           palette: Array(@params[:palette]),
-          shape_name: definition.name || renderer
+          shape_name: definition.name || renderer,
+          cache: cache
         )
       end
 

@@ -210,6 +210,11 @@ Inside a dynamic custom shape block, mappings to custom params such as `:radius`
 are applied before `draw(ctx)` runs. Transform aliases such as `:scale` and
 `:rotate` are applied to the generated primitives after expansion.
 
+Use `static: true` for generators that are independent of runtime context. Static
+custom shapes with identical renderer, params, layer context, palette, and
+resolution reuse a cached expansion, while each call still receives its own copy
+of the generated primitives.
+
 ## Coordinates
 
 New shape schema layers use center-origin logical coordinates by default:

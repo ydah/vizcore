@@ -24,10 +24,22 @@ module Vizcore
         primitives.map { |primitive| normalize_primitive(primitive, shape_name: shape_name) }
       end
 
-      def expand_custom_shape(renderer, params:, shape_id: nil, layer_name: nil, palette: [], audio: {}, time: 0.0, frame: 0, resolution: [1280, 720], globals: {}, shape_name: nil)
+      def expand_custom_shape(renderer, params:, shape_id: nil, layer_name: nil, palette: [], audio: {}, time: 0.0, frame: 0, resolution: [1280, 720], globals: {}, shape_name: nil, cache: false)
         definition = shape_definition(renderer)
         renderer = definition.renderer if definition
         shape_name ||= definition&.name || renderer
+        cache_key = custom_shape_cache_key(
+          renderer: renderer,
+          params: params,
+          shape_id: shape_id,
+          layer_name: layer_name,
+          palette: palette,
+          resolution: resolution,
+          globals: globals,
+          shape_name: shape_name
+        ) if cache
+        return deep_dup(custom_shape_cache[cache_key]) if cache_key && custom_shape_cache.key?(cache_key)
+
         context = DrawContext.new(
           params: params,
           param_schema: param_schema_for(renderer),
@@ -47,6 +59,7 @@ module Vizcore
           raise ArgumentError, "custom_shape id can only be assigned when one primitive is produced"
         end
         primitives.first[:id] ||= shape_id.to_sym if shape_id
+        custom_shape_cache[cache_key] = deep_dup(primitives) if cache_key
         primitives
       end
 
@@ -57,6 +70,55 @@ module Vizcore
       end
 
       private
+
+      def custom_shape_cache
+        @custom_shape_cache ||= {}
+      end
+
+      def custom_shape_cache_key(renderer:, params:, shape_id:, layer_name:, palette:, resolution:, globals:, shape_name:)
+        [
+          renderer_cache_identity(renderer),
+          normalize_cache_value(params),
+          shape_id&.to_sym,
+          layer_name&.to_sym,
+          normalize_cache_value(palette),
+          normalize_cache_value(resolution),
+          normalize_cache_value(globals),
+          normalize_cache_value(shape_name)
+        ]
+      end
+
+      def renderer_cache_identity(renderer)
+        if renderer.is_a?(Module) && renderer.name
+          [:module, renderer.name]
+        else
+          [:object, renderer.object_id]
+        end
+      end
+
+      def normalize_cache_value(value)
+        case value
+        when Hash
+          value.map { |key, entry| [key.to_s, normalize_cache_value(entry)] }.sort_by(&:first)
+        when Array
+          value.map { |entry| normalize_cache_value(entry) }
+        when Symbol
+          value.to_s
+        else
+          value
+        end
+      end
+
+      def deep_dup(value)
+        case value
+        when Hash
+          value.each_with_object({}) { |(key, entry), output| output[key] = deep_dup(entry) }
+        when Array
+          value.map { |entry| deep_dup(entry) }
+        else
+          value
+        end
+      end
 
       def shape_definition(renderer)
         return unless renderer.is_a?(Symbol) || renderer.is_a?(String)
