@@ -6,6 +6,19 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-05-20
+
+### Added
+
+- Added extended shape DSL primitives, custom shape registration, dynamic expansion, canvas rendering, arcs, and grouped shape validation.
+- Added browser controls for editing custom shape parameters and mapping them to runtime sources.
+- Added the Ruby WASM playground for trying Vizcore scenes in the browser.
+
+### Improved
+
+- Improved custom shape reliability with parameter metadata validation, risky payload warnings, path segment limits, static expansion caching, and adaptive path flattening tolerance.
+- Simplified the README into a smaller quick-start and reference entry point.
+
 ## [1.0.0] - 2026-05-20
 
 ### Added
