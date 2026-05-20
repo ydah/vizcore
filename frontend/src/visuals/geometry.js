@@ -72,6 +72,7 @@ const SHAPE_HALF_WIDTH = 640;
 const SHAPE_HALF_HEIGHT = 360;
 const PATH_DEFAULT_MAX_SEGMENTS = 4096;
 const PATH_HARD_MAX_SEGMENTS = 65536;
+const PATH_MAX_RECURSION = 12;
 
 export const buildWireframeLines = ({ rotationY, rotationX, deform }) => {
   const amount = clamp(Number(deform || 0), 0, 1);
@@ -317,6 +318,7 @@ const appendStarShape = (points, shape, context) => {
 const appendPathShape = (points, shape, context) => {
   const commands = Array.isArray(shape.commands) ? shape.commands : [];
   const detail = clampInt(shape.detail || 32, 4, 128);
+  const tolerance = pathTolerance(shape);
   const budget = pathSegmentBudget(shape);
   let current = null;
   let subpathStart = null;
@@ -341,9 +343,9 @@ const appendPathShape = (points, shape, context) => {
       appendRawSegment(points, current, next, shape, context, budget);
       current = next;
     } else if (command === "Q" && current && values.length >= 4) {
-      current = appendQuadraticPath(points, current, values, detail, shape, context, budget);
+      current = appendQuadraticPath(points, current, values, detail, tolerance, shape, context, budget);
     } else if (command === "C" && current && values.length >= 6) {
-      current = appendCubicPath(points, current, values, detail, shape, context, budget);
+      current = appendCubicPath(points, current, values, detail, tolerance, shape, context, budget);
     } else if (command === "A" && current && values.length >= 7) {
       current = appendArcPath(points, current, values, detail, shape, context, budget);
     } else if (command === "Z" && current && subpathStart) {
@@ -353,10 +355,15 @@ const appendPathShape = (points, shape, context) => {
   });
 };
 
-const appendQuadraticPath = (points, current, values, detail, shape, context, budget) => {
+const appendQuadraticPath = (points, current, values, detail, tolerance, shape, context, budget) => {
   let previous = current;
   const control = [values[0], values[1]];
   const end = [values[2], values[3]];
+
+  if (tolerance !== null) {
+    appendAdaptiveQuadraticPath(points, current, control, end, tolerance, shape, context, budget);
+    return end;
+  }
 
   for (let step = 1; step <= detail; step += 1) {
     const t = step / detail;
@@ -371,11 +378,16 @@ const appendQuadraticPath = (points, current, values, detail, shape, context, bu
   return end;
 };
 
-const appendCubicPath = (points, current, values, detail, shape, context, budget) => {
+const appendCubicPath = (points, current, values, detail, tolerance, shape, context, budget) => {
   let previous = current;
   const c1 = [values[0], values[1]];
   const c2 = [values[2], values[3]];
   const end = [values[4], values[5]];
+
+  if (tolerance !== null) {
+    appendAdaptiveCubicPath(points, current, c1, c2, end, tolerance, shape, context, budget);
+    return end;
+  }
 
   for (let step = 1; step <= detail; step += 1) {
     const t = step / detail;
@@ -428,6 +440,40 @@ const appendRawSegment = (points, from, to, shape, context, budget) => {
     budget.remaining -= 1;
   }
   return true;
+};
+
+const appendAdaptiveQuadraticPath = (points, from, control, to, tolerance, shape, context, budget, depth = 0) => {
+  if (budget && budget.remaining <= 0) return;
+
+  if (depth >= PATH_MAX_RECURSION || pointLineDistance(control, from, to) <= tolerance) {
+    appendRawSegment(points, from, to, shape, context, budget);
+    return;
+  }
+
+  const leftControl = midpoint(from, control);
+  const rightControl = midpoint(control, to);
+  const center = midpoint(leftControl, rightControl);
+  appendAdaptiveQuadraticPath(points, from, leftControl, center, tolerance, shape, context, budget, depth + 1);
+  appendAdaptiveQuadraticPath(points, center, rightControl, to, tolerance, shape, context, budget, depth + 1);
+};
+
+const appendAdaptiveCubicPath = (points, from, c1, c2, to, tolerance, shape, context, budget, depth = 0) => {
+  if (budget && budget.remaining <= 0) return;
+
+  const flatness = Math.max(pointLineDistance(c1, from, to), pointLineDistance(c2, from, to));
+  if (depth >= PATH_MAX_RECURSION || flatness <= tolerance) {
+    appendRawSegment(points, from, to, shape, context, budget);
+    return;
+  }
+
+  const p01 = midpoint(from, c1);
+  const p12 = midpoint(c1, c2);
+  const p23 = midpoint(c2, to);
+  const p012 = midpoint(p01, p12);
+  const p123 = midpoint(p12, p23);
+  const center = midpoint(p012, p123);
+  appendAdaptiveCubicPath(points, from, p01, p012, center, tolerance, shape, context, budget, depth + 1);
+  appendAdaptiveCubicPath(points, center, p123, p23, to, tolerance, shape, context, budget, depth + 1);
 };
 
 const appendPolylineSegments = (points, vertices, shape, context, closed) => {
@@ -595,6 +641,26 @@ const radiusToRawHalf = (value) => finiteNumber(value, 100) * 0.5;
 const pathSegmentBudget = (shape) => {
   const value = shape.max_segments ?? shape.maxSegments ?? PATH_DEFAULT_MAX_SEGMENTS;
   return { remaining: clampInt(value, 1, PATH_HARD_MAX_SEGMENTS) };
+};
+
+const pathTolerance = (shape) => {
+  if (shape.tolerance === undefined && shape.tolerancePx === undefined) return null;
+
+  const numeric = Number(shape.tolerance ?? shape.tolerancePx);
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : null;
+};
+
+const midpoint = (from, to) => [
+  (from[0] + to[0]) * 0.5,
+  (from[1] + to[1]) * 0.5
+];
+
+const pointLineDistance = (point, from, to) => {
+  const dx = to[0] - from[0];
+  const dy = to[1] - from[1];
+  const length = Math.hypot(dx, dy);
+  if (length <= 0) return Math.hypot(point[0] - from[0], point[1] - from[1]);
+  return Math.abs(dy * point[0] - dx * point[1] + to[0] * from[1] - to[1] * from[0]) / length;
 };
 
 const quadraticPoint = (from, control, to, t) => {

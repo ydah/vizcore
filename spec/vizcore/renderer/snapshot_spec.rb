@@ -83,6 +83,32 @@ RSpec.describe Vizcore::Renderer::Snapshot do
     expect(canvas.lines.length).to eq(3)
   end
 
+  it "uses path tolerance for adaptive software snapshot flattening" do
+    canvas = Class.new do
+      attr_reader :lines
+
+      def initialize
+        @lines = []
+      end
+
+      def draw_line(*args, **kwargs)
+        @lines << [args, kwargs]
+      end
+    end.new
+
+    renderer = Vizcore::Renderer::SnapshotRenderer.new(width: 160, height: 90)
+    renderer.send(
+      :render_path_shape,
+      canvas,
+      { kind: :path, detail: 64, tolerance: 80, commands: [["M", 0, 0], ["Q", 50, 10, 100, 0]] },
+      [255, 255, 255],
+      1.0,
+      { units: :logical }
+    )
+
+    expect(canvas.lines.length).to eq(1)
+  end
+
   it "matches the golden scanline digest for the basic dummy frame" do
     config = Vizcore::Config.new(
       scene_file: Vizcore.root.join("examples", "basic.rb").to_s,

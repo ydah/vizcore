@@ -155,6 +155,20 @@ test("buildShapeLines respects path max_segments", () => {
   assert.ok(points.every((value) => Number.isFinite(value)));
 });
 
+test("buildShapeLines uses path tolerance for adaptive curve flattening", () => {
+  const points = buildShapeLines({
+    params: {
+      shape_schema_version: 2,
+      shapes: [
+        { kind: "path", detail: 64, tolerance: 80, commands: [["M", 0, 0], ["Q", 50, 10, 100, 0]] },
+      ],
+    },
+  });
+
+  assert.equal(points.length, 4);
+  assert.ok(points.every((value) => Number.isFinite(value)));
+});
+
 test("buildShapeLines ignores unknown shapes", () => {
   assert.deepEqual(buildShapeLines({ params: { shapes: [{ kind: "triangle" }] } }), []);
 });

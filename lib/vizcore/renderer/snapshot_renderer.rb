@@ -10,6 +10,7 @@ module Vizcore
       DEFAULT_HEIGHT = 720
       PATH_DEFAULT_MAX_SEGMENTS = 4096
       PATH_HARD_MAX_SEGMENTS = 65_536
+      PATH_MAX_RECURSION = 12
       PALETTE = [
         [56, 189, 248],
         [225, 29, 72],
@@ -241,6 +242,7 @@ module Vizcore
 
       def render_path_shape(canvas, shape, color, alpha, context)
         detail = [[Integer(shape[:detail] || shape["detail"] || 32), 4].max, 128].min
+        tolerance = path_tolerance(shape)
         segment_budget = { remaining: path_segment_limit(shape) }
         current = nil
         subpath_start = nil
@@ -266,11 +268,11 @@ module Vizcore
           when "Q"
             next unless current && values.length >= 4
 
-            current = draw_quadratic_path(canvas, current, values, detail, shape, color, alpha, context, segment_budget)
+            current = draw_quadratic_path(canvas, current, values, detail, tolerance, shape, color, alpha, context, segment_budget)
           when "C"
             next unless current && values.length >= 6
 
-            current = draw_cubic_path(canvas, current, values, detail, shape, color, alpha, context, segment_budget)
+            current = draw_cubic_path(canvas, current, values, detail, tolerance, shape, color, alpha, context, segment_budget)
           when "A"
             next unless current && values.length >= 7
 
@@ -298,10 +300,15 @@ module Vizcore
         to
       end
 
-      def draw_quadratic_path(canvas, current, values, detail, shape, color, alpha, context, segment_budget = nil)
+      def draw_quadratic_path(canvas, current, values, detail, tolerance, shape, color, alpha, context, segment_budget = nil)
         previous = current
         control = values.first(2)
         endpoint = values.last(2)
+        if tolerance
+          draw_adaptive_quadratic_path(canvas, current, control, endpoint, tolerance, shape, color, alpha, context, segment_budget)
+          return endpoint
+        end
+
         1.upto(detail) do |step|
           break if segment_budget && segment_budget[:remaining] <= 0
 
@@ -316,11 +323,16 @@ module Vizcore
         endpoint
       end
 
-      def draw_cubic_path(canvas, current, values, detail, shape, color, alpha, context, segment_budget = nil)
+      def draw_cubic_path(canvas, current, values, detail, tolerance, shape, color, alpha, context, segment_budget = nil)
         previous = current
         c1 = values[0, 2]
         c2 = values[2, 2]
         endpoint = values[4, 2]
+        if tolerance
+          draw_adaptive_cubic_path(canvas, current, c1, c2, endpoint, tolerance, shape, color, alpha, context, segment_budget)
+          return endpoint
+        end
+
         1.upto(detail) do |step|
           break if segment_budget && segment_budget[:remaining] <= 0
 
@@ -367,6 +379,62 @@ module Vizcore
         [[Integer(raw_value), 1].max, PATH_HARD_MAX_SEGMENTS].min
       rescue ArgumentError, TypeError
         PATH_DEFAULT_MAX_SEGMENTS
+      end
+
+      def path_tolerance(shape)
+        return unless shape.key?(:tolerance) || shape.key?("tolerance")
+
+        value = Float(shape[:tolerance] || shape["tolerance"])
+        value if value.finite? && value >= 0
+      rescue ArgumentError, TypeError
+        nil
+      end
+
+      def draw_adaptive_quadratic_path(canvas, from, control, to, tolerance, shape, color, alpha, context, segment_budget, depth = 0)
+        return if segment_budget && segment_budget[:remaining] <= 0
+
+        if depth >= PATH_MAX_RECURSION || point_line_distance(control, from, to) <= tolerance
+          draw_raw_path_segment(canvas, from, to, shape, color, alpha, context, segment_budget)
+          return
+        end
+
+        left_control = midpoint(from, control)
+        right_control = midpoint(control, to)
+        center = midpoint(left_control, right_control)
+        draw_adaptive_quadratic_path(canvas, from, left_control, center, tolerance, shape, color, alpha, context, segment_budget, depth + 1)
+        draw_adaptive_quadratic_path(canvas, center, right_control, to, tolerance, shape, color, alpha, context, segment_budget, depth + 1)
+      end
+
+      def draw_adaptive_cubic_path(canvas, from, c1, c2, to, tolerance, shape, color, alpha, context, segment_budget, depth = 0)
+        return if segment_budget && segment_budget[:remaining] <= 0
+
+        flatness = [point_line_distance(c1, from, to), point_line_distance(c2, from, to)].max
+        if depth >= PATH_MAX_RECURSION || flatness <= tolerance
+          draw_raw_path_segment(canvas, from, to, shape, color, alpha, context, segment_budget)
+          return
+        end
+
+        p01 = midpoint(from, c1)
+        p12 = midpoint(c1, c2)
+        p23 = midpoint(c2, to)
+        p012 = midpoint(p01, p12)
+        p123 = midpoint(p12, p23)
+        center = midpoint(p012, p123)
+        draw_adaptive_cubic_path(canvas, from, p01, p012, center, tolerance, shape, color, alpha, context, segment_budget, depth + 1)
+        draw_adaptive_cubic_path(canvas, center, p123, p23, to, tolerance, shape, color, alpha, context, segment_budget, depth + 1)
+      end
+
+      def midpoint(from, to)
+        [(from[0] + to[0]) * 0.5, (from[1] + to[1]) * 0.5]
+      end
+
+      def point_line_distance(point, from, to)
+        dx = to[0] - from[0]
+        dy = to[1] - from[1]
+        length = Math.sqrt((dx * dx) + (dy * dy))
+        return Math.sqrt(((point[0] - from[0])**2) + ((point[1] - from[1])**2)) if length <= 0
+
+        ((dy * point[0]) - (dx * point[1]) + (to[0] * from[1]) - (to[1] * from[0])).abs / length
       end
 
       def draw_shape_segment(canvas, from, to, shape, color, alpha, context)
