@@ -258,3 +258,7 @@ schema.
 If Canvas2D is unavailable, the browser falls back to the existing line renderer.
 That fallback ignores fill and only approximates stroke geometry. The software
 snapshot renderer also uses line flattening.
+
+The browser HUD includes local shape editor controls for resolved shape layers:
+primitive kind, translate, rotate, scale, opacity, fill, stroke color, and stroke
+width can be adjusted in the running view without mutating the source DSL file.

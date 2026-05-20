@@ -35,6 +35,11 @@ import {
   pruneShaderParamOverrides,
   shaderParamControlEntries
 } from "./shader-param-controls.js";
+import {
+  normalizeShapeEditorPatch,
+  pruneShapeEditorOverrides,
+  shapeEditorEntries
+} from "./shape-editor-controls.js";
 import { normalizeRuntimeControlPreset } from "./runtime-control-preset.js";
 import { SHADER_ERROR_EVENT, formatShaderErrorMessage, formatShaderErrorTitle } from "./shader-error-overlay.js";
 import {
@@ -91,6 +96,7 @@ const reactivityStatusElement = document.querySelector("#reactivity-status");
 const midiLearnStatusElement = document.querySelector("#midi-learn-status");
 const midiLearnButtons = Array.from(document.querySelectorAll("[data-midi-learn-action]"));
 const shaderParamControlsElement = document.querySelector("#shader-param-controls");
+const shapeEditorControlsElement = document.querySelector("#shape-editor-controls");
 const shaderErrorOverlay = document.querySelector("#shader-error-overlay");
 const shaderErrorTitleElement = document.querySelector("#shader-error-title");
 const shaderErrorMessageElement = document.querySelector("#shader-error-message");
@@ -119,6 +125,8 @@ let runtimeControlPresetApplied = false;
 let controlPresetSaveUrl = null;
 let shaderParamOverrides = {};
 let shaderParamControlsSignature = "";
+let shapeEditorOverrides = {};
+let shapeEditorControlsSignature = "";
 let midiAccess = null;
 let pendingMidiLearnAction = null;
 applyProjectorMode(document.body, projectorMode);
@@ -180,8 +188,10 @@ const client = new WebSocketClient(websocketUrl, {
     currentSceneName = sceneName;
     if (sceneChanged) {
       shaderParamControlsSignature = "";
+      shapeEditorControlsSignature = "";
     }
     updateShaderParamControls(frame?.scene?.layers);
+    updateShapeEditorControls(frame?.scene?.layers);
     const amplitude = Number(frame?.audio?.amplitude || 0).toFixed(4);
     const bpm = Number(frame?.audio?.bpm || 0);
     const beat = !!frame?.audio?.beat;
@@ -218,7 +228,9 @@ const client = new WebSocketClient(websocketUrl, {
       sceneStatusElement.textContent = `Scene: ${currentSceneName}`;
       renderSceneButtons();
       shaderParamControlsSignature = "";
+      shapeEditorControlsSignature = "";
       updateShaderParamControls(payload?.scene?.layers);
+      updateShapeEditorControls(payload?.scene?.layers);
     }
     if (Object.prototype.hasOwnProperty.call(payload || {}, "tap_tempo_key")) {
       updateTapTempoKey(payload?.tap_tempo_key);
@@ -492,6 +504,127 @@ function formatShaderParamValue(value) {
     return "--";
   }
   return Math.abs(numeric) >= 10 ? numeric.toFixed(1) : numeric.toFixed(2);
+}
+
+function updateShapeEditorControls(layers) {
+  const entries = shapeEditorEntries(layers, shapeEditorOverrides);
+  const signature = shapeEditorControlsSignatureFor(entries);
+  if (signature === shapeEditorControlsSignature) {
+    return;
+  }
+
+  shapeEditorControlsSignature = signature;
+  shapeEditorOverrides = pruneShapeEditorOverrides(shapeEditorOverrides, entries);
+  engine.setShapeEditorOverrides(shapeEditorOverrides);
+  renderShapeEditorControls(entries);
+}
+
+function shapeEditorControlsSignatureFor(entries) {
+  return entries.map((entry) => (
+    `${entry.key}:${entry.kind}:${JSON.stringify(entry.values)}`
+  )).join("|");
+}
+
+function renderShapeEditorControls(entries) {
+  if (!shapeEditorControlsElement) {
+    return;
+  }
+
+  if (!entries.length) {
+    shapeEditorControlsElement.hidden = true;
+    shapeEditorControlsElement.replaceChildren();
+    return;
+  }
+
+  const title = document.createElement("p");
+  title.className = "shader-param-controls__title";
+  title.textContent = "Shape Editor";
+  const controls = entries.map((entry) => createShapeEditorControl(entry));
+  shapeEditorControlsElement.replaceChildren(title, ...controls);
+  shapeEditorControlsElement.hidden = false;
+}
+
+function createShapeEditorControl(entry) {
+  const section = document.createElement("details");
+  const summary = document.createElement("summary");
+  summary.textContent = entry.label;
+  section.append(summary);
+  section.append(
+    createShapeKindControl(entry),
+    createShapeNumberControl(entry, "translateX", "Move X", -640, 640, 1),
+    createShapeNumberControl(entry, "translateY", "Move Y", -360, 360, 1),
+    createShapeNumberControl(entry, "rotate", "Rotate", -180, 180, 1),
+    createShapeNumberControl(entry, "scaleX", "Scale X", -4, 4, 0.05),
+    createShapeNumberControl(entry, "scaleY", "Scale Y", -4, 4, 0.05),
+    createShapeNumberControl(entry, "opacity", "Opacity", 0, 1, 0.05),
+    createShapeColorControl(entry, "fill", "Fill"),
+    createShapeColorControl(entry, "strokeColor", "Stroke"),
+    createShapeNumberControl(entry, "strokeWidth", "Stroke W", 0, 24, 0.5)
+  );
+  return section;
+}
+
+function createShapeKindControl(entry) {
+  const label = document.createElement("label");
+  const name = document.createElement("span");
+  const select = document.createElement("select");
+  name.textContent = "Kind";
+  ["circle", "line", "rect", "polygon", "polyline", "path", "star"].forEach((kind) => {
+    const option = document.createElement("option");
+    option.value = kind;
+    option.textContent = kind;
+    select.append(option);
+  });
+  select.value = entry.kind;
+  select.addEventListener("change", () => {
+    writeShapeEditorOverride(entry, { ...entry.values, kind: select.value });
+  });
+  label.append(name, select);
+  return label;
+}
+
+function createShapeNumberControl(entry, key, labelText, min, max, step) {
+  const label = document.createElement("label");
+  const name = document.createElement("span");
+  const input = document.createElement("input");
+  const value = document.createElement("output");
+  name.textContent = labelText;
+  input.type = "range";
+  input.min = String(min);
+  input.max = String(max);
+  input.step = String(step);
+  input.value = String(entry.values[key]);
+  value.value = formatShaderParamValue(entry.values[key]);
+  input.addEventListener("input", () => {
+    const numeric = Number(input.value);
+    writeShapeEditorOverride(entry, { ...entry.values, [key]: numeric });
+    value.value = formatShaderParamValue(numeric);
+  });
+  label.append(name, input, value);
+  return label;
+}
+
+function createShapeColorControl(entry, key, labelText) {
+  const label = document.createElement("label");
+  const name = document.createElement("span");
+  const input = document.createElement("input");
+  const value = document.createElement("output");
+  name.textContent = labelText;
+  input.type = "color";
+  input.value = entry.values[key];
+  value.value = entry.values[key];
+  input.addEventListener("input", () => {
+    writeShapeEditorOverride(entry, { ...entry.values, [key]: input.value, [`${key}Enabled`]: true });
+    value.value = input.value;
+  });
+  label.append(name, input, value);
+  return label;
+}
+
+function writeShapeEditorOverride(entry, values) {
+  shapeEditorOverrides[entry.layerKey] ||= {};
+  shapeEditorOverrides[entry.layerKey][entry.shapeIndex] = normalizeShapeEditorPatch(values);
+  engine.setShapeEditorOverrides(shapeEditorOverrides);
 }
 
 function requestSceneSwitch(sceneName) {

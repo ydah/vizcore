@@ -409,6 +409,29 @@
       text-align: right;
     }
 
+    .shader-param-controls details {
+      margin-top: 0.35rem;
+      padding-top: 0.3rem;
+      border-top: 1px solid rgba(153, 195, 255, 0.12);
+    }
+
+    .shader-param-controls summary {
+      cursor: pointer;
+      color: #d9e8ff;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .shader-param-controls select,
+    .shader-param-controls input[type="color"] {
+      width: 100%;
+      min-height: 1.65rem;
+      border: 1px solid rgba(153, 195, 255, 0.28);
+      border-radius: 0.35rem;
+      background: rgba(2, 6, 14, 0.72);
+      color: var(--fg);
+    }
+
     @media (max-width: 520px) {
       .hud {
         right: 1rem;
@@ -507,6 +530,7 @@
         </div>
       </div>
       <div id="shader-param-controls" class="shader-param-controls" hidden aria-label="Shader parameter controls"></div>
+      <div id="shape-editor-controls" class="shader-param-controls" hidden aria-label="Shape editor controls"></div>
       <div id="scene-switcher" class="scene-switcher" hidden aria-label="Scene switcher"></div>
       <button id="audio-toggle" type="button" hidden>Play Audio</button>
     </section>

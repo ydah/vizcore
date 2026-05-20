@@ -1,6 +1,7 @@
 import { LayerManager } from "./layer-manager.js";
 import { ShaderManager } from "./shader-manager.js";
 import { applyShaderParamOverrides } from "../shader-param-controls.js";
+import { applyShapeEditorOverrides } from "../shape-editor-controls.js";
 
 export class Engine {
   constructor(canvas) {
@@ -27,6 +28,7 @@ export class Engine {
     };
     this.runtimeGlobals = {};
     this.shaderParamOverrides = {};
+    this.shapeEditorOverrides = {};
     this.beatHoldUntil = 0;
     this.frame = {
       audio: {
@@ -98,6 +100,10 @@ export class Engine {
     this.shaderParamOverrides = overrides && typeof overrides === "object" ? overrides : {};
   }
 
+  setShapeEditorOverrides(overrides = {}) {
+    this.shapeEditorOverrides = overrides && typeof overrides === "object" ? overrides : {};
+  }
+
   start() {
     this.lastTime = performance.now();
     requestAnimationFrame((time) => this.render(time));
@@ -156,7 +162,10 @@ export class Engine {
     });
     this.visualAudioState = audio;
     const rawLayers = Array.isArray(this.frame?.scene?.layers) ? this.frame.scene.layers : [];
-    const layers = applyShaderParamOverrides(rawLayers, this.shaderParamOverrides);
+    const layers = applyShapeEditorOverrides(
+      applyShaderParamOverrides(rawLayers, this.shaderParamOverrides),
+      this.shapeEditorOverrides
+    );
     const amplitude = clamp(Number(audio.amplitude || 0), 0, 1);
     const rotationSpeed = resolveRotationSpeed(layers, amplitude);
     this.currentRotationSpeed += (rotationSpeed - this.currentRotationSpeed) * 0.1;
