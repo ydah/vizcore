@@ -241,6 +241,11 @@ The DSL raises early for malformed primitives:
 - unknown `custom_shape`
 - custom shapes that return unsupported primitive kinds
 
+`vizcore validate` also emits warnings for shape payloads that are renderable but
+likely surprising: unsupported primitive kinds in raw `params[:shapes]`, fills
+that line fallback will ignore, opacity values outside `0..1`, and zero or very
+large scale values that will collapse or clamp.
+
 ## Renderer Notes
 
 The browser renderer uses a Canvas2D shape backend composited through the

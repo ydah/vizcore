@@ -140,6 +140,42 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
     end
   end
 
+  it "warns about shape payloads that will be clamped or ignored" do
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :shape_warnings do
+          layer :logo do
+            type :shape
+            shapes [
+              {
+                kind: :triangle,
+                id: :badge,
+                fill: "#ffffff",
+                opacity: 1.5,
+                transform: { scale: 0 }
+              },
+              {
+                kind: :circle,
+                id: :burst,
+                scale: 12
+              }
+            ]
+          end
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+      messages = result.warnings.map(&:message).join("\n")
+
+      expect(result).to be_valid
+      expect(messages).to include("shape `badge` uses unsupported kind: triangle")
+      expect(messages).to include("shape `badge` fill may be ignored by line fallback")
+      expect(messages).to include("shape `badge` opacity 1.5 is outside 0..1; renderer will clamp")
+      expect(messages).to include("shape `badge` scale includes 0; shape may collapse")
+      expect(messages).to include("shape `burst` scale 12.0 is extreme; renderer will clamp")
+    end
+  end
+
   it "accepts supported layer post effects" do
     with_scene_file(<<~RUBY) do |scene_path|
       Vizcore.define do

@@ -19,6 +19,7 @@ module Vizcore
       SUPPORTED_BLEND_MODES = Vizcore::LayerCatalog::BLEND_MODES
       SUPPORTED_POST_EFFECTS = Vizcore::LayerCatalog::POST_EFFECTS
       SUPPORTED_VJ_EFFECTS = Vizcore::LayerCatalog::VJ_EFFECTS
+      SUPPORTED_SHAPE_KINDS = %i[circle line rect polygon polyline path star].freeze
 
       Issue = Struct.new(:severity, :message, keyword_init: true) do
         def error?
@@ -113,6 +114,7 @@ module Vizcore
         issues << warn("scene #{scene_name} layer #{layer_name} has an empty GLSL file") if layer[:glsl] && glsl_source.to_s.empty?
         validate_blend_mode(layer, scene_name, layer_name, issues)
         validate_layer_effects(layer, scene_name, layer_name, issues)
+        validate_shape_layer(layer, scene_name, layer_name, issues)
         validate_mappings(Array(layer[:mappings]), scene_name, layer_name, issues)
       end
 
@@ -130,8 +132,98 @@ module Vizcore
         validate_effect_name(params[:vj_effect], SUPPORTED_VJ_EFFECTS, "vj_effect", scene_name, layer_name, issues)
       end
 
+      def validate_shape_layer(layer, scene_name, layer_name, issues)
+        params = layer[:params] || {}
+        return unless shape_layer?(layer) || shape_value(params, :shapes)
+
+        Array(shape_value(params, :shapes)).each_with_index do |shape, index|
+          values = shape_hash(shape)
+          label = shape_label(values, index)
+          validate_shape_kind(values, label, scene_name, layer_name, issues)
+          validate_shape_fallback_fill(values, label, scene_name, layer_name, issues)
+          validate_shape_opacity(values, label, scene_name, layer_name, issues)
+          validate_shape_scale(values, label, scene_name, layer_name, issues)
+        end
+      end
+
+      def validate_shape_kind(shape, label, scene_name, layer_name, issues)
+        kind = shape_value(shape, :kind)&.to_sym
+        return if SUPPORTED_SHAPE_KINDS.include?(kind)
+
+        issues << warn("scene #{scene_name} layer #{layer_name} shape #{label} uses unsupported kind: #{kind || "missing"}")
+      end
+
+      def validate_shape_fallback_fill(shape, label, scene_name, layer_name, issues)
+        fill = shape_value(shape, :fill)
+        return if fill.nil? || fill.to_s.empty?
+
+        issues << warn("scene #{scene_name} layer #{layer_name} shape #{label} fill may be ignored by line fallback")
+      end
+
+      def validate_shape_opacity(shape, label, scene_name, layer_name, issues)
+        opacity = numeric_shape_value(shape_value(shape, :opacity))
+        return unless opacity && (opacity.negative? || opacity > 1)
+
+        issues << warn("scene #{scene_name} layer #{layer_name} shape #{label} opacity #{opacity} is outside 0..1; renderer will clamp")
+      end
+
+      def validate_shape_scale(shape, label, scene_name, layer_name, issues)
+        scale_values(shape).each do |scale|
+          next unless scale
+
+          if scale.zero?
+            issues << warn("scene #{scene_name} layer #{layer_name} shape #{label} scale includes 0; shape may collapse")
+          elsif scale.abs > 8
+            issues << warn("scene #{scene_name} layer #{layer_name} shape #{label} scale #{scale} is extreme; renderer will clamp")
+          end
+        end
+      end
+
       def supported_layer_types
         Vizcore::LayerCatalog.supported_types
+      end
+
+      def shape_layer?(layer)
+        %w[shape shapes shape_layer].include?((layer[:type] || layer["type"]).to_s)
+      end
+
+      def shape_label(shape, index)
+        id = shape_value(shape, :id)
+        id ? "`#{id}`" : "##{index + 1}"
+      end
+
+      def scale_values(shape)
+        transform = Hash(shape_value(shape, :transform) || {})
+        scale = shape_value(transform, :scale) || shape_value(shape, :scale)
+        case scale
+        when Hash
+          [numeric_shape_value(shape_value(scale, :x)), numeric_shape_value(shape_value(scale, :y))]
+        when Array
+          [numeric_shape_value(scale[0]), numeric_shape_value(scale[1])]
+        else
+          [numeric_shape_value(scale)]
+        end
+      rescue TypeError
+        []
+      end
+
+      def numeric_shape_value(value)
+        return nil if value.nil?
+
+        numeric = Float(value)
+        numeric if numeric.finite?
+      rescue ArgumentError, TypeError
+        nil
+      end
+
+      def shape_hash(value)
+        Hash(value)
+      rescue TypeError
+        {}
+      end
+
+      def shape_value(hash, key)
+        hash[key] || hash[key.to_s]
       end
 
       def validate_effect_name(value, supported, field, scene_name, layer_name, issues)
