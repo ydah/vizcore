@@ -220,7 +220,11 @@ The DSL raises early for malformed primitives:
 
 ## Renderer Notes
 
-The browser and software snapshot renderers currently use a line-based fallback
-for shape primitives. `fill`, `stroke_color`, `stroke_width`, `opacity`, and
-`blend` are serialized by the DSL; fill and stroke width are reserved for a
-future Canvas2D shape renderer.
+The browser renderer uses a Canvas2D shape backend composited through the
+existing WebGL layer pipeline. It supports fill, stroke color/width, opacity,
+dash, line caps/joins, transforms, and logical/ndc coordinates for the shape
+schema.
+
+If Canvas2D is unavailable, the browser falls back to the existing line renderer.
+That fallback ignores fill and only approximates stroke geometry. The software
+snapshot renderer also uses line flattening.

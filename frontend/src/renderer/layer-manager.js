@@ -18,6 +18,7 @@ import {
   resolveShaderRenderer
 } from "../plugin-runtime.js";
 import { SpectrogramRenderer } from "../visuals/spectrogram-renderer.js";
+import { ShapeRenderer } from "../visuals/shape-renderer.js";
 import { TextRenderer } from "../visuals/text-renderer.js";
 import { getVJEffectShader } from "../visuals/vj-effects.js";
 import { FULLSCREEN_VERTEX_SHADER } from "./shader-manager.js";
@@ -205,6 +206,7 @@ export class LayerManager {
     this.particleSystem = new ParticleSystem(this.gl, this.shaderManager);
     this.textRenderer = new TextRenderer(this.gl, this.shaderManager);
     this.imageRenderer = new ImageRenderer(this.gl, this.shaderManager);
+    this.shapeRenderer = new ShapeRenderer(this.gl, this.shaderManager);
     this.spectrogramRenderer = new SpectrogramRenderer(this.gl, this.shaderManager);
 
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.fullscreenBuffer);
@@ -274,7 +276,7 @@ export class LayerManager {
       return;
     }
     if (isShapeLayer(layer)) {
-      this.renderShapeLayer(layer, audio, paletteIndex);
+      this.renderShapeLayer(layer, audio, time, resolution, paletteIndex);
       return;
     }
     if (isShaderLayer(layer)) {
@@ -556,16 +558,28 @@ export class LayerManager {
     });
   }
 
-  renderShapeLayer(layer, audio, paletteIndex = 0) {
+  renderShapeLayer(layer, audio, time, resolution, paletteIndex = 0) {
     const params = layer?.params || {};
+    const amplitude = clamp(Number(audio?.amplitude || 0), 0, 1);
+    const fallbackColor = [0.85, 0.50 + amplitude * 0.24, 0.95];
+    const cssColor = resolveLayerCssColor(params, "#d98cff", paletteIndex);
+    const rendered = this.shapeRenderer.render({
+      params,
+      color: cssColor,
+      resolution,
+      audio,
+      time
+    });
+    if (rendered) {
+      return;
+    }
+
     const points = buildShapeLines({ params });
 
     if (points.length === 0) {
       return;
     }
 
-    const amplitude = clamp(Number(audio?.amplitude || 0), 0, 1);
-    const fallbackColor = [0.85, 0.50 + amplitude * 0.24, 0.95];
     const color = resolveLayerRgbColor(params, fallbackColor, paletteIndex);
     this.renderLinePoints(points, color);
   }
