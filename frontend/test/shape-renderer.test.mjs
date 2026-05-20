@@ -8,6 +8,7 @@ import {
   shapeCoordinateContext,
   shouldStrokeShape
 } from "../src/visuals/shape-renderer.js";
+import { describeSvgArc, svgArcPoint, svgArcSegmentCount } from "../src/visuals/svg-arc.js";
 
 const canvas = { width: 1280, height: 720 };
 
@@ -50,4 +51,24 @@ test("shouldStrokeShape preserves outline defaults", () => {
   assert.equal(shouldStrokeShape({ fill: "#0f0" }, "rect"), false);
   assert.equal(shouldStrokeShape({ fill: "#0f0", stroke_width: 2 }, "rect"), true);
   assert.equal(shouldStrokeShape({ fill: "#0f0" }, "line"), true);
+});
+
+test("describeSvgArc converts endpoint arcs to center parameters", () => {
+  const arc = describeSvgArc({
+    from: [0, 0],
+    to: [100, 0],
+    rx: 50,
+    ry: 50,
+    largeArc: false,
+    sweep: true
+  });
+
+  assert.ok(arc);
+  assert.equal(Math.round(arc.cx), 50);
+  assert.equal(Math.round(arc.cy), 0);
+  assert.equal(arc.rx, 50);
+  assert.equal(arc.ry, 50);
+  assert.equal(svgArcSegmentCount(arc, 16), 8);
+  assert.ok(Math.abs(svgArcPoint(arc, 1)[0] - 100) < 1e-9);
+  assert.ok(Math.abs(svgArcPoint(arc, 1)[1]) < 1e-9);
 });

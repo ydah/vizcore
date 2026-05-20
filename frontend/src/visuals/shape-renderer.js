@@ -1,3 +1,5 @@
+import { describeSvgArc } from "./svg-arc.js";
+
 const SHAPE_VERTEX_SHADER = `#version 300 es
 in vec2 a_position;
 in vec2 a_uv;
@@ -307,13 +309,42 @@ const appendCustomPath = (ctx, shape, context, canvas) => {
       const c2 = resolveShapeCanvasPoint(values[2], values[3], context, canvas);
       current = resolveShapeCanvasPoint(values[4], values[5], context, canvas);
       ctx.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], current[0], current[1]);
-    } else if (command === "A" && values.length >= 7) {
-      current = resolveShapeCanvasPoint(values[5], values[6], context, canvas);
-      ctx.lineTo(current[0], current[1]);
+    } else if (command === "A" && current && values.length >= 7) {
+      current = appendSvgArcPath(ctx, current, values, context, canvas);
     } else if (command === "Z") {
       ctx.closePath();
     }
   });
+};
+
+const appendSvgArcPath = (ctx, current, values, context, canvas) => {
+  const endpoint = resolveShapeCanvasPoint(values[5], values[6], context, canvas);
+  const arc = describeSvgArc({
+    from: current,
+    to: endpoint,
+    rx: resolveShapeCanvasLength(values[0], context, canvas, "x"),
+    ry: resolveShapeCanvasLength(values[1], context, canvas, "y"),
+    xAxisRotation: -finiteNumber(values[2], 0),
+    largeArc: !!values[3],
+    sweep: !!values[4]
+  });
+
+  if (arc && typeof ctx.ellipse === "function") {
+    ctx.ellipse(
+      arc.cx,
+      arc.cy,
+      arc.rx,
+      arc.ry,
+      arc.rotation,
+      arc.startAngle,
+      arc.startAngle + arc.deltaAngle,
+      arc.deltaAngle < 0
+    );
+  } else {
+    ctx.lineTo(endpoint[0], endpoint[1]);
+  }
+
+  return endpoint;
 };
 
 const applyShapeTransform = (ctx, shape, context, canvas) => {

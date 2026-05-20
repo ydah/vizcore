@@ -35,6 +35,7 @@ RSpec.describe Vizcore::Renderer::Snapshot do
               { kind: :rect, width: 160, height: 80, transform: { rotate: 8 } },
               { kind: :polygon, points: [[0, 80], [-70, -40], [70, -40]] },
               { kind: :path, detail: 8, commands: [["M", -90, 0], ["C", -30, 80, 30, -80, 90, 0]] },
+              { kind: :path, detail: 12, commands: [["M", -80, -45], ["A", 40, 24, 0, 0, 1, 0, -45]] },
               { kind: :star, points: 5, radius: 60, inner_radius: 24, transform: { translate: { x: 180, y: 0 } } }
             ]
           }

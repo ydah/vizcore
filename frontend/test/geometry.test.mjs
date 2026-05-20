@@ -121,6 +121,21 @@ test("buildShapeLines flattens extended shape primitives", () => {
   assert.ok(points.every((value) => value >= -1.2 && value <= 1.2));
 });
 
+test("buildShapeLines flattens arc path commands", () => {
+  const points = buildShapeLines({
+    params: {
+      shape_schema_version: 2,
+      shapes: [
+        { kind: "path", detail: 16, commands: [["M", 0, 0], ["A", 50, 50, 0, 0, 1, 100, 0]] },
+      ],
+    },
+  });
+
+  assert.equal(points.length, 32);
+  assert.ok(points.every((value) => Number.isFinite(value)));
+  assert.notEqual(points[3], 0);
+});
+
 test("buildShapeLines ignores unknown shapes", () => {
   assert.deepEqual(buildShapeLines({ params: { shapes: [{ kind: "triangle" }] } }), []);
 });

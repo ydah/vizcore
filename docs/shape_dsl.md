@@ -54,9 +54,9 @@ path :blob, detail: 48 do
 end
 ```
 
-Commands are serialized as `M`, `L`, `Q`, `C`, `H`, `V`, `A`, and `Z`. The current
-browser fallback flattens curves to line segments. `arc_to` is accepted but is
-currently previewed as a straight segment to its endpoint.
+Commands are serialized as `M`, `L`, `Q`, `C`, `H`, `V`, `A`, and `Z`. The
+Canvas2D renderer draws `arc_to` as an SVG-style elliptical arc, and the line
+fallback/snapshot renderer flattens curves and arcs to line segments.
 
 ## Style And Transform
 

@@ -1,3 +1,5 @@
+import { describeSvgArc, svgArcPoint, svgArcSegmentCount } from "./svg-arc.js";
+
 const BASE_VERTICES = [
   [-1.0, -1.0, -1.0],
   [1.0, -1.0, -1.0],
@@ -340,9 +342,7 @@ const appendPathShape = (points, shape, context) => {
     } else if (command === "C" && current && values.length >= 6) {
       current = appendCubicPath(points, current, values, detail, shape, context);
     } else if (command === "A" && current && values.length >= 7) {
-      const next = [values[5], values[6]];
-      appendRawSegment(points, current, next, shape, context);
-      current = next;
+      current = appendArcPath(points, current, values, detail, shape, context);
     } else if (command === "Z" && current && subpathStart) {
       appendRawSegment(points, current, subpathStart, shape, context);
       current = subpathStart;
@@ -380,6 +380,34 @@ const appendCubicPath = (points, current, values, detail, shape, context) => {
       cubicPoint(current[0], c1[0], c2[0], end[0], t),
       cubicPoint(current[1], c1[1], c2[1], end[1], t)
     ];
+    appendRawSegment(points, previous, next, shape, context);
+    previous = next;
+  }
+
+  return end;
+};
+
+const appendArcPath = (points, current, values, detail, shape, context) => {
+  const end = [values[5], values[6]];
+  const arc = describeSvgArc({
+    from: current,
+    to: end,
+    rx: values[0],
+    ry: values[1],
+    xAxisRotation: values[2],
+    largeArc: !!values[3],
+    sweep: !!values[4]
+  });
+
+  if (!arc) {
+    appendRawSegment(points, current, end, shape, context);
+    return end;
+  }
+
+  let previous = current;
+  const segments = svgArcSegmentCount(arc, detail);
+  for (let step = 1; step <= segments; step += 1) {
+    const next = svgArcPoint(arc, step / segments);
     appendRawSegment(points, previous, next, shape, context);
     previous = next;
   }

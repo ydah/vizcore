@@ -271,7 +271,7 @@ module Vizcore
           when "A"
             next unless current && values.length >= 7
 
-            current = draw_raw_path_segment(canvas, current, [values[5], values[6]], shape, color, alpha, context)
+            current = draw_arc_path(canvas, current, values, detail, shape, color, alpha, context)
           when "Z"
             current = draw_raw_path_segment(canvas, current, subpath_start, shape, color, alpha, context) if current && subpath_start
           end
@@ -317,6 +317,29 @@ module Vizcore
             cubic_point(current[0], c1[0], c2[0], endpoint[0], t),
             cubic_point(current[1], c1[1], c2[1], endpoint[1], t)
           ]
+          draw_raw_path_segment(canvas, previous, point, shape, color, alpha, context)
+          previous = point
+        end
+        endpoint
+      end
+
+      def draw_arc_path(canvas, current, values, detail, shape, color, alpha, context)
+        endpoint = values[5, 2]
+        arc = svg_arc_description(
+          from: current,
+          to: endpoint,
+          rx: values[0],
+          ry: values[1],
+          x_axis_rotation: values[2],
+          large_arc: arc_flag(values[3]),
+          sweep: arc_flag(values[4])
+        )
+        return draw_raw_path_segment(canvas, current, endpoint, shape, color, alpha, context) unless arc
+
+        previous = current
+        segments = svg_arc_segment_count(arc, detail)
+        1.upto(segments) do |step|
+          point = svg_arc_point(arc, step.to_f / segments)
           draw_raw_path_segment(canvas, previous, point, shape, color, alpha, context)
           previous = point
         end
@@ -460,6 +483,115 @@ module Vizcore
       def cubic_point(from, c1, c2, to, t)
         inv = 1.0 - t
         inv * inv * inv * from + 3 * inv * inv * t * c1 + 3 * inv * t * t * c2 + t * t * t * to
+      end
+
+      def svg_arc_description(from:, to:, rx:, ry:, x_axis_rotation:, large_arc:, sweep:)
+        return if same_point?(from, to)
+
+        radius_x = Float(rx || 0).abs
+        radius_y = Float(ry || 0).abs
+        return if radius_x <= 0 || radius_y <= 0
+
+        rotation = Float(x_axis_rotation || 0) * Math::PI / 180.0
+        cos = Math.cos(rotation)
+        sin = Math.sin(rotation)
+        dx = (from[0] - to[0]) / 2.0
+        dy = (from[1] - to[1]) / 2.0
+        x1p = cos * dx + sin * dy
+        y1p = -sin * dx + cos * dy
+
+        scale = (x1p * x1p / (radius_x * radius_x)) + (y1p * y1p / (radius_y * radius_y))
+        if scale > 1
+          multiplier = Math.sqrt(scale)
+          radius_x *= multiplier
+          radius_y *= multiplier
+        end
+
+        center = svg_arc_center(
+          from: from,
+          to: to,
+          radius_x: radius_x,
+          radius_y: radius_y,
+          x1p: x1p,
+          y1p: y1p,
+          rotation_cos: cos,
+          rotation_sin: sin,
+          large_arc: large_arc,
+          sweep: sweep
+        )
+        return unless center
+
+        start_vector = [(x1p - center[:cxp]) / radius_x, (y1p - center[:cyp]) / radius_y]
+        end_vector = [(-x1p - center[:cxp]) / radius_x, (-y1p - center[:cyp]) / radius_y]
+        start_angle = vector_angle([1.0, 0.0], start_vector)
+        delta_angle = vector_angle(start_vector, end_vector)
+        delta_angle -= Math::PI * 2 if !sweep && delta_angle.positive?
+        delta_angle += Math::PI * 2 if sweep && delta_angle.negative?
+
+        {
+          cx: center[:cx],
+          cy: center[:cy],
+          rx: radius_x,
+          ry: radius_y,
+          rotation: rotation,
+          start_angle: start_angle,
+          delta_angle: delta_angle
+        }
+      rescue ArgumentError, TypeError
+        nil
+      end
+
+      def svg_arc_center(from:, to:, radius_x:, radius_y:, x1p:, y1p:, rotation_cos:, rotation_sin:, large_arc:, sweep:)
+        rx2 = radius_x * radius_x
+        ry2 = radius_y * radius_y
+        x1p2 = x1p * x1p
+        y1p2 = y1p * y1p
+        denominator = rx2 * y1p2 + ry2 * x1p2
+        return if denominator.zero?
+
+        numerator = [rx2 * ry2 - rx2 * y1p2 - ry2 * x1p2, 0.0].max
+        sign = large_arc == sweep ? -1.0 : 1.0
+        coefficient = sign * Math.sqrt(numerator / denominator)
+        cxp = coefficient * ((radius_x * y1p) / radius_y)
+        cyp = coefficient * (-(radius_y * x1p) / radius_x)
+        {
+          cxp: cxp,
+          cyp: cyp,
+          cx: rotation_cos * cxp - rotation_sin * cyp + (from[0] + to[0]) / 2.0,
+          cy: rotation_sin * cxp + rotation_cos * cyp + (from[1] + to[1]) / 2.0
+        }
+      end
+
+      def svg_arc_point(arc, progress)
+        angle = arc[:start_angle] + arc[:delta_angle] * progress
+        cos_rotation = Math.cos(arc[:rotation])
+        sin_rotation = Math.sin(arc[:rotation])
+        x = Math.cos(angle) * arc[:rx]
+        y = Math.sin(angle) * arc[:ry]
+        [
+          arc[:cx] + cos_rotation * x - sin_rotation * y,
+          arc[:cy] + sin_rotation * x + cos_rotation * y
+        ]
+      end
+
+      def svg_arc_segment_count(arc, detail)
+        [((arc[:delta_angle].abs / (Math::PI * 2)) * detail).ceil, 1].max
+      end
+
+      def vector_angle(from, to)
+        cross = from[0] * to[1] - from[1] * to[0]
+        dot = from[0] * to[0] + from[1] * to[1]
+        Math.atan2(cross, dot)
+      end
+
+      def same_point?(from, to)
+        (from[0] - to[0]).abs < 1e-9 && (from[1] - to[1]).abs < 1e-9
+      end
+
+      def arc_flag(value)
+        !Float(value || 0).zero?
+      rescue ArgumentError, TypeError
+        false
       end
 
       def render_mesh_layer(canvas, layer, audio, color, index)
