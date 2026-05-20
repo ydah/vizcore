@@ -23,6 +23,34 @@ RSpec.describe Vizcore::Renderer::Snapshot do
     end
   end
 
+  it "renders extended shape primitives in software snapshots" do
+    scene = {
+      layers: [
+        {
+          name: :shapes,
+          type: :shape,
+          params: {
+            shape_schema_version: 2,
+            shapes: [
+              { kind: :rect, width: 160, height: 80, transform: { rotate: 8 } },
+              { kind: :polygon, points: [[0, 80], [-70, -40], [70, -40]] },
+              { kind: :path, detail: 8, commands: [["M", -90, 0], ["C", -30, 80, 30, -80, 90, 0]] },
+              { kind: :star, points: 5, radius: 60, inner_radius: 24, transform: { translate: { x: 180, y: 0 } } }
+            ]
+          }
+        }
+      ]
+    }
+
+    png = Vizcore::Renderer::SnapshotRenderer.new(width: 160, height: 90).render(
+      scene: scene,
+      audio: { amplitude: 0.4, beat_pulse: 0.2, bands: { low: 0.1, high: 0.3 } }
+    )
+
+    expect(png.byteslice(0, 8)).to eq(Vizcore::Renderer::PngWriter::SIGNATURE)
+    expect(png.bytesize).to be > 128
+  end
+
   it "matches the golden scanline digest for the basic dummy frame" do
     config = Vizcore::Config.new(
       scene_file: Vizcore.root.join("examples", "basic.rb").to_s,

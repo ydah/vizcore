@@ -102,6 +102,25 @@ test("buildShapeLines returns circle and line coordinates", () => {
   assert.ok(points.every((value) => Number.isFinite(value)));
 });
 
+test("buildShapeLines flattens extended shape primitives", () => {
+  const points = buildShapeLines({
+    params: {
+      shape_schema_version: 2,
+      shapes: [
+        { kind: "rect", width: 320, height: 160, transform: { translate: { x: 40, y: 0 }, scale: 1.1 } },
+        { kind: "polygon", points: [[0, 120], [-104, -60], [104, -60]] },
+        { kind: "polyline", points: [[-120, 0], [0, 80], [120, 0]] },
+        { kind: "path", detail: 8, commands: [["M", 0, 100], ["Q", 80, 140, 120, 40], ["Z"]] },
+        { kind: "star", points: 5, radius: 80, inner_radius: 32 },
+      ],
+    },
+  });
+
+  assert.equal(points.length, 112);
+  assert.ok(points.every((value) => Number.isFinite(value)));
+  assert.ok(points.every((value) => value >= -1.2 && value <= 1.2));
+});
+
 test("buildShapeLines ignores unknown shapes", () => {
   assert.deepEqual(buildShapeLines({ params: { shapes: [{ kind: "triangle" }] } }), []);
 });

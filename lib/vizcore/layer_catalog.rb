@@ -151,10 +151,12 @@ module Vizcore
         aliases: %i[shapes shape_layer],
         params: COMMON_PARAMS.merge(
           shapes: "Array<Hash>",
+          shape_schema_version: "Integer",
+          units: "Symbol",
           color_shift: "Float"
         ),
-        mappable_params: %i[color_shift opacity],
-        description: "Declarative 2D circle and line primitives rendered by the browser."
+        mappable_params: %i[color_shift opacity shapes],
+        description: "Declarative 2D circle, line, rect, polygon, polyline, path, and star primitives rendered by the browser."
       ),
       Capability.new(
         type: :mesh,

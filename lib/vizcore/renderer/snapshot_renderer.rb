@@ -156,6 +156,7 @@ module Vizcore
       def render_shape_layer(canvas, layer, audio, color)
         params = Hash(layer[:params] || layer["params"] || {})
         shapes = Array(params[:shapes] || params["shapes"])
+        context = shape_coordinate_context(params)
         pulse = clamp(audio[:beat_pulse])
         alpha = 0.58 + pulse * 0.24
 
@@ -163,34 +164,302 @@ module Vizcore
           shape_hash = Hash(shape)
           case (shape_hash[:kind] || shape_hash["kind"]).to_s
           when "circle"
-            render_circle_shape(canvas, shape_hash, color, alpha)
+            render_circle_shape(canvas, shape_hash, color, alpha, context)
           when "line"
-            render_line_shape(canvas, shape_hash, color, alpha)
+            render_line_shape(canvas, shape_hash, color, alpha, context)
+          when "rect"
+            render_rect_shape(canvas, shape_hash, color, alpha, context)
+          when "polygon", "polyline"
+            render_polygon_shape(canvas, shape_hash, color, alpha, context)
+          when "path"
+            render_path_shape(canvas, shape_hash, color, alpha, context)
+          when "star"
+            render_star_shape(canvas, shape_hash, color, alpha, context)
           end
         end
       rescue ArgumentError, TypeError
         nil
       end
 
-      def render_circle_shape(canvas, shape, color, alpha)
+      def render_circle_shape(canvas, shape, color, alpha, context)
         count = [[Integer(shape[:count] || shape["count"] || 1), 1].max, 32].min
-        radius = Float(shape[:radius] || shape["radius"] || 100).abs
-        x = Float(shape[:x] || shape["x"] || width * 0.5)
-        y = Float(shape[:y] || shape["y"] || height * 0.5)
-        x = width * 0.5 if x.abs <= 1.5
-        y = height * 0.5 if y.abs <= 1.5
+        radius = shape_length(shape[:radius] || shape["radius"] || 100, context, :radius)
+        center = shape_point(shape[:x] || shape["x"] || 0, shape[:y] || shape["y"] || 0, context)
 
         count.times do |index|
-          canvas.draw_circle_outline(x, y, radius * ((index + 1).to_f / count), color, alpha: alpha)
+          ring_radius = radius * ((index + 1).to_f / count)
+          render_polyline_shape(canvas, circle_points(center, ring_radius), shape, color, alpha, context, closed: true)
         end
       end
 
-      def render_line_shape(canvas, shape, color, alpha)
-        x1 = Float(shape[:x1] || shape["x1"] || width * 0.2)
-        y1 = Float(shape[:y1] || shape["y1"] || height * 0.5)
-        x2 = Float(shape[:x2] || shape["x2"] || width * 0.8)
-        y2 = Float(shape[:y2] || shape["y2"] || height * 0.5)
-        canvas.draw_line(x1, y1, x2, y2, color, alpha: alpha)
+      def render_line_shape(canvas, shape, color, alpha, context)
+        defaults = context[:units] == :legacy || context[:units] == :ndc ? [-0.8, 0, 0.8, 0] : [-100, 0, 100, 0]
+        from = shape_point(shape[:x1] || shape["x1"] || defaults[0], shape[:y1] || shape["y1"] || defaults[1], context)
+        to = shape_point(shape[:x2] || shape["x2"] || defaults[2], shape[:y2] || shape["y2"] || defaults[3], context)
+        draw_shape_segment(canvas, from, to, shape, color, alpha, context)
+      end
+
+      def render_rect_shape(canvas, shape, color, alpha, context)
+        center = shape_point(shape[:x] || shape["x"] || 0, shape[:y] || shape["y"] || 0, context)
+        half_width = shape_length(shape[:width] || shape["width"] || 100, context, :x) / 2.0
+        half_height = shape_length(shape[:height] || shape["height"] || 100, context, :y) / 2.0
+        points = [
+          [center[0] - half_width, center[1] - half_height],
+          [center[0] + half_width, center[1] - half_height],
+          [center[0] + half_width, center[1] + half_height],
+          [center[0] - half_width, center[1] + half_height]
+        ]
+        render_polyline_shape(canvas, points, shape, color, alpha, context, closed: true)
+      end
+
+      def render_polygon_shape(canvas, shape, color, alpha, context)
+        points = Array(shape[:points] || shape["points"]).filter_map do |point|
+          values = Array(point)
+          next if values.length < 2
+
+          shape_point(values[0], values[1], context)
+        end
+        closed = (shape[:kind] || shape["kind"]).to_s == "polygon" ? shape.fetch(:closed, shape.fetch("closed", true)) : false
+        render_polyline_shape(canvas, points, shape, color, alpha, context, closed: closed)
+      end
+
+      def render_star_shape(canvas, shape, color, alpha, context)
+        tips = [[Integer(shape[:points] || shape["points"] || 5), 3].max, 128].min
+        center = shape_point(shape[:x] || shape["x"] || 0, shape[:y] || shape["y"] || 0, context)
+        radius = shape_length(shape[:radius] || shape["radius"] || 100, context, :radius)
+        inner_radius = shape_length(shape[:inner_radius] || shape["inner_radius"] || Float(shape[:radius] || shape["radius"] || 100) * 0.5, context, :radius)
+        rotation = Float(shape[:rotation] || shape["rotation"] || -90) * Math::PI / 180.0
+        points = (tips * 2).times.map do |index|
+          angle = rotation + (index.to_f / (tips * 2)) * Math::PI * 2
+          point_radius = index.even? ? radius : inner_radius
+          [center[0] + Math.cos(angle) * point_radius, center[1] - Math.sin(angle) * point_radius]
+        end
+        render_polyline_shape(canvas, points, shape, color, alpha, context, closed: true)
+      end
+
+      def render_path_shape(canvas, shape, color, alpha, context)
+        detail = [[Integer(shape[:detail] || shape["detail"] || 32), 4].max, 128].min
+        current = nil
+        subpath_start = nil
+        Array(shape[:commands] || shape["commands"]).each do |entry|
+          command, *values = Array(entry)
+          values = values.map { |value| Float(value) }
+          case command.to_s.upcase
+          when "M"
+            current = values.first(2)
+            subpath_start = current
+          when "L"
+            next unless current && values.length >= 2
+
+            current = draw_raw_path_segment(canvas, current, values.first(2), shape, color, alpha, context)
+          when "H"
+            next unless current && values.length >= 1
+
+            current = draw_raw_path_segment(canvas, current, [values[0], current[1]], shape, color, alpha, context)
+          when "V"
+            next unless current && values.length >= 1
+
+            current = draw_raw_path_segment(canvas, current, [current[0], values[0]], shape, color, alpha, context)
+          when "Q"
+            next unless current && values.length >= 4
+
+            current = draw_quadratic_path(canvas, current, values, detail, shape, color, alpha, context)
+          when "C"
+            next unless current && values.length >= 6
+
+            current = draw_cubic_path(canvas, current, values, detail, shape, color, alpha, context)
+          when "A"
+            next unless current && values.length >= 7
+
+            current = draw_raw_path_segment(canvas, current, [values[5], values[6]], shape, color, alpha, context)
+          when "Z"
+            current = draw_raw_path_segment(canvas, current, subpath_start, shape, color, alpha, context) if current && subpath_start
+          end
+        end
+      end
+
+      def render_polyline_shape(canvas, points, shape, color, alpha, context, closed:)
+        return if points.length < 2
+
+        points.each_cons(2) { |from, to| draw_shape_segment(canvas, from, to, shape, color, alpha, context) }
+        draw_shape_segment(canvas, points.last, points.first, shape, color, alpha, context) if closed && points.length > 2
+      end
+
+      def draw_raw_path_segment(canvas, from, to, shape, color, alpha, context)
+        draw_shape_segment(canvas, shape_point(from[0], from[1], context), shape_point(to[0], to[1], context), shape, color, alpha, context)
+        to
+      end
+
+      def draw_quadratic_path(canvas, current, values, detail, shape, color, alpha, context)
+        previous = current
+        control = values.first(2)
+        endpoint = values.last(2)
+        1.upto(detail) do |step|
+          t = step.to_f / detail
+          point = [
+            quadratic_point(current[0], control[0], endpoint[0], t),
+            quadratic_point(current[1], control[1], endpoint[1], t)
+          ]
+          draw_raw_path_segment(canvas, previous, point, shape, color, alpha, context)
+          previous = point
+        end
+        endpoint
+      end
+
+      def draw_cubic_path(canvas, current, values, detail, shape, color, alpha, context)
+        previous = current
+        c1 = values[0, 2]
+        c2 = values[2, 2]
+        endpoint = values[4, 2]
+        1.upto(detail) do |step|
+          t = step.to_f / detail
+          point = [
+            cubic_point(current[0], c1[0], c2[0], endpoint[0], t),
+            cubic_point(current[1], c1[1], c2[1], endpoint[1], t)
+          ]
+          draw_raw_path_segment(canvas, previous, point, shape, color, alpha, context)
+          previous = point
+        end
+        endpoint
+      end
+
+      def draw_shape_segment(canvas, from, to, shape, color, alpha, context)
+        from = apply_shape_transform(from, shape, context)
+        to = apply_shape_transform(to, shape, context)
+        canvas.draw_line(from[0], from[1], to[0], to[1], color, alpha: alpha * shape_opacity(shape))
+      end
+
+      def shape_coordinate_context(params)
+        units = (params[:units] || params["units"]).to_s.strip.downcase
+        version = Integer(params[:shape_schema_version] || params["shape_schema_version"] || 1)
+        { units: (units.empty? ? (version >= 2 ? :logical : :legacy) : units.to_sym) }
+      rescue ArgumentError, TypeError
+        { units: :legacy }
+      end
+
+      def shape_point(x, y, context)
+        [shape_coordinate(x, context, :x), shape_coordinate(y, context, :y)]
+      end
+
+      def shape_coordinate(value, context, axis)
+        numeric = Float(value || 0)
+        case context[:units]
+        when :ndc
+          axis == :x ? width * 0.5 + numeric * width * 0.5 : height * 0.5 - numeric * height * 0.5
+        when :logical, :center, :center_origin, :px
+          axis == :x ? width * 0.5 + numeric : height * 0.5 - numeric
+        when :screen, :canvas, :viewport
+          numeric
+        else
+          legacy_shape_coordinate(numeric, axis)
+        end
+      end
+
+      def legacy_shape_coordinate(value, axis)
+        return axis == :x ? width * 0.5 + value * width * 0.5 : height * 0.5 - value * height * 0.5 if value.abs <= 1.5
+
+        value
+      end
+
+      def shape_length(value, context, _axis)
+        numeric = Float(value || 0).abs
+        return numeric * [width, height].min * 0.5 if context[:units] == :ndc || numeric <= 2
+
+        numeric
+      end
+
+      def circle_points(center, radius)
+        segments = 96
+        segments.times.map do |index|
+          angle = (index.to_f / segments) * Math::PI * 2
+          [center[0] + Math.cos(angle) * radius, center[1] + Math.sin(angle) * radius]
+        end
+      end
+
+      def apply_shape_transform(point, shape, context)
+        transform = shape_transform(shape, context)
+        shifted_x = (point[0] - transform[:origin][0]) * transform[:scale][:x]
+        shifted_y = (point[1] - transform[:origin][1]) * transform[:scale][:y]
+        radians = -transform[:rotate] * Math::PI / 180.0
+        cos = Math.cos(radians)
+        sin = Math.sin(radians)
+        rotated_x = shifted_x * cos - shifted_y * sin
+        rotated_y = shifted_x * sin + shifted_y * cos
+
+        [
+          rotated_x + transform[:origin][0] + transform[:translate][:x],
+          rotated_y + transform[:origin][1] + transform[:translate][:y]
+        ]
+      end
+
+      def shape_transform(shape, context)
+        transform = Hash(shape[:transform] || shape["transform"] || {})
+        {
+          translate: shape_vector_pair(shape_hash_value(transform, :translate) || shape_hash_value(shape, :translate), context),
+          origin: shape_origin_pair(shape_hash_value(transform, :origin) || shape_hash_value(shape, :origin), context),
+          rotate: Float(shape_hash_value(transform, :rotate) || shape_hash_value(shape, :rotate) || shape_hash_value(shape, :rotation) || 0),
+          scale: shape_scale(shape_hash_value(transform, :scale) || shape_hash_value(shape, :scale))
+        }
+      end
+
+      def shape_vector_pair(value, context)
+        if value.is_a?(Array)
+          return { x: shape_vector(value[0], context, :x), y: shape_vector(value[1], context, :y) }
+        end
+
+        values = value.is_a?(Hash) ? value : {}
+        { x: shape_vector(shape_hash_value(values, :x) || 0, context, :x), y: shape_vector(shape_hash_value(values, :y) || 0, context, :y) }
+      end
+
+      def shape_origin_pair(value, context)
+        if value.is_a?(Array)
+          return shape_point(value[0], value[1], context)
+        end
+
+        values = value.is_a?(Hash) ? value : {}
+        shape_point(shape_hash_value(values, :x) || 0, shape_hash_value(values, :y) || 0, context)
+      end
+
+      def shape_vector(value, context, axis)
+        numeric = Float(value || 0)
+        case context[:units]
+        when :ndc
+          axis == :x ? numeric * width * 0.5 : -numeric * height * 0.5
+        else
+          axis == :x ? numeric : -numeric
+        end
+      end
+
+      def shape_scale(value)
+        if value.is_a?(Hash)
+          return {
+            x: Float(shape_hash_value(value, :x) || 1).clamp(-8.0, 8.0),
+            y: Float(shape_hash_value(value, :y) || 1).clamp(-8.0, 8.0)
+          }
+        end
+
+        scale = Float(value || 1).clamp(-8.0, 8.0)
+        { x: scale, y: scale }
+      end
+
+      def shape_opacity(shape)
+        Float(shape[:opacity] || shape["opacity"] || 1).clamp(0.0, 1.0)
+      rescue ArgumentError, TypeError
+        1.0
+      end
+
+      def shape_hash_value(hash, key)
+        hash[key] || hash[key.to_s]
+      end
+
+      def quadratic_point(from, control, to, t)
+        inv = 1.0 - t
+        inv * inv * from + 2 * inv * t * control + t * t * to
+      end
+
+      def cubic_point(from, c1, c2, to, t)
+        inv = 1.0 - t
+        inv * inv * inv * from + 3 * inv * inv * t * c1 + 3 * inv * t * t * c2 + t * t * t * to
       end
 
       def render_mesh_layer(canvas, layer, audio, color, index)

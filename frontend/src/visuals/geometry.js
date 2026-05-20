@@ -66,6 +66,8 @@ const MESH_PRESETS = {
   octahedron: { vertices: OCTAHEDRON_VERTICES, edges: OCTAHEDRON_EDGES },
   icosahedron: { vertices: ICOSAHEDRON_VERTICES, edges: ICOSAHEDRON_EDGES }
 };
+const SHAPE_HALF_WIDTH = 640;
+const SHAPE_HALF_HEIGHT = 360;
 
 export const buildWireframeLines = ({ rotationY, rotationX, deform }) => {
   const amount = clamp(Number(deform || 0), 0, 1);
@@ -185,14 +187,23 @@ export const buildWaveformLines = ({ time = 0, params = {}, audio = {} } = {}) =
 
 export const buildShapeLines = ({ params = {} } = {}) => {
   const shapes = Array.isArray(params.shapes) ? params.shapes : [];
+  const context = shapeCoordinateContext(params);
   const points = [];
 
   shapes.forEach((shape) => {
     const kind = String(shape?.kind || shape?.type || "").toLowerCase();
     if (kind === "circle") {
-      appendCircleShape(points, shape);
+      appendCircleShape(points, shape, context);
     } else if (kind === "line") {
-      appendLineShape(points, shape);
+      appendLineShape(points, shape, context);
+    } else if (kind === "rect") {
+      appendRectShape(points, shape, context);
+    } else if (kind === "polygon" || kind === "polyline") {
+      appendPolygonShape(points, shape, context, kind === "polygon");
+    } else if (kind === "path") {
+      appendPathShape(points, shape, context);
+    } else if (kind === "star") {
+      appendStarShape(points, shape, context);
     }
   });
 
@@ -223,56 +234,333 @@ const appendLineSegments = (points, samples) => {
   }
 };
 
-const appendCircleShape = (points, shape) => {
+const appendCircleShape = (points, shape, context) => {
   const count = clampInt(shape.count || 1, 1, 64);
   const segments = clampInt(shape.segments || 96, 12, 256);
-  const radius = normalizeShapeRadius(shape.radius ?? 100);
-  const x = normalizeShapeCoordinate(shape.x ?? 0, "x");
-  const y = normalizeShapeCoordinate(shape.y ?? 0, "y");
+  const radius = normalizeShapeLength(shape.radius ?? 100, context, "radius");
+  const center = normalizeShapePoint(shape.x ?? 0, shape.y ?? 0, context);
 
   for (let ring = 0; ring < count; ring += 1) {
     const ringRadius = radius * ((ring + 1) / count);
     for (let index = 0; index < segments; index += 1) {
-      appendCirclePoint(points, x, y, ringRadius, index, segments);
-      appendCirclePoint(points, x, y, ringRadius, index + 1, segments);
+      appendSegment(
+        points,
+        circlePoint(center, ringRadius, index, segments),
+        circlePoint(center, ringRadius, index + 1, segments),
+        shape,
+        context
+      );
     }
   }
 };
 
-const appendCirclePoint = (points, x, y, radius, index, segments) => {
+const circlePoint = (center, radius, index, segments) => {
   const angle = (index / segments) * Math.PI * 2;
-  points.push(
-    clamp(x + Math.cos(angle) * radius, -1.2, 1.2),
-    clamp(y + Math.sin(angle) * radius, -1.2, 1.2)
+  return [center[0] + Math.cos(angle) * radius, center[1] + Math.sin(angle) * radius];
+};
+
+const appendLineShape = (points, shape, context) => {
+  const [x1, y1, x2, y2] = lineDefaults(context);
+  appendSegment(
+    points,
+    normalizeShapePoint(shape.x1 ?? x1, shape.y1 ?? y1, context),
+    normalizeShapePoint(shape.x2 ?? x2, shape.y2 ?? y2, context),
+    shape,
+    context
   );
 };
 
-const appendLineShape = (points, shape) => {
-  points.push(
-    normalizeShapeCoordinate(shape.x1 ?? -0.8, "x"),
-    normalizeShapeCoordinate(shape.y1 ?? 0, "y"),
-    normalizeShapeCoordinate(shape.x2 ?? 0.8, "x"),
-    normalizeShapeCoordinate(shape.y2 ?? 0, "y")
-  );
+const appendRectShape = (points, shape, context) => {
+  const center = normalizeShapePoint(shape.x ?? 0, shape.y ?? 0, context);
+  const halfWidth = normalizeShapeLength(shape.width ?? 100, context, "x") / 2;
+  const halfHeight = normalizeShapeLength(shape.height ?? 100, context, "y") / 2;
+  const vertices = [
+    [center[0] - halfWidth, center[1] - halfHeight],
+    [center[0] + halfWidth, center[1] - halfHeight],
+    [center[0] + halfWidth, center[1] + halfHeight],
+    [center[0] - halfWidth, center[1] + halfHeight]
+  ];
+
+  appendPolylineSegments(points, vertices, shape, context, true);
 };
 
-const normalizeShapeRadius = (value) => {
-  const numeric = finiteNumber(value, 100);
-  const radius = Math.abs(numeric) <= 2 ? Math.abs(numeric) : Math.abs(numeric) / 360;
-  return clamp(radius, 0.005, 1.4);
+const appendPolygonShape = (points, shape, context, defaultClosed) => {
+  const vertices = normalizeShapePoints(shape.points, context);
+  if (vertices.length < (defaultClosed ? 3 : 2)) {
+    return;
+  }
+
+  appendPolylineSegments(points, vertices, shape, context, shape.closed ?? defaultClosed);
 };
 
-const normalizeShapeCoordinate = (value, axis) => {
+const appendStarShape = (points, shape, context) => {
+  const tips = clampInt(shape.points || 5, 3, 128);
+  const center = normalizeShapePoint(shape.x ?? 0, shape.y ?? 0, context);
+  const radius = normalizeShapeLength(shape.radius ?? 100, context, "radius");
+  const innerRadius = normalizeShapeLength(shape.inner_radius ?? radiusToRawHalf(shape.radius ?? 100), context, "radius");
+  const rotation = (finiteNumber(shape.rotation, -90) / 180) * Math.PI;
+  const vertices = [];
+
+  for (let index = 0; index < tips * 2; index += 1) {
+    const angle = rotation + (index / (tips * 2)) * Math.PI * 2;
+    const pointRadius = index % 2 === 0 ? radius : innerRadius;
+    vertices.push([center[0] + Math.cos(angle) * pointRadius, center[1] + Math.sin(angle) * pointRadius]);
+  }
+
+  appendPolylineSegments(points, vertices, shape, context, true);
+};
+
+const appendPathShape = (points, shape, context) => {
+  const commands = Array.isArray(shape.commands) ? shape.commands : [];
+  const detail = clampInt(shape.detail || 32, 4, 128);
+  let current = null;
+  let subpathStart = null;
+
+  commands.forEach((entry) => {
+    const command = Array.isArray(entry) ? String(entry[0] || "").toUpperCase() : "";
+    const values = Array.isArray(entry) ? entry.slice(1).map((value) => finiteNumber(value, 0)) : [];
+
+    if (command === "M" && values.length >= 2) {
+      current = [values[0], values[1]];
+      subpathStart = current;
+    } else if (command === "L" && current && values.length >= 2) {
+      const next = [values[0], values[1]];
+      appendRawSegment(points, current, next, shape, context);
+      current = next;
+    } else if (command === "H" && current && values.length >= 1) {
+      const next = [values[0], current[1]];
+      appendRawSegment(points, current, next, shape, context);
+      current = next;
+    } else if (command === "V" && current && values.length >= 1) {
+      const next = [current[0], values[0]];
+      appendRawSegment(points, current, next, shape, context);
+      current = next;
+    } else if (command === "Q" && current && values.length >= 4) {
+      current = appendQuadraticPath(points, current, values, detail, shape, context);
+    } else if (command === "C" && current && values.length >= 6) {
+      current = appendCubicPath(points, current, values, detail, shape, context);
+    } else if (command === "A" && current && values.length >= 7) {
+      const next = [values[5], values[6]];
+      appendRawSegment(points, current, next, shape, context);
+      current = next;
+    } else if (command === "Z" && current && subpathStart) {
+      appendRawSegment(points, current, subpathStart, shape, context);
+      current = subpathStart;
+    }
+  });
+};
+
+const appendQuadraticPath = (points, current, values, detail, shape, context) => {
+  let previous = current;
+  const control = [values[0], values[1]];
+  const end = [values[2], values[3]];
+
+  for (let step = 1; step <= detail; step += 1) {
+    const t = step / detail;
+    const next = [
+      quadraticPoint(current[0], control[0], end[0], t),
+      quadraticPoint(current[1], control[1], end[1], t)
+    ];
+    appendRawSegment(points, previous, next, shape, context);
+    previous = next;
+  }
+
+  return end;
+};
+
+const appendCubicPath = (points, current, values, detail, shape, context) => {
+  let previous = current;
+  const c1 = [values[0], values[1]];
+  const c2 = [values[2], values[3]];
+  const end = [values[4], values[5]];
+
+  for (let step = 1; step <= detail; step += 1) {
+    const t = step / detail;
+    const next = [
+      cubicPoint(current[0], c1[0], c2[0], end[0], t),
+      cubicPoint(current[1], c1[1], c2[1], end[1], t)
+    ];
+    appendRawSegment(points, previous, next, shape, context);
+    previous = next;
+  }
+
+  return end;
+};
+
+const appendRawSegment = (points, from, to, shape, context) => {
+  appendSegment(points, normalizeShapePoint(from[0], from[1], context), normalizeShapePoint(to[0], to[1], context), shape, context);
+};
+
+const appendPolylineSegments = (points, vertices, shape, context, closed) => {
+  for (let index = 1; index < vertices.length; index += 1) {
+    appendSegment(points, vertices[index - 1], vertices[index], shape, context);
+  }
+
+  if (closed && vertices.length > 2) {
+    appendSegment(points, vertices[vertices.length - 1], vertices[0], shape, context);
+  }
+};
+
+const appendSegment = (points, from, to, shape, context) => {
+  const start = applyShapeTransform(from, shape, context);
+  const end = applyShapeTransform(to, shape, context);
+  points.push(start[0], start[1], end[0], end[1]);
+};
+
+const normalizeShapePoints = (value, context) => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((point) => Array.isArray(point) && point.length >= 2)
+    .map((point) => normalizeShapePoint(point[0], point[1], context));
+};
+
+const shapeCoordinateContext = (params) => {
+  const requestedUnits = String(params.units || "").trim().toLowerCase();
+  if (requestedUnits) {
+    return { units: requestedUnits };
+  }
+
+  const version = Number(params.shape_schema_version ?? params.shapeSchemaVersion ?? 1);
+  return { units: version >= 2 ? "logical" : "legacy" };
+};
+
+const normalizeShapePoint = (x, y, context) => {
+  return [
+    normalizeShapeCoordinate(x, context, "x"),
+    normalizeShapeCoordinate(y, context, "y")
+  ];
+};
+
+const normalizeShapeCoordinate = (value, context, axis) => {
   const numeric = finiteNumber(value, 0);
+  if (context.units === "ndc") {
+    return clamp(numeric, -1.2, 1.2);
+  }
+
+  if (logicalShapeUnits(context.units)) {
+    return clamp(numeric / shapeAxisHalf(axis), -1.2, 1.2);
+  }
+
+  if (screenShapeUnits(context.units)) {
+    return axis === "y"
+      ? clamp(1 - numeric / SHAPE_HALF_HEIGHT, -1.2, 1.2)
+      : clamp(numeric / SHAPE_HALF_WIDTH - 1, -1.2, 1.2);
+  }
+
+  return normalizeLegacyShapeCoordinate(numeric, axis);
+};
+
+const normalizeLegacyShapeCoordinate = (numeric, axis) => {
   if (Math.abs(numeric) <= 1.5) {
     return clamp(numeric, -1.2, 1.2);
   }
 
-  if (axis === "y") {
-    return clamp(1 - numeric / 360, -1.2, 1.2);
+  return axis === "y"
+    ? clamp(1 - numeric / SHAPE_HALF_HEIGHT, -1.2, 1.2)
+    : clamp(numeric / SHAPE_HALF_WIDTH - 1, -1.2, 1.2);
+};
+
+const normalizeShapeLength = (value, context, axis) => {
+  const numeric = Math.abs(finiteNumber(value, 0));
+  if (context.units === "ndc" || Math.abs(numeric) <= 2) {
+    return clamp(numeric, 0.005, 1.4);
   }
 
-  return clamp(numeric / 640 - 1, -1.2, 1.2);
+  return clamp(numeric / shapeAxisHalf(axis === "radius" ? "y" : axis), 0.005, 1.4);
+};
+
+const normalizeShapeVector = (value, context, axis) => {
+  const numeric = finiteNumber(value, 0);
+  if (context.units === "ndc") {
+    return clamp(numeric, -2.0, 2.0);
+  }
+
+  return clamp(numeric / shapeAxisHalf(axis), -2.0, 2.0);
+};
+
+const applyShapeTransform = (point, shape, context) => {
+  const transform = shapeTransform(shape, context);
+  const shiftedX = (point[0] - transform.origin.x) * transform.scale.x;
+  const shiftedY = (point[1] - transform.origin.y) * transform.scale.y;
+  const radians = (transform.rotate / 180) * Math.PI;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const rotatedX = shiftedX * cos - shiftedY * sin;
+  const rotatedY = shiftedX * sin + shiftedY * cos;
+
+  return [
+    clamp(rotatedX + transform.origin.x + transform.translate.x, -1.2, 1.2),
+    clamp(rotatedY + transform.origin.y + transform.translate.y, -1.2, 1.2)
+  ];
+};
+
+const shapeTransform = (shape, context) => {
+  const transform = shape?.transform || {};
+  return {
+    translate: normalizeShapeVectorObject(transform.translate || shape.translate, context, { x: 0, y: 0 }),
+    origin: normalizeShapeVectorObject(transform.origin || shape.origin, context, { x: 0, y: 0 }),
+    rotate: finiteNumber(transform.rotate ?? shape.rotate ?? shape.rotation, 0),
+    scale: normalizeShapeScale(transform.scale ?? shape.scale)
+  };
+};
+
+const normalizeShapeVectorObject = (value, context, fallback) => {
+  if (Array.isArray(value)) {
+    return {
+      x: normalizeShapeVector(value[0] ?? fallback.x, context, "x"),
+      y: normalizeShapeVector(value[1] ?? fallback.y, context, "y")
+    };
+  }
+
+  if (value && typeof value === "object") {
+    return {
+      x: normalizeShapeVector(value.x ?? fallback.x, context, "x"),
+      y: normalizeShapeVector(value.y ?? fallback.y, context, "y")
+    };
+  }
+
+  return fallback;
+};
+
+const normalizeShapeScale = (value) => {
+  if (value && typeof value === "object") {
+    return {
+      x: clamp(finiteNumber(value.x, 1), -8, 8),
+      y: clamp(finiteNumber(value.y, 1), -8, 8)
+    };
+  }
+
+  const scale = clamp(finiteNumber(value, 1), -8, 8);
+  return { x: scale, y: scale };
+};
+
+const lineDefaults = (context) => {
+  if (context.units === "legacy" || context.units === "ndc") {
+    return [-0.8, 0, 0.8, 0];
+  }
+
+  return [-100, 0, 100, 0];
+};
+
+const shapeAxisHalf = (axis) => axis === "x" ? SHAPE_HALF_WIDTH : SHAPE_HALF_HEIGHT;
+
+const logicalShapeUnits = (value) => ["logical", "center", "center_origin", "px"].includes(value);
+
+const screenShapeUnits = (value) => ["screen", "canvas", "viewport"].includes(value);
+
+const radiusToRawHalf = (value) => finiteNumber(value, 100) * 0.5;
+
+const quadraticPoint = (from, control, to, t) => {
+  const inv = 1 - t;
+  return inv * inv * from + 2 * inv * t * control + t * t * to;
+};
+
+const cubicPoint = (from, c1, c2, to, t) => {
+  const inv = 1 - t;
+  return inv * inv * inv * from + 3 * inv * inv * t * c1 + 3 * inv * t * t * c2 + t * t * t * to;
 };
 
 const sampleSpectrum = (spectrum, progress) => {

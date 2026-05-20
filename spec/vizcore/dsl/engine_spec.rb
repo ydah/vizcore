@@ -487,6 +487,82 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "stores extended shape primitives, transforms, and shape id mappings" do
+      definition = described_class.define do
+        scene :badge_scene do
+          layer :badge do
+            rect :panel, width: 320, height: 160, radius: 24 do
+              fill "#111827"
+              stroke width: 2, color: "#38bdf8"
+              translate x: 100, y: 40
+              rotate 15
+              scale x: 1.2, y: 0.8
+              opacity 0.75
+              map beat_pulse, to: :scale, range: 1.0..1.4
+            end
+
+            polygon :triangle, points: [[0, 120], [-104, -60], [104, -60]]
+            polyline points: [[-120, 0], [0, 80], [120, 0]]
+
+            path :blob, detail: 8 do
+              move_to 0, 100
+              quad_to 80, 140, 120, 40
+              close
+            end
+
+            bezier :curve, from: [-120, 0], control: [0, 100], to: [120, 0]
+
+            star :spark, points: 5, radius: 80, inner_radius: 32 do
+              map high, to: :opacity, range: 0.2..1.0
+            end
+
+            map bass, to: shape(:panel).rotate, range: -15..15
+          end
+        end
+      end
+
+      layer = definition[:scenes].first[:layers].first
+      expect(layer[:type]).to eq(:shape)
+      expect(layer[:params][:shape_schema_version]).to eq(2)
+      expect(layer[:params][:shapes]).to include(
+        hash_including(
+          kind: :rect,
+          id: :panel,
+          fill: "#111827",
+          stroke_width: 2.0,
+          stroke_color: "#38bdf8",
+          opacity: 0.75,
+          transform: {
+            translate: { x: 100.0, y: 40.0 },
+            rotate: 15.0,
+            scale: { x: 1.2, y: 0.8 }
+          }
+        ),
+        hash_including(kind: :polygon, id: :triangle),
+        hash_including(kind: :polyline, closed: false),
+        hash_including(kind: :path, id: :blob, commands: [["M", 0, 100], ["Q", 80, 140, 120, 40], ["Z"]]),
+        hash_including(kind: :path, id: :curve, commands: [["M", -120, 0], ["Q", 0, 100, 120, 0]]),
+        hash_including(kind: :star, id: :spark)
+      )
+      expect(layer[:mappings]).to include(
+        {
+          source: { kind: :beat_pulse },
+          target: :"shapes.0.transform.scale",
+          transform: { min: 1.0, max: 1.4 }
+        },
+        {
+          source: { kind: :frequency_band, band: :high },
+          target: :"shapes.5.opacity",
+          transform: { min: 0.2, max: 1.0 }
+        },
+        {
+          source: { kind: :frequency_band, band: :low },
+          target: :"shapes.0.transform.rotate",
+          transform: { min: -15, max: 15 }
+        }
+      )
+    end
+
     it "builds scenes from inherited layers" do
       definition = described_class.define do
         scene :base do

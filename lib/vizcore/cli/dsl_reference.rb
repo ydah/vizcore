@@ -40,7 +40,7 @@ module Vizcore
         Entry.new(syntax: "type :waveform / source :audio / style :ribbon", description: "Render an audio feature waveform layer."),
         Entry.new(syntax: "type :spectrogram / scroll :vertical", description: "Render a scrolling FFT heatmap layer."),
         Entry.new(syntax: "type :mesh / geometry :icosahedron / material :wireframe", description: "Render preset 3D wireframe geometry."),
-        Entry.new(syntax: "circle count: 8 { radius 100 } / line x1: 0, y1: 360, x2: 1280, y2: 360", description: "Render declarative 2D shape primitives."),
+        Entry.new(syntax: "circle count: 8 { radius 100 } / rect width: 320, height: 160 / path { move_to 0, 80 }", description: "Render declarative 2D shape primitives."),
         Entry.new(syntax: "font \"Inter\" / letter_spacing 4", description: "Set text presentation params."),
         Entry.new(syntax: "palette \"#ff0055\", \"#00ffff\"", description: "Set ordered colors for supported layer renderers."),
         Entry.new(syntax: "blend :add / effect :bloom / vj_effect :mirror", description: "Set compositing and browser effects."),

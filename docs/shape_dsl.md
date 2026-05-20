@@ -1,0 +1,131 @@
+# Vizcore Shape DSL
+
+Vizcore shape layers can declare 2D vector primitives directly in Ruby. Calling a
+shape primitive inside a layer automatically marks that layer as `type: :shape`.
+
+```ruby
+Vizcore.define do
+  scene :logo do
+    layer :badge do
+      rect :panel, width: 360, height: 160, radius: 24 do
+        fill "#111827"
+        stroke width: 2, color: "#38bdf8"
+        opacity 0.8
+      end
+
+      star :spark, points: 5, radius: 72, inner_radius: 28 do
+        translate x: 180, y: 0
+        map beat_pulse, to: :scale, range: 0.8..1.4
+      end
+    end
+  end
+end
+```
+
+## Primitives
+
+Supported primitives:
+
+- `circle id = nil, x: 0, y: 0, radius: 100, count: 1, segments: 96`
+- `line id = nil, x1: -100, y1: 0, x2: 100, y2: 0`
+- `rect id = nil, x: 0, y: 0, width:, height:, radius: 0`
+- `polygon id = nil, points: [[x, y], ...], closed: true`
+- `polyline id = nil, points: [[x, y], ...]`
+- `path id = nil, detail: 32 do ... end`
+- `bezier id = nil, from:, control:, to:` for quadratic curves
+- `bezier id = nil, from:, c1:, c2:, to:` for cubic curves
+- `star id = nil, points: 5, radius: 100, inner_radius: 50`
+
+`draw do ... end` may be used to group declarations for readability.
+
+## Path Commands
+
+Path blocks support an SVG-like command subset:
+
+```ruby
+path :blob, detail: 48 do
+  move_to 0, 120
+  line_to 120, 0
+  quad_to 80, -100, 0, -120
+  cubic_to -80, -100, -120, 80, 0, 120
+  close
+end
+```
+
+Commands are serialized as `M`, `L`, `Q`, `C`, `H`, `V`, `A`, and `Z`. The current
+browser fallback flattens curves to line segments. `arc_to` is accepted but is
+currently previewed as a straight segment to its endpoint.
+
+## Style And Transform
+
+Inside a shape block, these methods target the shape rather than the layer:
+
+```ruby
+fill "#f472b6"
+stroke 2
+stroke width: 3, color: "#ffffff"
+blend :add
+opacity 0.75
+
+translate x: 100, y: 40
+translate 100, 40
+rotate 30
+scale 1.2
+scale x: 1.4, y: 0.8
+origin x: 0, y: 0
+```
+
+The transform order is origin adjustment, scale, rotate, then translate.
+
+## Mapping
+
+Mappings declared inside a shape block are scoped to that shape:
+
+```ruby
+circle :ring, radius: 120 do
+  map bass, to: :radius, range: 80..240
+  map beat_pulse, to: :scale, range: 1.0..1.4
+  map high, to: :opacity, range: 0.2..1.0
+end
+```
+
+Transform aliases:
+
+- `:translate_x` -> `transform.translate.x`
+- `:translate_y` -> `transform.translate.y`
+- `:rotate` and `:rotation` -> `transform.rotate`
+- `:scale` -> `transform.scale`
+- `:scale_x` -> `transform.scale.x`
+- `:scale_y` -> `transform.scale.y`
+- `:origin_x` -> `transform.origin.x`
+- `:origin_y` -> `transform.origin.y`
+
+You can also map to a named shape from the layer scope:
+
+```ruby
+rect :panel, width: 360, height: 160
+map bass, to: shape(:panel).rotate, range: -12..12
+```
+
+## Coordinates
+
+New shape schema layers use center-origin logical coordinates by default:
+
+- `x` increases to the right.
+- `y` increases upward.
+- `x: 0, y: 0` is the center of the canvas.
+
+Legacy `circle` and `line` layers without `shape_schema_version: 2` keep the old
+coordinate heuristic for compatibility with existing examples.
+
+Set `units :ndc` on the layer to use normalized device coordinates directly.
+
+## Renderer Notes
+
+The browser and software snapshot renderers currently use a line-based fallback
+for shape primitives. `fill`, `stroke_color`, `stroke_width`, `opacity`, and
+`blend` are serialized by the DSL; fill and stroke width are reserved for a
+future Canvas2D shape renderer.
+
+Custom Ruby shape registration and per-frame custom shape expansion remain a
+future phase.

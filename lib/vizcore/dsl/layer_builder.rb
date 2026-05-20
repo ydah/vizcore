@@ -8,9 +8,39 @@ module Vizcore
     # Builder for one render layer in a scene.
     class LayerBuilder
       NO_ARGUMENT = Object.new.freeze
+      SHAPE_SCHEMA_VERSION = 2
       MAPPING_SOURCE_KINDS = %i[
         amplitude frequency_band fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
       ].freeze
+      SHAPE_TARGET_ALIASES = {
+        "translate_x" => "transform.translate.x",
+        "translate_y" => "transform.translate.y",
+        "rotate" => "transform.rotate",
+        "rotation" => "transform.rotate",
+        "scale" => "transform.scale",
+        "scale_x" => "transform.scale.x",
+        "scale_y" => "transform.scale.y",
+        "origin_x" => "transform.origin.x",
+        "origin_y" => "transform.origin.y"
+      }.freeze
+
+      # Reference to an already declared shape, used by `map ... to: shape(:id).radius`.
+      class ShapeReference
+        def initialize(prefix)
+          @prefix = prefix
+        end
+
+        def method_missing(method_name, *args, &block)
+          return super unless args.empty? && block.nil?
+
+          target = SHAPE_TARGET_ALIASES.fetch(method_name.to_s, method_name.to_s)
+          :"#{@prefix}.#{target}"
+        end
+
+        def respond_to_missing?(_method_name, _include_private = false)
+          true
+        end
+      end
 
       # @param name [Symbol, String] layer identifier
       # @param styles [Hash] reusable layer parameter styles
@@ -24,6 +54,7 @@ module Vizcore
         @params = deep_dup(defaults)
         @param_schema = {}
         @mappings = []
+        @shape_index_by_id = {}
       end
 
       # Evaluate a layer block.
@@ -72,8 +103,8 @@ module Vizcore
       # @param options [Hash] shape params such as `count`, `radius`, `x`, and `y`
       # @yield optional block evaluated in the shape context
       # @return [Hash]
-      def circle(**options, &block)
-        build_shape(:circle, options, &block)
+      def circle(id = nil, **options, &block)
+        build_shape(:circle, shape_options(id, options), &block)
       end
 
       # Declare a 2D line primitive for a shape layer.
@@ -81,8 +112,84 @@ module Vizcore
       # @param options [Hash] shape params such as `x1`, `y1`, `x2`, and `y2`
       # @yield optional block evaluated in the shape context
       # @return [Hash]
-      def line(**options, &block)
-        build_shape(:line, options, &block)
+      def line(id = nil, **options, &block)
+        build_shape(:line, shape_options(id, options), &block)
+      end
+
+      # Declare a 2D rectangle primitive for a shape layer.
+      #
+      # @param id [Symbol, String, nil] optional shape identifier
+      # @param options [Hash] shape params such as `x`, `y`, `width`, `height`, and `radius`
+      # @yield optional block evaluated in the shape context
+      # @return [Hash]
+      def rect(id = nil, **options, &block)
+        build_shape(:rect, shape_options(id, options), schema_version: true, &block)
+      end
+
+      # Declare a closed polygon primitive for a shape layer.
+      #
+      # @param id [Symbol, String, nil] optional shape identifier
+      # @param options [Hash] shape params including `points`
+      # @yield optional block evaluated in the shape context
+      # @return [Hash]
+      def polygon(id = nil, **options, &block)
+        build_shape(:polygon, shape_options(id, options), schema_version: true, &block)
+      end
+
+      # Declare an open polyline primitive for a shape layer.
+      #
+      # @param id [Symbol, String, nil] optional shape identifier
+      # @param options [Hash] shape params including `points`
+      # @yield optional block evaluated in the shape context
+      # @return [Hash]
+      def polyline(id = nil, **options, &block)
+        build_shape(:polyline, shape_options(id, options).merge(closed: false), schema_version: true, &block)
+      end
+
+      # Declare a path primitive using SVG-like path commands.
+      #
+      # @param id [Symbol, String, nil] optional shape identifier
+      # @param options [Hash] path params such as `detail`
+      # @yield block containing path commands and shape styling
+      # @return [Hash]
+      def path(id = nil, **options, &block)
+        shape = shape_options(id, options)
+        shape[:commands] ||= []
+        build_shape(:path, shape, schema_version: true, &block)
+      end
+
+      # Declare a quadratic or cubic bezier curve. The serialized primitive is a path.
+      #
+      # @param id [Symbol, String, nil] optional shape identifier
+      # @param from [Array<Numeric>] start point
+      # @param to [Array<Numeric>] end point
+      # @param control [Array<Numeric>, nil] quadratic control point
+      # @param c1 [Array<Numeric>, nil] first cubic control point
+      # @param c2 [Array<Numeric>, nil] second cubic control point
+      # @param options [Hash] additional path params
+      # @yield optional block evaluated in the shape context
+      # @return [Hash]
+      def bezier(id = nil, from:, to:, control: nil, c1: nil, c2: nil, **options, &block)
+        commands = [["M", *point_values(from)]]
+        if control
+          commands << ["Q", *point_values(control), *point_values(to)]
+        elsif c1 && c2
+          commands << ["C", *point_values(c1), *point_values(c2), *point_values(to)]
+        else
+          raise ArgumentError, "bezier requires either :control or both :c1 and :c2"
+        end
+
+        build_shape(:path, shape_options(id, options).merge(commands: commands), schema_version: true, &block)
+      end
+
+      # Declare a star polygon primitive for a shape layer.
+      #
+      # @param id [Symbol, String, nil] optional shape identifier
+      # @param options [Hash] shape params such as `points`, `radius`, and `inner_radius`
+      # @yield optional block evaluated in the shape context
+      # @return [Hash]
+      def star(id = nil, **options, &block)
+        build_shape(:star, shape_options(id, options), schema_version: true, &block)
       end
 
       # Group shape primitives in a block for readability.
@@ -146,6 +253,12 @@ module Vizcore
       # @param value [String] text fill color
       # @return [String]
       def fill(value)
+        if @current_shape
+          @current_shape[:fill] = value.to_s
+          mark_shape_schema_version!
+          return @current_shape
+        end
+
         @params[:color] = value.to_s
       end
 
@@ -177,7 +290,131 @@ module Vizcore
       # @param value [Symbol, String] layer compositing mode
       # @return [Symbol]
       def blend(value)
+        if @current_shape
+          @current_shape[:blend] = value.to_sym
+          mark_shape_schema_version!
+          return @current_shape
+        end
+
         @params[:blend] = value.to_sym
+      end
+
+      # Set layer or shape opacity.
+      #
+      # @param value [Numeric]
+      # @return [Float, Hash]
+      def opacity(value)
+        if @current_shape
+          @current_shape[:opacity] = normalize_param_number(value, :opacity)
+          mark_shape_schema_version!
+          return @current_shape
+        end
+
+        @params[:opacity] = normalize_param_number(value, :opacity)
+      end
+
+      # Set a shape/layer translation transform.
+      #
+      # @param args [Array<Numeric>]
+      # @param x [Numeric, nil]
+      # @param y [Numeric, nil]
+      # @return [Hash]
+      def translate(*args, x: nil, y: nil)
+        values = normalize_xy_args(args, x: x, y: y, name: :translate)
+        if @current_shape
+          current_shape_transform[:translate] = values
+          return @current_shape
+        end
+
+        @params[:translate] = values
+      end
+
+      # Set a shape/layer rotation transform in degrees.
+      #
+      # @param value [Numeric]
+      # @return [Float, Hash]
+      def rotate(value)
+        rotation = normalize_param_number(value, :rotate)
+        if @current_shape
+          current_shape_transform[:rotate] = rotation
+          return @current_shape
+        end
+
+        @params[:rotate] = rotation
+      end
+
+      # Set a shape/layer scale transform.
+      #
+      # @param value [Numeric]
+      # @param x [Numeric, nil]
+      # @param y [Numeric, nil]
+      # @return [Float, Hash]
+      def scale(value = NO_ARGUMENT, x: nil, y: nil)
+        scale_value = normalize_scale_args(value, x: x, y: y)
+        if @current_shape
+          current_shape_transform[:scale] = scale_value
+          return @current_shape
+        end
+
+        @params[:scale] = scale_value
+      end
+
+      # Set a shape/layer transform origin.
+      #
+      # @param args [Array<Numeric>]
+      # @param x [Numeric, nil]
+      # @param y [Numeric, nil]
+      # @return [Hash]
+      def origin(*args, x: nil, y: nil)
+        values = normalize_xy_args(args, x: x, y: y, name: :origin)
+        if @current_shape
+          current_shape_transform[:origin] = values
+          return @current_shape
+        end
+
+        @params[:origin] = values
+      end
+
+      # Return a reference object for mapping to a named shape.
+      #
+      # @param id [Symbol, String]
+      # @return [ShapeReference]
+      def shape(id)
+        key = id.to_sym
+        index = @shape_index_by_id.fetch(key) { raise ArgumentError, "unknown shape id: #{key.inspect}" }
+        ShapeReference.new("shapes.#{index}")
+      end
+
+      def move_to(x, y)
+        append_path_command("M", x, y)
+      end
+
+      def line_to(x, y)
+        append_path_command("L", x, y)
+      end
+
+      def quad_to(cx, cy, x, y)
+        append_path_command("Q", cx, cy, x, y)
+      end
+
+      def cubic_to(c1x, c1y, c2x, c2y, x, y)
+        append_path_command("C", c1x, c1y, c2x, c2y, x, y)
+      end
+
+      def horizontal_to(x)
+        append_path_command("H", x)
+      end
+
+      def vertical_to(y)
+        append_path_command("V", y)
+      end
+
+      def arc_to(rx, ry, rotation, large_arc, sweep, x, y)
+        append_path_command("A", rx, ry, rotation, large_arc, sweep, x, y)
+      end
+
+      def close
+        append_path_command("Z")
       end
 
       # Store an ordered color palette for this layer.
@@ -419,11 +656,13 @@ module Vizcore
 
       private
 
-      def build_shape(kind, options, &block)
+      def build_shape(kind, options, schema_version: false, &block)
         @type ||= :shape
+        mark_shape_schema_version! if schema_version
         shape = normalize_shape(kind, options)
         @params[:shapes] ||= []
         shape_index = @params[:shapes].length
+        register_shape_id!(shape, shape_index)
         @params[:shapes] << shape
 
         with_shape_context(shape, shape_index) do
@@ -433,12 +672,85 @@ module Vizcore
         shape
       end
 
+      def shape_options(id, options)
+        return options if id.nil?
+
+        raise ArgumentError, "shape id specified twice" if options.key?(:id)
+
+        options.merge(id: id.to_sym)
+      end
+
       def normalize_shape(kind, options)
         shape = { kind: kind.to_sym }
         options.each do |key, value|
           shape[key.to_sym] = value
         end
         shape
+      end
+
+      def register_shape_id!(shape, shape_index)
+        id = shape[:id]
+        return if id.nil?
+
+        key = id.to_sym
+        raise ArgumentError, "duplicate shape id: #{key.inspect}" if @shape_index_by_id.key?(key)
+
+        @shape_index_by_id[key] = shape_index
+      end
+
+      def current_shape_transform
+        mark_shape_schema_version!
+        @current_shape[:transform] ||= {}
+      end
+
+      def mark_shape_schema_version!
+        @params[:shape_schema_version] ||= SHAPE_SCHEMA_VERSION
+      end
+
+      def normalize_xy_args(args, x:, y:, name:)
+        if args.length == 2
+          return { x: normalize_param_number(args[0], :"#{name}.x"), y: normalize_param_number(args[1], :"#{name}.y") }
+        end
+
+        if args.length == 1 && args.first.is_a?(Hash)
+          values = args.first
+          x = values.fetch(:x, values["x"])
+          y = values.fetch(:y, values["y"])
+        elsif args.any?
+          raise ArgumentError, "#{name} expects x/y keywords or two numeric arguments"
+        end
+
+        {
+          x: normalize_param_number(x || 0, :"#{name}.x"),
+          y: normalize_param_number(y || 0, :"#{name}.y")
+        }
+      end
+
+      def normalize_scale_args(value, x:, y:)
+        if value.equal?(NO_ARGUMENT)
+          return {
+            x: normalize_param_number(x || 1, :"scale.x"),
+            y: normalize_param_number(y || 1, :"scale.y")
+          }
+        end
+
+        raise ArgumentError, "scale accepts either a value or x/y keywords" unless x.nil? && y.nil?
+
+        normalize_param_number(value, :scale)
+      end
+
+      def append_path_command(command, *values)
+        raise ArgumentError, "#{command} is only available inside a path shape" unless @current_shape&.fetch(:kind) == :path
+
+        @current_shape[:commands] ||= []
+        @current_shape[:commands] << [command, *values]
+      end
+
+      def point_values(value)
+        values = Array(value)
+        raise ArgumentError, "point must contain x and y" unless values.length == 2
+
+        values
       end
 
       def with_shape_context(shape, shape_index)
@@ -475,7 +787,9 @@ module Vizcore
       end
 
       def prefixed_shape_target(target)
-        :"#{@shape_target_prefix}.#{target}"
+        target_name = target.to_s
+        resolved_target = SHAPE_TARGET_ALIASES.fetch(target_name, target_name)
+        :"#{@shape_target_prefix}.#{resolved_target}"
       end
 
       def resolved_type
