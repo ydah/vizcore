@@ -563,6 +563,77 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "expands registered custom shapes into primitive shapes" do
+      shape_class = Class.new do
+        include Vizcore::Shape
+
+        param :radius, default: 64
+
+        def draw(ctx)
+          ctx.draw do
+            circle radius: ctx.param(:radius)
+
+            group do
+              translate x: 90, y: 0
+              rect width: 40, height: 20
+            end
+          end
+        end
+      end
+      Vizcore.register_shape :engine_spec_badge_shape, shape_class
+      Vizcore.register_shape :engine_spec_diamond_shape do |ctx|
+        radius = ctx.param(:radius, 50)
+        ctx.polygon points: [[0, radius], [radius, 0], [0, -radius], [-radius, 0]]
+      end
+
+      definition = described_class.define do
+        scene :custom_shape_scene do
+          layer :generated do
+            custom_shape :engine_spec_badge_shape, radius: 96 do
+              fill "#22d3ee"
+              map beat_pulse, to: :scale, range: 0.8..1.2
+            end
+
+            custom_shape :engine_spec_diamond_shape, radius: 48
+          end
+        end
+      end
+
+      layer = definition[:scenes].first[:layers].first
+      expect(layer[:params][:shape_schema_version]).to eq(2)
+      expect(layer[:params][:shapes]).to eq(
+        [
+          { kind: :circle, radius: 96, fill: "#22d3ee" },
+          { kind: :rect, width: 40, height: 20, transform: { translate: { x: 90.0, y: 0.0 } }, fill: "#22d3ee" },
+          { kind: :polygon, points: [[0, 48], [48, 0], [0, -48], [-48, 0]] }
+        ]
+      )
+      expect(layer[:mappings]).to include(
+        {
+          source: { kind: :beat_pulse },
+          target: :"shapes.0.transform.scale",
+          transform: { min: 0.8, max: 1.2 }
+        },
+        {
+          source: { kind: :beat_pulse },
+          target: :"shapes.1.transform.scale",
+          transform: { min: 0.8, max: 1.2 }
+        }
+      )
+    end
+
+    it "raises when a custom shape is unknown" do
+      expect do
+        described_class.define do
+          scene :custom_shape_scene do
+            layer :generated do
+              custom_shape :missing_shape
+            end
+          end
+        end
+      end.to raise_error(ArgumentError, /Unknown custom shape: :missing_shape/)
+    end
+
     it "builds scenes from inherited layers" do
       definition = described_class.define do
         scene :base do

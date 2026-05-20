@@ -2,6 +2,7 @@
 
 require_relative "mapping_transform_builder"
 require_relative "reaction_builder"
+require_relative "../shape"
 
 module Vizcore
   module DSL
@@ -190,6 +191,27 @@ module Vizcore
       # @return [Hash]
       def star(id = nil, **options, &block)
         build_shape(:star, shape_options(id, options), schema_version: true, &block)
+      end
+
+      # Expand a registered Ruby custom shape into normal shape primitives.
+      #
+      # @param renderer [Symbol, String, Class, Module, #call] registered shape name or renderer
+      # @param options [Hash] custom shape params
+      # @yield optional block applied to each generated primitive
+      # @return [Array<Hash>]
+      def custom_shape(renderer, **options, &block)
+        mark_shape_schema_version!
+        shape_id = options.delete(:id)
+        primitives = expand_custom_shape(renderer, options, shape_id: shape_id)
+        raise ArgumentError, "custom_shape produced no primitives" if primitives.empty?
+        raise ArgumentError, "custom_shape id can only be assigned when one primitive is produced" if shape_id && primitives.length > 1
+
+        @type ||= :shape
+        @params[:shapes] ||= []
+        primitives.map do |primitive|
+          primitive[:id] ||= shape_id.to_sym if shape_id
+          append_expanded_shape(primitive, &block)
+        end
       end
 
       # Group shape primitives in a block for readability.
@@ -672,6 +694,18 @@ module Vizcore
         shape
       end
 
+      def append_expanded_shape(shape, &block)
+        shape_index = @params[:shapes].length
+        register_shape_id!(shape, shape_index)
+        @params[:shapes] << shape
+
+        with_shape_context(shape, shape_index) do
+          instance_eval(&block) if block
+        end
+
+        shape
+      end
+
       def shape_options(id, options)
         return options if id.nil?
 
@@ -686,6 +720,51 @@ module Vizcore
           shape[key.to_sym] = value
         end
         shape
+      end
+
+      def expand_custom_shape(renderer, options, shape_id:)
+        definition = custom_shape_definition(renderer)
+        context = Vizcore::Shape::DrawContext.new(
+          params: options,
+          param_schema: custom_shape_param_schema(definition.renderer),
+          shape_id: shape_id,
+          layer_name: @name,
+          palette: Array(@params[:palette])
+        )
+        result = call_custom_shape(definition.renderer, context, options)
+        result = context.shapes if result.nil?
+        Vizcore::Shape.normalize_primitives(result, shape_name: definition.name || renderer)
+      end
+
+      def custom_shape_definition(renderer)
+        return Vizcore::Shape::Definition.new(name: nil, renderer: renderer) unless renderer.is_a?(Symbol) || renderer.is_a?(String)
+
+        Vizcore.resolve_shape(renderer) || raise(ArgumentError, "Unknown custom shape: #{renderer.inspect}. Register it with `Vizcore.register_shape #{renderer.inspect}, ShapeClass`.")
+      end
+
+      def custom_shape_param_schema(renderer)
+        return renderer.shape_param_schema if renderer.respond_to?(:shape_param_schema)
+
+        {}
+      end
+
+      def call_custom_shape(renderer, context, params)
+        if renderer.respond_to?(:draw)
+          return renderer.draw(context)
+        end
+
+        return renderer.call(context) if renderer.respond_to?(:call) && !renderer.is_a?(Class)
+
+        instance = instantiate_custom_shape(renderer, params)
+        return instance.draw(context) if instance.respond_to?(:draw)
+
+        raise ArgumentError, "custom shape renderer must implement draw(context)"
+      end
+
+      def instantiate_custom_shape(renderer, params)
+        renderer.new(**params)
+      rescue ArgumentError
+        renderer.new
       end
 
       def register_shape_id!(shape, shape_index)

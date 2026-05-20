@@ -6,6 +6,9 @@ module Vizcore
   def self.templates_root: () -> Pathname
   def self.define: () { () -> void } -> Hash[Symbol, untyped]
   def self.plugin: (String | Symbol name) -> bool
+  def self.register_shape: (Symbol | String name, untyped renderer) -> Vizcore::Shape::Definition
+                         | (Symbol | String name) { (Vizcore::Shape::DrawContext) -> untyped } -> Vizcore::Shape::Definition
+  def self.resolve_shape: (Symbol | String name) -> Vizcore::Shape::Definition?
   def self.register_layer_capability: (
     type: Symbol | String,
     ?aliases: Array[Symbol | String] aliases,
@@ -13,6 +16,73 @@ module Vizcore
     ?mappable_params: Array[Symbol | String] mappable_params,
     ?description: String? description
   ) -> Vizcore::LayerCatalog::Capability
+end
+
+module Vizcore::Shape
+  SUPPORTED_PRIMITIVES: Array[Symbol]
+
+  def self.normalize_primitives: (untyped value, shape_name: untyped) -> Array[Hash[Symbol, untyped]]
+
+  class Definition < Struct[untyped]
+    attr_accessor name: Symbol?
+    attr_accessor renderer: untyped
+  end
+
+  module ClassMethods
+    def param: (
+      Symbol | String name,
+      ?default: untyped default,
+      ?range: Range[Numeric]? | [Numeric, Numeric]? range,
+      ?min: Numeric? min,
+      ?max: Numeric? max,
+      ?step: Numeric? step
+    ) -> Hash[Symbol, untyped]
+    def shape_param_schema: () -> Hash[Symbol, Hash[Symbol, untyped]]
+  end
+
+  class DrawContext
+    attr_reader params: Hash[Symbol, untyped]
+    attr_reader shape_id: Symbol?
+    attr_reader layer_name: Symbol?
+    attr_reader palette: Array[untyped]
+    attr_reader audio: AudioContext
+    attr_reader time: Float
+    attr_reader frame: Integer
+    attr_reader resolution: Array[untyped]
+    attr_reader globals: Hash[Symbol, untyped]
+
+    def initialize: (
+      params: Hash[Symbol | String, untyped],
+      ?param_schema: Hash[Symbol, Hash[Symbol, untyped]] param_schema,
+      ?shape_id: Symbol | String? shape_id,
+      ?layer_name: Symbol? layer_name,
+      ?palette: Array[untyped] palette,
+      ?audio: Hash[untyped, untyped] audio,
+      ?time: Numeric time,
+      ?frame: Integer frame,
+      ?resolution: Array[untyped] resolution,
+      ?globals: Hash[untyped, untyped] globals
+    ) -> void
+    def param: (Symbol | String name, ?untyped default) -> untyped
+    def width: () -> untyped
+    def height: () -> untyped
+    def draw: () { () -> void } -> Array[Hash[Symbol, untyped]]
+    def shapes: () -> Array[Hash[Symbol, untyped]]
+  end
+
+  class AudioContext
+    def amplitude: () -> Float
+    def bass: () -> Float
+    def mid: () -> Float
+    def high: () -> Float
+    def fft: () -> Array[untyped]
+    def beat?: () -> bool
+    def beat_pulse: () -> Float
+    def kick: () -> Float
+    def snare: () -> Float
+    def hihat: () -> Float
+    def bpm: () -> Float
+  end
 end
 
 module Vizcore::LayerCatalog
@@ -276,6 +346,13 @@ module Vizcore::DSL
     def file: (String | Pathname path) -> String
     def circle: (**untyped options) ?{ () -> void } -> Hash[Symbol, untyped]
     def line: (**untyped options) ?{ () -> void } -> Hash[Symbol, untyped]
+    def rect: (*untyped args, **untyped options) ?{ () -> void } -> Hash[Symbol, untyped]
+    def polygon: (*untyped args, **untyped options) ?{ () -> void } -> Hash[Symbol, untyped]
+    def polyline: (*untyped args, **untyped options) ?{ () -> void } -> Hash[Symbol, untyped]
+    def path: (*untyped args, **untyped options) ?{ () -> void } -> Hash[Symbol, untyped]
+    def bezier: (*untyped args, **untyped options) ?{ () -> void } -> Hash[Symbol, untyped]
+    def star: (*untyped args, **untyped options) ?{ () -> void } -> Hash[Symbol, untyped]
+    def custom_shape: (untyped renderer, **untyped options) ?{ () -> void } -> Array[Hash[Symbol, untyped]]
     def draw: () { () -> void } -> Array[Hash[Symbol, untyped]]
     def source: (Symbol | String value, **untyped options) -> (Symbol | source)
     def count: (Integer value) -> Integer

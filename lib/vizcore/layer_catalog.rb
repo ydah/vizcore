@@ -156,7 +156,7 @@ module Vizcore
           color_shift: "Float"
         ),
         mappable_params: %i[color_shift opacity shapes],
-        description: "Declarative 2D circle, line, rect, polygon, polyline, path, and star primitives rendered by the browser."
+        description: "Declarative and Ruby-generated 2D circle, line, rect, polygon, polyline, path, and star primitives rendered by the browser."
       ),
       Capability.new(
         type: :mesh,
