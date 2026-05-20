@@ -634,6 +634,96 @@ RSpec.describe Vizcore::DSL::Engine do
       end.to raise_error(ArgumentError, /Unknown custom shape: :missing_shape/)
     end
 
+    it "flattens shape groups into child primitive style and transform" do
+      definition = described_class.define do
+        scene :grouped_shape_scene do
+          layer :logo do
+            group :badge do
+              translate x: 40, y: 20
+              rotate 15
+              scale 1.5
+              opacity 0.5
+              stroke width: 2, color: "#38bdf8"
+
+              circle :ring, radius: 80 do
+                opacity 0.8
+                translate x: 10, y: 0
+              end
+
+              group do
+                translate x: -20, y: 0
+                rect width: 120, height: 48
+              end
+            end
+          end
+        end
+      end
+
+      shapes = definition[:scenes].first[:layers].first[:params][:shapes]
+      expect(shapes).to eq(
+        [
+          {
+            kind: :circle,
+            id: :ring,
+            radius: 80,
+            opacity: 0.4,
+            stroke_width: 2.0,
+            stroke_color: "#38bdf8",
+            transform: {
+              translate: { x: 50.0, y: 20.0 },
+              rotate: 15.0,
+              scale: { x: 1.5, y: 1.5 }
+            }
+          },
+          {
+            kind: :rect,
+            width: 120,
+            height: 48,
+            opacity: 0.5,
+            stroke_width: 2.0,
+            stroke_color: "#38bdf8",
+            transform: {
+              translate: { x: 20.0, y: 20.0 },
+              rotate: 15.0,
+              scale: { x: 1.5, y: 1.5 }
+            }
+          }
+        ]
+      )
+    end
+
+    it "validates invalid shape primitives early" do
+      expect do
+        described_class.define do
+          scene :invalid_shape_scene do
+            layer :bad do
+              polygon :piece, points: [[0, 0], [1, 1]]
+            end
+          end
+        end
+      end.to raise_error(ArgumentError, /Invalid polygon `piece`: points must contain at least 3 points/)
+
+      expect do
+        described_class.define do
+          scene :invalid_shape_scene do
+            layer :bad do
+              rect width: -10, height: 20
+            end
+          end
+        end
+      end.to raise_error(ArgumentError, /width must be non-negative/)
+
+      expect do
+        described_class.define do
+          scene :invalid_shape_scene do
+            layer :bad do
+              path :empty
+            end
+          end
+        end
+      end.to raise_error(ArgumentError, /Invalid path `empty`: commands must not be empty/)
+    end
+
     it "builds scenes from inherited layers" do
       definition = described_class.define do
         scene :base do

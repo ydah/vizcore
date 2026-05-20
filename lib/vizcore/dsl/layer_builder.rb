@@ -24,6 +24,8 @@ module Vizcore
         "origin_x" => "transform.origin.x",
         "origin_y" => "transform.origin.y"
       }.freeze
+      SHAPE_STYLE_KEYS = Vizcore::Shape::STYLE_KEYS
+      SHAPE_TRANSFORM_KEYS = %i[translate rotate rotation scale origin].freeze
 
       # Reference to an already declared shape, used by `map ... to: shape(:id).radius`.
       class ShapeReference
@@ -56,6 +58,7 @@ module Vizcore
         @param_schema = {}
         @mappings = []
         @shape_index_by_id = {}
+        @shape_group_stack = [{}]
       end
 
       # Evaluate a layer block.
@@ -214,6 +217,27 @@ module Vizcore
         end
       end
 
+      # Apply shared style and transform to shape primitives declared in the block.
+      #
+      # Group attributes are flattened into child primitives so the frontend only
+      # needs to render regular shape primitives.
+      #
+      # @param id [Symbol, String, nil] optional group identifier, currently documentation-only
+      # @param attrs [Hash] initial group style/transform attrs
+      # @yield shape declarations
+      # @return [Array<Hash>]
+      def group(_id = nil, **attrs, &block)
+        raise ArgumentError, "group requires a block" unless block
+
+        mark_shape_schema_version!
+        @type ||= :shape
+        @shape_group_stack << merge_shape_group(current_shape_group, normalize_shape_group(attrs))
+        instance_eval(&block)
+        @params[:shapes] || []
+      ensure
+        @shape_group_stack.pop if @shape_group_stack.length > 1
+      end
+
       # Group shape primitives in a block for readability.
       #
       # @yield shape declarations
@@ -281,6 +305,11 @@ module Vizcore
           return @current_shape
         end
 
+        if in_shape_group?
+          current_shape_group[:fill] = value.to_s
+          return current_shape_group
+        end
+
         @params[:color] = value.to_s
       end
 
@@ -293,6 +322,13 @@ module Vizcore
           @current_shape[:stroke_width] = normalize_non_negative_param_number(width, :stroke_width) unless width.nil?
           @current_shape[:stroke_color] = color.to_s unless color.nil?
           return @current_shape
+        end
+
+        if in_shape_group?
+          current_shape_group[:stroke] = normalize_non_negative_param_number(value, :stroke) unless value.equal?(NO_ARGUMENT)
+          current_shape_group[:stroke_width] = normalize_non_negative_param_number(width, :stroke_width) unless width.nil?
+          current_shape_group[:stroke_color] = color.to_s unless color.nil?
+          return current_shape_group
         end
 
         @params[:stroke_width] = normalize_non_negative_param_number(width, :stroke_width) unless width.nil?
@@ -318,6 +354,11 @@ module Vizcore
           return @current_shape
         end
 
+        if in_shape_group?
+          current_shape_group[:blend] = value.to_sym
+          return current_shape_group
+        end
+
         @params[:blend] = value.to_sym
       end
 
@@ -330,6 +371,11 @@ module Vizcore
           @current_shape[:opacity] = normalize_param_number(value, :opacity)
           mark_shape_schema_version!
           return @current_shape
+        end
+
+        if in_shape_group?
+          current_shape_group[:opacity] = current_shape_group.key?(:opacity) ? normalize_param_number(current_shape_group[:opacity], :opacity) * normalize_param_number(value, :opacity) : normalize_param_number(value, :opacity)
+          return current_shape_group
         end
 
         @params[:opacity] = normalize_param_number(value, :opacity)
@@ -348,6 +394,11 @@ module Vizcore
           return @current_shape
         end
 
+        if in_shape_group?
+          current_shape_group_transform[:translate] = add_shape_xy(current_shape_group_transform[:translate], values)
+          return current_shape_group
+        end
+
         @params[:translate] = values
       end
 
@@ -360,6 +411,11 @@ module Vizcore
         if @current_shape
           current_shape_transform[:rotate] = rotation
           return @current_shape
+        end
+
+        if in_shape_group?
+          current_shape_group_transform[:rotate] = normalize_param_number(current_shape_group_transform[:rotate] || 0, :rotate) + rotation
+          return current_shape_group
         end
 
         @params[:rotate] = rotation
@@ -378,6 +434,11 @@ module Vizcore
           return @current_shape
         end
 
+        if in_shape_group?
+          current_shape_group_transform[:scale] = multiply_shape_scale(current_shape_group_transform[:scale], scale_value)
+          return current_shape_group
+        end
+
         @params[:scale] = scale_value
       end
 
@@ -392,6 +453,11 @@ module Vizcore
         if @current_shape
           current_shape_transform[:origin] = values
           return @current_shape
+        end
+
+        if in_shape_group?
+          current_shape_group_transform[:origin] = values
+          return current_shape_group
         end
 
         @params[:origin] = values
@@ -664,6 +730,11 @@ module Vizcore
           return args.first
         end
 
+        if in_shape_group? && block.nil? && args.length == 1
+          current_shape_group[method_name.to_sym] = args.first
+          return args.first
+        end
+
         if block.nil? && args.length == 1
           @params[method_name.to_sym] = args.first
           return args.first
@@ -690,6 +761,8 @@ module Vizcore
         with_shape_context(shape, shape_index) do
           instance_eval(&block) if block
         end
+        apply_current_shape_group!(shape)
+        validate_shape!(shape)
 
         shape
       end
@@ -702,6 +775,8 @@ module Vizcore
         with_shape_context(shape, shape_index) do
           instance_eval(&block) if block
         end
+        apply_current_shape_group!(shape)
+        validate_shape!(shape)
 
         shape
       end
@@ -720,6 +795,129 @@ module Vizcore
           shape[key.to_sym] = value
         end
         shape
+      end
+
+      def normalize_shape_group(attrs)
+        attrs.each_with_object({}) do |(key, value), group|
+          symbol_key = key.to_sym
+          if SHAPE_TRANSFORM_KEYS.include?(symbol_key)
+            transform_key = symbol_key == :rotation ? :rotate : symbol_key
+            group[:transform] ||= {}
+            group[:transform][transform_key] = value
+          else
+            group[symbol_key] = value
+          end
+        end
+      end
+
+      def merge_shape_group(parent, child)
+        output = deep_dup(parent)
+        child.each do |key, value|
+          if key == :transform
+            output[:transform] = compose_shape_transform(output[:transform], value)
+          elsif key == :opacity && output.key?(:opacity)
+            output[:opacity] = normalize_param_number(output[:opacity], :opacity) * normalize_param_number(value, :opacity)
+          else
+            output[key] = deep_dup(value)
+          end
+        end
+        output
+      end
+
+      def apply_current_shape_group!(shape)
+        group = current_shape_group
+        return shape if group.empty?
+
+        SHAPE_STYLE_KEYS.each do |key|
+          next unless group.key?(key)
+
+          if key == :opacity && shape.key?(:opacity)
+            shape[:opacity] = normalize_param_number(group[:opacity], :opacity) * normalize_param_number(shape[:opacity], :opacity)
+          else
+            shape[key] = deep_dup(group[key]) unless shape.key?(key)
+          end
+        end
+        shape[:transform] = compose_shape_transform(group[:transform], shape[:transform]) if group[:transform]
+        shape
+      end
+
+      def compose_shape_transform(parent, child)
+        return deep_dup(child || {}) unless parent
+
+        child ||= {}
+        output = deep_dup(parent)
+        output[:translate] = add_shape_xy(parent[:translate], child[:translate]) if child.key?(:translate)
+        output[:origin] = child[:origin] if child.key?(:origin)
+        output[:rotate] = normalize_param_number(parent[:rotate] || 0, :rotate) + normalize_param_number(child[:rotate] || 0, :rotate) if child.key?(:rotate)
+        output[:scale] = multiply_shape_scale(parent[:scale], child[:scale]) if child.key?(:scale)
+        output
+      end
+
+      def add_shape_xy(parent, child)
+        parent ||= {}
+        child ||= {}
+        {
+          x: normalize_param_number(parent[:x] || parent["x"] || 0, :"translate.x") + normalize_param_number(child[:x] || child["x"] || 0, :"translate.x"),
+          y: normalize_param_number(parent[:y] || parent["y"] || 0, :"translate.y") + normalize_param_number(child[:y] || child["y"] || 0, :"translate.y")
+        }
+      end
+
+      def multiply_shape_scale(parent, child)
+        parent = shape_scale_pair(parent)
+        child = shape_scale_pair(child)
+        { x: parent[:x] * child[:x], y: parent[:y] * child[:y] }
+      end
+
+      def shape_scale_pair(value)
+        return { x: normalize_param_number(value[:x] || value["x"] || 1, :"scale.x"), y: normalize_param_number(value[:y] || value["y"] || 1, :"scale.y") } if value.is_a?(Hash)
+
+        scale = normalize_param_number(value || 1, :scale)
+        { x: scale, y: scale }
+      end
+
+      def current_shape_group
+        @shape_group_stack.last
+      end
+
+      def current_shape_group_transform
+        current_shape_group[:transform] ||= {}
+      end
+
+      def in_shape_group?
+        @shape_group_stack.length > 1
+      end
+
+      def validate_shape!(shape)
+        validate_non_negative_shape_numbers!(shape)
+        case shape.fetch(:kind)
+        when :polygon
+          validate_shape_points!(shape, minimum: 3)
+        when :polyline
+          validate_shape_points!(shape, minimum: 2)
+        when :path
+          raise ArgumentError, "Invalid path#{shape_label(shape)}: commands must not be empty" if Array(shape[:commands]).empty?
+        end
+      end
+
+      def validate_non_negative_shape_numbers!(shape)
+        %i[radius width height stroke_width inner_radius].each do |key|
+          next unless shape.key?(key)
+
+          value = normalize_param_number(shape[key], key)
+          raise ArgumentError, "Invalid #{shape.fetch(:kind)}#{shape_label(shape)}: #{key} must be non-negative" if value.negative?
+        end
+      end
+
+      def validate_shape_points!(shape, minimum:)
+        points = Array(shape[:points])
+        valid_points = points.count { |point| Array(point).length >= 2 }
+        return if valid_points >= minimum
+
+        raise ArgumentError, "Invalid #{shape.fetch(:kind)}#{shape_label(shape)}: points must contain at least #{minimum} points"
+      end
+
+      def shape_label(shape)
+        shape[:id] ? " `#{shape[:id]}`" : ""
       end
 
       def expand_custom_shape(renderer, options, shape_id:)

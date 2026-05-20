@@ -38,6 +38,7 @@ Supported primitives:
 - `custom_shape name_or_class, **params`
 
 `draw do ... end` may be used to group declarations for readability.
+`group do ... end` applies shared style and transform to child primitives.
 
 ## Path Commands
 
@@ -77,6 +78,29 @@ origin x: 0, y: 0
 ```
 
 The transform order is origin adjustment, scale, rotate, then translate.
+
+## Groups
+
+Groups are flattened into child primitives during DSL evaluation. Child shapes
+inherit style values they do not set themselves, and group opacity is multiplied
+with child opacity.
+
+```ruby
+group :spinner do
+  translate x: 0, y: 80
+  rotate 15
+  scale 1.2
+  opacity 0.75
+  stroke width: 2, color: "#38bdf8"
+
+  12.times do |index|
+    rect width: 12, height: 80 do
+      translate x: 0, y: 160
+      rotate index * 30
+    end
+  end
+end
+```
 
 ## Mapping
 
@@ -181,6 +205,18 @@ Legacy `circle` and `line` layers without `shape_schema_version: 2` keep the old
 coordinate heuristic for compatibility with existing examples.
 
 Set `units :ndc` on the layer to use normalized device coordinates directly.
+
+## Validation
+
+The DSL raises early for malformed primitives:
+
+- duplicate shape IDs within a layer
+- negative `radius`, `inner_radius`, `width`, `height`, or `stroke_width`
+- `polygon` with fewer than 3 points
+- `polyline` with fewer than 2 points
+- `path` without commands
+- unknown `custom_shape`
+- custom shapes that return unsupported primitive kinds
 
 ## Renderer Notes
 

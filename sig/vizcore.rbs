@@ -353,6 +353,7 @@ module Vizcore::DSL
     def bezier: (*untyped args, **untyped options) ?{ () -> void } -> Hash[Symbol, untyped]
     def star: (*untyped args, **untyped options) ?{ () -> void } -> Hash[Symbol, untyped]
     def custom_shape: (untyped renderer, **untyped options) ?{ () -> void } -> Array[Hash[Symbol, untyped]]
+    def group: (*untyped args, **untyped attrs) { () -> void } -> Array[Hash[Symbol, untyped]]
     def draw: () { () -> void } -> Array[Hash[Symbol, untyped]]
     def source: (Symbol | String value, **untyped options) -> (Symbol | source)
     def count: (Integer value) -> Integer

@@ -301,19 +301,26 @@ module Vizcore
       end
 
       def opacity(value)
-        target[:opacity] = number(value, :opacity)
+        if @current_shape || !target.key?(:opacity)
+          target[:opacity] = number(value, :opacity)
+        else
+          target[:opacity] = number(target[:opacity], :opacity) * number(value, :opacity)
+        end
       end
 
       def translate(*args, x: nil, y: nil)
-        target_transform[:translate] = xy_args(args, x: x, y: y, name: :translate)
+        values = xy_args(args, x: x, y: y, name: :translate)
+        target_transform[:translate] = @current_shape ? values : add_xy(target_transform[:translate], values)
       end
 
       def rotate(value)
-        target_transform[:rotate] = number(value, :rotate)
+        rotation = number(value, :rotate)
+        target_transform[:rotate] = @current_shape ? rotation : number(target_transform[:rotate] || 0, :rotate) + rotation
       end
 
       def scale(value = NO_ARGUMENT, x: nil, y: nil)
-        target_transform[:scale] = scale_args(value, x: x, y: y)
+        values = scale_args(value, x: x, y: y)
+        target_transform[:scale] = @current_shape ? values : multiply_scale(target_transform[:scale], values)
       end
 
       def origin(*args, x: nil, y: nil)
@@ -393,7 +400,13 @@ module Vizcore
 
       def merge_group(parent, child)
         merged = deep_dup(parent)
-        child.each { |key, value| merged[key] = value }
+        child.each do |key, value|
+          if key == :opacity && merged.key?(:opacity)
+            merged[:opacity] = number(merged[:opacity], :opacity) * number(value, :opacity)
+          else
+            merged[key] = value
+          end
+        end
         merged
       end
 
@@ -401,7 +414,13 @@ module Vizcore
         group = current_group
         merged = deep_dup(shape)
         STYLE_KEYS.each do |key|
-          merged[key] = group[key] if !merged.key?(key) && group.key?(key)
+          next unless group.key?(key)
+
+          if key == :opacity && merged.key?(:opacity)
+            merged[:opacity] = number(group[:opacity], :opacity) * number(merged[:opacity], :opacity)
+          else
+            merged[key] = group[key] unless merged.key?(key)
+          end
         end
         merged[:transform] = compose_transform(group[:transform], merged[:transform]) if group[:transform]
         merged
