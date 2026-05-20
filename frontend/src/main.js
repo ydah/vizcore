@@ -32,6 +32,15 @@ import { applyProjectorMode, resolveProjectorMode } from "./projector-mode.js";
 import { Engine } from "./renderer/engine.js";
 import { SHADER_COMPILE_EVENT } from "./renderer/shader-manager.js";
 import {
+  customShapeParamControlEntries,
+  customShapeParamMessage,
+  pruneCustomShapeParamOverrides
+} from "./custom-shape-param-controls.js";
+import {
+  mappingTargetOptions,
+  mappingTargetSignature
+} from "./mapping-target-selector.js";
+import {
   pruneShaderParamOverrides,
   shaderParamControlEntries
 } from "./shader-param-controls.js";
@@ -97,6 +106,8 @@ const midiLearnStatusElement = document.querySelector("#midi-learn-status");
 const midiLearnButtons = Array.from(document.querySelectorAll("[data-midi-learn-action]"));
 const shaderParamControlsElement = document.querySelector("#shader-param-controls");
 const shapeEditorControlsElement = document.querySelector("#shape-editor-controls");
+const customShapeParamControlsElement = document.querySelector("#custom-shape-param-controls");
+const mappingTargetSelectorElement = document.querySelector("#mapping-target-selector");
 const shaderErrorOverlay = document.querySelector("#shader-error-overlay");
 const shaderErrorTitleElement = document.querySelector("#shader-error-title");
 const shaderErrorMessageElement = document.querySelector("#shader-error-message");
@@ -127,6 +138,10 @@ let shaderParamOverrides = {};
 let shaderParamControlsSignature = "";
 let shapeEditorOverrides = {};
 let shapeEditorControlsSignature = "";
+let customShapeParamOverrides = {};
+let customShapeParamControlsSignature = "";
+let mappingTargetSelectorSignature = "";
+let selectedMappingTarget = "";
 let midiAccess = null;
 let pendingMidiLearnAction = null;
 applyProjectorMode(document.body, projectorMode);
@@ -189,9 +204,13 @@ const client = new WebSocketClient(websocketUrl, {
     if (sceneChanged) {
       shaderParamControlsSignature = "";
       shapeEditorControlsSignature = "";
+      customShapeParamControlsSignature = "";
+      mappingTargetSelectorSignature = "";
     }
     updateShaderParamControls(frame?.scene?.layers);
     updateShapeEditorControls(frame?.scene?.layers);
+    updateCustomShapeParamControls(frame?.scene?.layers);
+    updateMappingTargetSelector(frame?.scene?.layers);
     const amplitude = Number(frame?.audio?.amplitude || 0).toFixed(4);
     const bpm = Number(frame?.audio?.bpm || 0);
     const beat = !!frame?.audio?.beat;
@@ -229,8 +248,12 @@ const client = new WebSocketClient(websocketUrl, {
       renderSceneButtons();
       shaderParamControlsSignature = "";
       shapeEditorControlsSignature = "";
+      customShapeParamControlsSignature = "";
+      mappingTargetSelectorSignature = "";
       updateShaderParamControls(payload?.scene?.layers);
       updateShapeEditorControls(payload?.scene?.layers);
+      updateCustomShapeParamControls(payload?.scene?.layers);
+      updateMappingTargetSelector(payload?.scene?.layers);
     }
     if (Object.prototype.hasOwnProperty.call(payload || {}, "tap_tempo_key")) {
       updateTapTempoKey(payload?.tap_tempo_key);
@@ -625,6 +648,118 @@ function writeShapeEditorOverride(entry, values) {
   shapeEditorOverrides[entry.layerKey] ||= {};
   shapeEditorOverrides[entry.layerKey][entry.shapeIndex] = normalizeShapeEditorPatch(values);
   engine.setShapeEditorOverrides(shapeEditorOverrides);
+}
+
+function updateCustomShapeParamControls(layers) {
+  const entries = customShapeParamControlEntries(layers, customShapeParamOverrides);
+  const signature = customShapeParamControlsSignatureFor(entries);
+  if (signature === customShapeParamControlsSignature) {
+    return;
+  }
+
+  customShapeParamControlsSignature = signature;
+  customShapeParamOverrides = pruneCustomShapeParamOverrides(customShapeParamOverrides, entries);
+  renderCustomShapeParamControls(entries);
+}
+
+function customShapeParamControlsSignatureFor(entries) {
+  return entries.map((entry) => (
+    `${entry.key}:${entry.min}:${entry.max}:${entry.step}:${entry.value}`
+  )).join("|");
+}
+
+function renderCustomShapeParamControls(entries) {
+  if (!customShapeParamControlsElement) {
+    return;
+  }
+
+  if (!entries.length) {
+    customShapeParamControlsElement.hidden = true;
+    customShapeParamControlsElement.replaceChildren();
+    return;
+  }
+
+  const title = document.createElement("p");
+  title.className = "shader-param-controls__title";
+  title.textContent = "Custom Shape Params";
+  const controls = entries.map((entry) => createCustomShapeParamControl(entry));
+  customShapeParamControlsElement.replaceChildren(title, ...controls);
+  customShapeParamControlsElement.hidden = false;
+}
+
+function createCustomShapeParamControl(entry) {
+  const label = document.createElement("label");
+  const name = document.createElement("span");
+  const input = document.createElement("input");
+  const value = document.createElement("output");
+  name.textContent = entry.label;
+  input.type = "range";
+  input.min = String(entry.min);
+  input.max = String(entry.max);
+  input.step = String(entry.step);
+  input.value = String(entry.value);
+  value.value = formatShaderParamValue(entry.value);
+  input.addEventListener("input", () => {
+    const numeric = Number(input.value);
+    customShapeParamOverrides[entry.layerKey] ||= {};
+    customShapeParamOverrides[entry.layerKey][entry.customShapeIndex] ||= {};
+    customShapeParamOverrides[entry.layerKey][entry.customShapeIndex][entry.paramName] = numeric;
+    client.send("custom_shape_param", customShapeParamMessage(entry, numeric));
+    value.value = formatShaderParamValue(numeric);
+  });
+  label.append(name, input, value);
+  return label;
+}
+
+function updateMappingTargetSelector(layers) {
+  const options = mappingTargetOptions(layers);
+  const signature = mappingTargetSignature(options);
+  if (signature === mappingTargetSelectorSignature) {
+    return;
+  }
+
+  mappingTargetSelectorSignature = signature;
+  renderMappingTargetSelector(options);
+}
+
+function renderMappingTargetSelector(options) {
+  if (!mappingTargetSelectorElement) {
+    return;
+  }
+
+  if (!options.length) {
+    selectedMappingTarget = "";
+    mappingTargetSelectorElement.hidden = true;
+    mappingTargetSelectorElement.replaceChildren();
+    return;
+  }
+
+  const title = document.createElement("p");
+  title.className = "shader-param-controls__title";
+  title.textContent = "Mapping Targets";
+  const label = document.createElement("label");
+  const name = document.createElement("span");
+  const select = document.createElement("select");
+  const output = document.createElement("output");
+  name.textContent = "Target";
+  options.forEach((option) => {
+    const item = document.createElement("option");
+    item.value = option.target;
+    item.textContent = option.label;
+    select.append(item);
+  });
+  if (!options.some((option) => option.target === selectedMappingTarget)) {
+    selectedMappingTarget = options[0].target;
+  }
+  select.value = selectedMappingTarget;
+  output.value = selectedMappingTarget;
+  select.addEventListener("change", () => {
+    selectedMappingTarget = select.value;
+    output.value = select.value;
+  });
+  label.append(name, select, output);
+  mappingTargetSelectorElement.replaceChildren(title, label);
+  mappingTargetSelectorElement.hidden = false;
 }
 
 function requestSceneSwitch(sceneName) {

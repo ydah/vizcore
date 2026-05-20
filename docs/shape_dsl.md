@@ -263,3 +263,7 @@ snapshot renderer also uses line flattening.
 The browser HUD includes local shape editor controls for resolved shape layers:
 primitive kind, translate, rotate, scale, opacity, fill, stroke color, and stroke
 width can be adjusted in the running view without mutating the source DSL file.
+Dynamic custom shape params with `param` metadata are also exposed as HUD
+controls; changing one sends a runtime override to the server so the Ruby custom
+shape is re-expanded on the next frame. The HUD also lists valid mapping target
+paths for layer params, primitive params/transforms, and custom shape params.
