@@ -205,6 +205,13 @@ module Vizcore
       def custom_shape(renderer, **options, &block)
         mark_shape_schema_version!
         shape_id = options.delete(:id)
+        dynamic = options.delete(:dynamic)
+        static = options.delete(:static)
+        raise ArgumentError, "custom_shape cannot be both static and dynamic" if dynamic && static
+
+        dynamic = true if static == false
+        return append_dynamic_custom_shape(renderer, options, shape_id: shape_id, &block) if dynamic
+
         primitives = expand_custom_shape(renderer, options, shape_id: shape_id)
         raise ArgumentError, "custom_shape produced no primitives" if primitives.empty?
         raise ArgumentError, "custom_shape id can only be assigned when one primitive is produced" if shape_id && primitives.length > 1
@@ -305,6 +312,11 @@ module Vizcore
           return @current_shape
         end
 
+        if @current_custom_shape
+          current_custom_shape_style[:fill] = value.to_s
+          return @current_custom_shape
+        end
+
         if in_shape_group?
           current_shape_group[:fill] = value.to_s
           return current_shape_group
@@ -322,6 +334,13 @@ module Vizcore
           @current_shape[:stroke_width] = normalize_non_negative_param_number(width, :stroke_width) unless width.nil?
           @current_shape[:stroke_color] = color.to_s unless color.nil?
           return @current_shape
+        end
+
+        if @current_custom_shape
+          current_custom_shape_style[:stroke] = normalize_non_negative_param_number(value, :stroke) unless value.equal?(NO_ARGUMENT)
+          current_custom_shape_style[:stroke_width] = normalize_non_negative_param_number(width, :stroke_width) unless width.nil?
+          current_custom_shape_style[:stroke_color] = color.to_s unless color.nil?
+          return @current_custom_shape
         end
 
         if in_shape_group?
@@ -354,6 +373,11 @@ module Vizcore
           return @current_shape
         end
 
+        if @current_custom_shape
+          current_custom_shape_style[:blend] = value.to_sym
+          return @current_custom_shape
+        end
+
         if in_shape_group?
           current_shape_group[:blend] = value.to_sym
           return current_shape_group
@@ -371,6 +395,11 @@ module Vizcore
           @current_shape[:opacity] = normalize_param_number(value, :opacity)
           mark_shape_schema_version!
           return @current_shape
+        end
+
+        if @current_custom_shape
+          current_custom_shape_style[:opacity] = normalize_param_number(value, :opacity)
+          return @current_custom_shape
         end
 
         if in_shape_group?
@@ -394,6 +423,11 @@ module Vizcore
           return @current_shape
         end
 
+        if @current_custom_shape
+          current_custom_shape_transform[:translate] = add_shape_xy(current_custom_shape_transform[:translate], values)
+          return @current_custom_shape
+        end
+
         if in_shape_group?
           current_shape_group_transform[:translate] = add_shape_xy(current_shape_group_transform[:translate], values)
           return current_shape_group
@@ -411,6 +445,11 @@ module Vizcore
         if @current_shape
           current_shape_transform[:rotate] = rotation
           return @current_shape
+        end
+
+        if @current_custom_shape
+          current_custom_shape_transform[:rotate] = normalize_param_number(current_custom_shape_transform[:rotate] || 0, :rotate) + rotation
+          return @current_custom_shape
         end
 
         if in_shape_group?
@@ -434,6 +473,11 @@ module Vizcore
           return @current_shape
         end
 
+        if @current_custom_shape
+          current_custom_shape_transform[:scale] = multiply_shape_scale(current_custom_shape_transform[:scale], scale_value)
+          return @current_custom_shape
+        end
+
         if in_shape_group?
           current_shape_group_transform[:scale] = multiply_shape_scale(current_shape_group_transform[:scale], scale_value)
           return current_shape_group
@@ -453,6 +497,11 @@ module Vizcore
         if @current_shape
           current_shape_transform[:origin] = values
           return @current_shape
+        end
+
+        if @current_custom_shape
+          current_custom_shape_transform[:origin] = values
+          return @current_custom_shape
         end
 
         if in_shape_group?
@@ -557,6 +606,7 @@ module Vizcore
       # @raise [ArgumentError] when the mapping is empty or invalid
       # @return [void]
       def map(definition = nil, **options, &block)
+        definition, options = normalize_custom_shape_mapping(definition, options) if @custom_shape_target_prefix
         definition, options = normalize_shape_mapping(definition, options) if @shape_target_prefix
 
         if options.key?(:to)
@@ -730,6 +780,11 @@ module Vizcore
           return args.first
         end
 
+        if @current_custom_shape && block.nil? && args.length == 1
+          @current_custom_shape[:params][method_name.to_sym] = args.first
+          return args.first
+        end
+
         if in_shape_group? && block.nil? && args.length == 1
           current_shape_group[method_name.to_sym] = args.first
           return args.first
@@ -744,7 +799,7 @@ module Vizcore
       end
 
       def respond_to_missing?(method_name, include_private = false)
-        @params.key?(method_name.to_sym) || super
+        !!@current_custom_shape || @params.key?(method_name.to_sym) || super
       end
 
       private
@@ -779,6 +834,30 @@ module Vizcore
         validate_shape!(shape)
 
         shape
+      end
+
+      def append_dynamic_custom_shape(renderer, options, shape_id:, &block)
+        definition = custom_shape_definition(renderer)
+        @type ||= :shape
+        @params[:custom_shapes] ||= []
+        descriptor = {
+          name: definition.name || renderer,
+          renderer: definition.renderer,
+          params: deep_dup(options),
+          style: {},
+          transform: {},
+          dynamic: true
+        }
+        descriptor[:shape_id] = shape_id.to_sym if shape_id
+        descriptor_index = @params[:custom_shapes].length
+        @params[:custom_shapes] << descriptor
+
+        with_custom_shape_context(descriptor, descriptor_index) do
+          instance_eval(&block) if block
+        end
+        apply_current_shape_group_to_custom_shape!(descriptor)
+
+        descriptor
       end
 
       def shape_options(id, options)
@@ -841,6 +920,24 @@ module Vizcore
         shape
       end
 
+      def apply_current_shape_group_to_custom_shape!(descriptor)
+        group = current_shape_group
+        return descriptor if group.empty?
+
+        style = descriptor[:style] ||= {}
+        SHAPE_STYLE_KEYS.each do |key|
+          next unless group.key?(key)
+
+          if key == :opacity && style.key?(:opacity)
+            style[:opacity] = normalize_param_number(group[:opacity], :opacity) * normalize_param_number(style[:opacity], :opacity)
+          else
+            style[key] = deep_dup(group[key]) unless style.key?(key)
+          end
+        end
+        descriptor[:transform] = compose_shape_transform(group[:transform], descriptor[:transform]) if group[:transform]
+        descriptor
+      end
+
       def compose_shape_transform(parent, child)
         return deep_dup(child || {}) unless parent
 
@@ -883,6 +980,14 @@ module Vizcore
         current_shape_group[:transform] ||= {}
       end
 
+      def current_custom_shape_style
+        @current_custom_shape[:style] ||= {}
+      end
+
+      def current_custom_shape_transform
+        @current_custom_shape[:transform] ||= {}
+      end
+
       def in_shape_group?
         @shape_group_stack.length > 1
       end
@@ -922,47 +1027,20 @@ module Vizcore
 
       def expand_custom_shape(renderer, options, shape_id:)
         definition = custom_shape_definition(renderer)
-        context = Vizcore::Shape::DrawContext.new(
+        Vizcore::Shape.expand_custom_shape(
+          definition.renderer,
           params: options,
-          param_schema: custom_shape_param_schema(definition.renderer),
           shape_id: shape_id,
           layer_name: @name,
-          palette: Array(@params[:palette])
+          palette: Array(@params[:palette]),
+          shape_name: definition.name || renderer
         )
-        result = call_custom_shape(definition.renderer, context, options)
-        result = context.shapes if result.nil?
-        Vizcore::Shape.normalize_primitives(result, shape_name: definition.name || renderer)
       end
 
       def custom_shape_definition(renderer)
         return Vizcore::Shape::Definition.new(name: nil, renderer: renderer) unless renderer.is_a?(Symbol) || renderer.is_a?(String)
 
         Vizcore.resolve_shape(renderer) || raise(ArgumentError, "Unknown custom shape: #{renderer.inspect}. Register it with `Vizcore.register_shape #{renderer.inspect}, ShapeClass`.")
-      end
-
-      def custom_shape_param_schema(renderer)
-        return renderer.shape_param_schema if renderer.respond_to?(:shape_param_schema)
-
-        {}
-      end
-
-      def call_custom_shape(renderer, context, params)
-        if renderer.respond_to?(:draw)
-          return renderer.draw(context)
-        end
-
-        return renderer.call(context) if renderer.respond_to?(:call) && !renderer.is_a?(Class)
-
-        instance = instantiate_custom_shape(renderer, params)
-        return instance.draw(context) if instance.respond_to?(:draw)
-
-        raise ArgumentError, "custom shape renderer must implement draw(context)"
-      end
-
-      def instantiate_custom_shape(renderer, params)
-        renderer.new(**params)
-      rescue ArgumentError
-        renderer.new
       end
 
       def register_shape_id!(shape, shape_index)
@@ -1039,6 +1117,50 @@ module Vizcore
       ensure
         @current_shape = previous_shape
         @shape_target_prefix = previous_prefix
+      end
+
+      def with_custom_shape_context(descriptor, descriptor_index)
+        previous_custom_shape = @current_custom_shape
+        previous_prefix = @custom_shape_target_prefix
+        @current_custom_shape = descriptor
+        @custom_shape_target_prefix = "custom_shapes.#{descriptor_index}"
+        yield
+      ensure
+        @current_custom_shape = previous_custom_shape
+        @custom_shape_target_prefix = previous_prefix
+      end
+
+      def normalize_custom_shape_mapping(definition, options)
+        if options.key?(:to)
+          prefixed_options = options.dup
+          prefixed_options[:to] = prefixed_custom_shape_target(prefixed_options[:to])
+          return [definition, prefixed_options]
+        end
+
+        mapping = definition.nil? ? options : Hash(definition)
+        prefixed_mapping = mapping.each_with_object({}) do |(source, target), output|
+          output[source] = prefix_custom_shape_target_value(target)
+        end
+        [prefixed_mapping, {}]
+      end
+
+      def prefix_custom_shape_target_value(target)
+        return prefixed_custom_shape_target(target) unless target.is_a?(Hash)
+
+        target.merge(to: prefixed_custom_shape_target(target.fetch(:to)))
+      rescue KeyError
+        target
+      end
+
+      def prefixed_custom_shape_target(target)
+        target_name = target.to_s
+        return :"#{@custom_shape_target_prefix}.#{target_name}" if target_name.match?(/\A(?:params|style|transform)\./)
+
+        resolved_target = SHAPE_TARGET_ALIASES[target_name]
+        return :"#{@custom_shape_target_prefix}.#{resolved_target}" if resolved_target
+        return :"#{@custom_shape_target_prefix}.style.#{target_name}" if SHAPE_STYLE_KEYS.include?(target_name.to_sym)
+
+        :"#{@custom_shape_target_prefix}.params.#{target_name}"
       end
 
       def normalize_shape_mapping(definition, options)

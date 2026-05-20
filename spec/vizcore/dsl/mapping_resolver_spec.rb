@@ -289,14 +289,85 @@ RSpec.describe Vizcore::DSL::MappingResolver do
               source: { kind: :frequency_band, band: :low },
               target: :"shapes.0.radius",
               transform: { min: 40.0, max: 180.0 }
+            },
+            {
+              source: { kind: :amplitude },
+              target: :"shapes.0.transform.translate.x",
+              transform: { gain: 100.0 }
             }
           ]
         }
       ]
 
-      resolved = resolver.resolve_layers(scene_layers: scene_layers, audio: { bands: { low: 0.8 } })
+      resolved = resolver.resolve_layers(scene_layers: scene_layers, audio: { amplitude: 0.25, bands: { low: 0.8 } })
 
       expect(resolved[0][:params][:shapes][0][:radius]).to eq(40.0)
+      expect(resolved[0][:params][:shapes][0][:transform]).to eq(translate: { x: 25.0 })
+    end
+
+    it "expands dynamic custom shapes after custom params are mapped" do
+      shape_class = Class.new do
+        include Vizcore::Shape
+
+        def draw(ctx)
+          {
+            kind: :circle,
+            radius: ctx.param(:radius),
+            opacity: ctx.audio.high
+          }
+        end
+      end
+      resolver = described_class.new
+      scene_layers = [
+        {
+          name: :generated,
+          type: :shape,
+          params: {
+            custom_shapes: [
+              {
+                name: :dynamic_circle,
+                renderer: shape_class,
+                params: { radius: 10 },
+                style: { fill: "#22d3ee", opacity: 0.5 },
+                transform: { scale: 1.2 },
+                dynamic: true
+              }
+            ]
+          },
+          mappings: [
+            {
+              source: { kind: :amplitude },
+              target: :"custom_shapes.0.params.radius",
+              transform: { gain: 100.0 }
+            },
+            {
+              source: { kind: :frequency_band, band: :high },
+              target: :"custom_shapes.0.transform.translate.x",
+              transform: { gain: 10.0 }
+            }
+          ]
+        }
+      ]
+
+      resolved = resolver.resolve_layers(
+        scene_layers: scene_layers,
+        audio: { amplitude: 0.4, bands: { high: 0.8 } },
+        time: 2.0,
+        frame: 7
+      )
+
+      expect(resolved[0][:params]).not_to have_key(:custom_shapes)
+      expect(resolved[0][:params][:shapes]).to eq(
+        [
+          {
+            kind: :circle,
+            radius: 40.0,
+            opacity: 0.4,
+            fill: "#22d3ee",
+            transform: { scale: 1.2, translate: { x: 8.0 } }
+          }
+        ]
+      )
     end
   end
 end

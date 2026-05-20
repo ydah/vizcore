@@ -622,6 +622,57 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "stores dynamic custom shapes for runtime expansion after mappings" do
+      shape_class = Class.new do
+        include Vizcore::Shape
+
+        param :radius, default: 64
+
+        def draw(ctx)
+          ctx.circle radius: ctx.param(:radius)
+        end
+      end
+      Vizcore.register_shape :engine_spec_dynamic_shape, shape_class
+
+      definition = described_class.define do
+        scene :dynamic_custom_shape_scene do
+          layer :generated do
+            custom_shape :engine_spec_dynamic_shape, radius: 48, dynamic: true do
+              fill "#22d3ee"
+              rotate 15
+              map bass, to: :radius, range: 24..96
+              map beat_pulse, to: :scale, range: 0.8..1.2
+            end
+          end
+        end
+      end
+
+      layer = definition[:scenes].first[:layers].first
+      expect(layer[:params][:shapes]).to be_nil
+      expect(layer[:params][:custom_shapes]).to contain_exactly(
+        hash_including(
+          name: :engine_spec_dynamic_shape,
+          renderer: shape_class,
+          params: { radius: 48 },
+          style: { fill: "#22d3ee" },
+          transform: { rotate: 15.0 },
+          dynamic: true
+        )
+      )
+      expect(layer[:mappings]).to include(
+        {
+          source: { kind: :frequency_band, band: :low },
+          target: :"custom_shapes.0.params.radius",
+          transform: { min: 24, max: 96 }
+        },
+        {
+          source: { kind: :beat_pulse },
+          target: :"custom_shapes.0.transform.scale",
+          transform: { min: 0.8, max: 1.2 }
+        }
+      )
+    end
+
     it "raises when a custom shape is unknown" do
       expect do
         described_class.define do

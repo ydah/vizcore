@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../shape"
+
 module Vizcore
   module DSL
     # Resolves `map` definitions into concrete per-layer parameter values.
@@ -11,17 +13,18 @@ module Vizcore
       # @param scene_layers [Array<Hash>]
       # @param audio [Hash]
       # @return [Array<Hash>] normalized layer payloads with resolved params
-      def resolve_layers(scene_layers:, audio:)
+      def resolve_layers(scene_layers:, audio:, time: 0.0, frame: 0, resolution: [1280, 720], globals: {})
         normalize_scene_layers(scene_layers).map do |layer|
-          resolve_layer(layer, audio)
+          resolve_layer(layer, audio, time: time, frame: frame, resolution: resolution, globals: globals)
         end
       end
 
       private
 
-      def resolve_layer(layer, audio)
+      def resolve_layer(layer, audio, time:, frame:, resolution:, globals:)
         params = (layer[:params] || {}).dup
         merge_resolved_mappings!(params, resolve_mappings(layer[:mappings], audio, layer_name: layer[:name]))
+        expand_dynamic_custom_shapes!(params, layer: layer, audio: audio, time: time, frame: frame, resolution: resolution, globals: globals)
 
         output = {
           name: layer.fetch(:name).to_s,
@@ -57,6 +60,53 @@ module Vizcore
         end
       end
 
+      def expand_dynamic_custom_shapes!(params, layer:, audio:, time:, frame:, resolution:, globals:)
+        descriptors = Array(params.delete(:custom_shapes))
+        return if descriptors.empty?
+
+        params[:shapes] = Array(params[:shapes])
+        descriptors.each do |descriptor|
+          expanded = expand_dynamic_custom_shape(descriptor, layer: layer, palette: params[:palette], audio: audio, time: time, frame: frame, resolution: resolution, globals: globals)
+          params[:shapes].concat(expanded)
+        end
+      end
+
+      def expand_dynamic_custom_shape(descriptor, layer:, palette:, audio:, time:, frame:, resolution:, globals:)
+        values = Hash(descriptor)
+        renderer = values.fetch(:renderer)
+        shape_name = values[:name] || renderer
+        primitives = Vizcore::Shape.expand_custom_shape(
+          renderer,
+          params: Hash(values[:params] || {}),
+          shape_id: values[:shape_id],
+          layer_name: layer[:name],
+          palette: Array(palette),
+          audio: audio,
+          time: time,
+          frame: frame,
+          resolution: resolution,
+          globals: globals,
+          shape_name: shape_name
+        )
+        primitives.each { |primitive| apply_custom_shape_attributes!(primitive, values) }
+      end
+
+      def apply_custom_shape_attributes!(primitive, descriptor)
+        style = Hash(descriptor[:style] || {})
+        style.each do |key, value|
+          symbol_key = key.to_sym
+          if symbol_key == :opacity && primitive.key?(:opacity)
+            primitive[:opacity] = numeric(style[:opacity] || style["opacity"], :opacity) * numeric(primitive[:opacity], :opacity)
+          else
+            primitive[symbol_key] = deep_dup(value) unless primitive.key?(symbol_key)
+          end
+        end
+
+        transform = Hash(descriptor[:transform] || {})
+        primitive[:transform] = compose_shape_transform(transform, primitive[:transform]) unless transform.empty?
+        primitive
+      end
+
       def assign_nested_param(container, path, value)
         key = path.shift
         if path.empty?
@@ -65,6 +115,7 @@ module Vizcore
         end
 
         next_container = nested_value(container, key)
+        next_container = create_nested_container(container, key, path.first) if next_container.nil?
         return unless next_container
 
         assign_nested_param(next_container, path, value)
@@ -77,6 +128,13 @@ module Vizcore
         nil
       end
 
+      def create_nested_container(container, key, next_key)
+        return unless container.is_a?(Hash)
+
+        value = integer_key?(next_key) ? [] : {}
+        container[key.to_sym] = value
+      end
+
       def assign_nested_value(container, key, value)
         if container.is_a?(Array) && integer_key?(key)
           container[key.to_i] = value
@@ -87,6 +145,46 @@ module Vizcore
 
       def integer_key?(value)
         value.match?(/\A\d+\z/)
+      end
+
+      def compose_shape_transform(parent, child)
+        return deep_dup(child || {}) unless parent
+
+        child ||= {}
+        output = deep_dup(parent)
+        output[:translate] = add_shape_xy(parent[:translate], child[:translate]) if child.key?(:translate)
+        output[:origin] = child[:origin] if child.key?(:origin)
+        output[:rotate] = numeric(parent[:rotate] || 0, :rotate) + numeric(child[:rotate] || 0, :rotate) if child.key?(:rotate)
+        output[:scale] = multiply_shape_scale(parent[:scale], child[:scale]) if child.key?(:scale)
+        output
+      end
+
+      def add_shape_xy(parent, child)
+        parent ||= {}
+        child ||= {}
+        {
+          x: numeric(parent[:x] || parent["x"] || 0, :"translate.x") + numeric(child[:x] || child["x"] || 0, :"translate.x"),
+          y: numeric(parent[:y] || parent["y"] || 0, :"translate.y") + numeric(child[:y] || child["y"] || 0, :"translate.y")
+        }
+      end
+
+      def multiply_shape_scale(parent, child)
+        parent = shape_scale_pair(parent)
+        child = shape_scale_pair(child)
+        { x: parent[:x] * child[:x], y: parent[:y] * child[:y] }
+      end
+
+      def shape_scale_pair(value)
+        return { x: numeric(value[:x] || value["x"] || 1, :"scale.x"), y: numeric(value[:y] || value["y"] || 1, :"scale.y") } if value.is_a?(Hash)
+
+        scale = numeric(value || 1, :scale)
+        { x: scale, y: scale }
+      end
+
+      def numeric(value, name)
+        Float(value)
+      rescue ArgumentError, TypeError
+        raise ArgumentError, "param #{name} must be numeric"
       end
 
       def resolve_source_value(source, audio)
@@ -191,6 +289,19 @@ module Vizcore
 
       def normalize_scene_layers(scene_layers)
         Array(scene_layers).map { |layer| deep_symbolize(layer) }
+      end
+
+      def deep_dup(value)
+        case value
+        when Hash
+          value.each_with_object({}) do |(key, entry), output|
+            output[key] = deep_dup(entry)
+          end
+        when Array
+          value.map { |entry| deep_dup(entry) }
+        else
+          value
+        end
       end
 
       def deep_symbolize(value)

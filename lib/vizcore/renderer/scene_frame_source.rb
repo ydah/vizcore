@@ -22,6 +22,7 @@ module Vizcore
         @input_manager.start
         @capture_size = capture_size
         @pipeline = build_pipeline
+        @frame_count = 0
         self
       end
 
@@ -30,7 +31,13 @@ module Vizcore
         ensure_started!
 
         audio = @pipeline.call(@input_manager.capture_frame(@capture_size))
-        layers = Vizcore::DSL::MappingResolver.new.resolve_layers(scene_layers: @scene[:layers], audio: audio)
+        @frame_count += 1
+        layers = Vizcore::DSL::MappingResolver.new.resolve_layers(
+          scene_layers: @scene[:layers],
+          audio: audio,
+          time: frame_time,
+          frame: @frame_count
+        )
 
         {
           scene: { name: @scene[:name], layers: layers },
@@ -80,6 +87,12 @@ module Vizcore
           bpm: bpm_setting,
           bpm_lock: bpm_lock_setting
         )
+      end
+
+      def frame_time
+        return 0.0 unless @frame_rate
+
+        (@frame_count - 1).fdiv(@frame_rate)
       end
 
       def audio_normalize_settings

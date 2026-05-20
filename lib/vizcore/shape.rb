@@ -24,7 +24,65 @@ module Vizcore
         primitives.map { |primitive| normalize_primitive(primitive, shape_name: shape_name) }
       end
 
+      def expand_custom_shape(renderer, params:, shape_id: nil, layer_name: nil, palette: [], audio: {}, time: 0.0, frame: 0, resolution: [1280, 720], globals: {}, shape_name: nil)
+        definition = shape_definition(renderer)
+        renderer = definition.renderer if definition
+        shape_name ||= definition&.name || renderer
+        context = DrawContext.new(
+          params: params,
+          param_schema: param_schema_for(renderer),
+          shape_id: shape_id,
+          layer_name: layer_name,
+          palette: palette,
+          audio: audio,
+          time: time,
+          frame: frame,
+          resolution: resolution,
+          globals: globals
+        )
+        result = call_renderer(renderer, context, params)
+        result = context.shapes if result.nil?
+        primitives = normalize_primitives(result, shape_name: shape_name)
+        if shape_id && primitives.length != 1
+          raise ArgumentError, "custom_shape id can only be assigned when one primitive is produced"
+        end
+        primitives.first[:id] ||= shape_id.to_sym if shape_id
+        primitives
+      end
+
+      def param_schema_for(renderer)
+        return renderer.shape_param_schema if renderer.respond_to?(:shape_param_schema)
+
+        {}
+      end
+
       private
+
+      def shape_definition(renderer)
+        return unless renderer.is_a?(Symbol) || renderer.is_a?(String)
+        return unless Vizcore.respond_to?(:resolve_shape)
+
+        Vizcore.resolve_shape(renderer) || raise(ArgumentError, "Unknown custom shape: #{renderer.inspect}. Register it with `Vizcore.register_shape #{renderer.inspect}, ShapeClass`.")
+      end
+
+      def call_renderer(renderer, context, params)
+        if renderer.respond_to?(:draw)
+          return renderer.draw(context)
+        end
+
+        return renderer.call(context) if renderer.respond_to?(:call) && !renderer.is_a?(Class)
+
+        instance = instantiate_renderer(renderer, params)
+        return instance.draw(context) if instance.respond_to?(:draw)
+
+        raise ArgumentError, "custom shape renderer must implement draw(context)"
+      end
+
+      def instantiate_renderer(renderer, params)
+        renderer.new(**params)
+      rescue ArgumentError
+        renderer.new
+      end
 
       def normalize_primitive(primitive, shape_name:)
         values = symbolize_keys(primitive)

@@ -22,6 +22,20 @@ module Vizcore::Shape
   SUPPORTED_PRIMITIVES: Array[Symbol]
 
   def self.normalize_primitives: (untyped value, shape_name: untyped) -> Array[Hash[Symbol, untyped]]
+  def self.expand_custom_shape: (
+    untyped renderer,
+    params: Hash[Symbol | String, untyped],
+    ?shape_id: Symbol | String? shape_id,
+    ?layer_name: Symbol? layer_name,
+    ?palette: Array[untyped] palette,
+    ?audio: Hash[untyped, untyped] audio,
+    ?time: Numeric time,
+    ?frame: Integer frame,
+    ?resolution: Array[untyped] resolution,
+    ?globals: Hash[untyped, untyped] globals,
+    ?shape_name: untyped shape_name
+  ) -> Array[Hash[Symbol, untyped]]
+  def self.param_schema_for: (untyped renderer) -> Hash[Symbol, Hash[Symbol, untyped]]
 
   class Definition < Struct[untyped]
     attr_accessor name: Symbol?
@@ -352,7 +366,7 @@ module Vizcore::DSL
     def path: (*untyped args, **untyped options) ?{ () -> void } -> Hash[Symbol, untyped]
     def bezier: (*untyped args, **untyped options) ?{ () -> void } -> Hash[Symbol, untyped]
     def star: (*untyped args, **untyped options) ?{ () -> void } -> Hash[Symbol, untyped]
-    def custom_shape: (untyped renderer, **untyped options) ?{ () -> void } -> Array[Hash[Symbol, untyped]]
+    def custom_shape: (untyped renderer, **untyped options) ?{ () -> void } -> (Array[Hash[Symbol, untyped]] | Hash[Symbol, untyped])
     def group: (*untyped args, **untyped attrs) { () -> void } -> Array[Hash[Symbol, untyped]]
     def draw: () { () -> void } -> Array[Hash[Symbol, untyped]]
     def source: (Symbol | String value, **untyped options) -> (Symbol | source)
@@ -435,6 +449,13 @@ module Vizcore::DSL
 
   class MappingResolver
     def initialize: () -> void
-    def resolve_layers: (scene_layers: Array[Hash[Symbol, untyped]], audio: Hash[Symbol, untyped]) -> Array[Hash[Symbol, untyped]]
+    def resolve_layers: (
+      scene_layers: Array[Hash[Symbol, untyped]],
+      audio: Hash[Symbol, untyped],
+      ?time: Numeric time,
+      ?frame: Integer frame,
+      ?resolution: Array[untyped] resolution,
+      ?globals: Hash[untyped, untyped] globals
+    ) -> Array[Hash[Symbol, untyped]]
   end
 end

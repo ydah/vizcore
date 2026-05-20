@@ -216,12 +216,12 @@ module Vizcore
       # @param samples [Array<Float>, nil]
       # @raise [Vizcore::FrameBuildError] when frame construction fails
       # @return [Hash]
-      def build_frame(_elapsed_seconds, samples = nil)
+      def build_frame(elapsed_seconds, samples = nil)
         started_at_ms = monotonic_ms
         audio_samples, audio_capture_ms = capture_or_use_samples(samples)
         analyzed, audio_analysis_ms = measure_ms { @analysis_pipeline.call(audio_samples) }
         scene = current_scene
-        layers, scene_build_ms = measure_ms { build_scene_layers(scene[:layers], analyzed) }
+        layers, scene_build_ms = measure_ms { build_scene_layers(scene[:layers], analyzed, time: elapsed_seconds, frame: @frame_count) }
 
         @scene_serializer.audio_frame(
           timestamp: Time.now.to_f,
@@ -293,10 +293,10 @@ module Vizcore
         value.positive? && (value & (value - 1)).zero?
       end
 
-      def build_scene_layers(scene_layers, analyzed)
+      def build_scene_layers(scene_layers, analyzed, time: 0.0, frame: 0)
         return default_scene_layers(analyzed) if scene_layers.empty?
 
-        @mapping_resolver.resolve_layers(scene_layers: scene_layers, audio: analyzed)
+        @mapping_resolver.resolve_layers(scene_layers: scene_layers, audio: analyzed, time: time, frame: frame)
       end
 
       def default_scene_layers(analyzed)
