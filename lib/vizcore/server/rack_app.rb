@@ -103,6 +103,7 @@ module Vizcore
           projector_mode: @projector_mode,
           websocket_clients: WebSocketHandler.connection_count,
           dropped_frames: WebSocketHandler.dropped_frame_count,
+          websocket_backpressure: WebSocketHandler.backpressure_status,
           runtime: runtime_status
         }
 

@@ -62,7 +62,12 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
         fps: described_class::FRAME_RATE,
         frame_id: 0,
         websocket_clients: an_instance_of(Integer),
-        dropped_frames: an_instance_of(Integer)
+        dropped_frames: an_instance_of(Integer),
+        websocket_backpressure: hash_including(
+          :threshold_bytes,
+          :active_clients,
+          :total
+        )
       )
       expect(status[:sample_rate]).to be_a(Integer)
       expect(status[:frame_size]).to be_a(Integer)

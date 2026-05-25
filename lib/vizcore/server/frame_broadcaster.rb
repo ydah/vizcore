@@ -141,6 +141,7 @@ module Vizcore
           transport_playing: @scene_mutex.synchronize { @transport_playing },
           websocket_clients: WebSocketHandler.connection_count,
           dropped_frames: WebSocketHandler.dropped_frame_count,
+          websocket_backpressure: WebSocketHandler.backpressure_status,
           last_error: formatted_last_error,
           metrics: deep_dup(@last_frame_metrics)
         }.compact

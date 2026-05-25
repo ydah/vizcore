@@ -13,6 +13,11 @@ RSpec.describe Vizcore::Server::WebSocketHandler do
   before do
     described_class.send(:sockets).clear
     described_class.instance_variable_set(:@dropped_frame_count, 0)
+    described_class.send(:socket_backpressure_metrics).clear
+    described_class.send(:socket_backpressure_totals)[:dropped_frames] = 0
+    described_class.send(:socket_backpressure_totals)[:dropped_payload_bytes] = 0
+    described_class.send(:socket_backpressure_totals)[:sent_frames] = 0
+    described_class.send(:socket_backpressure_totals)[:sent_payload_bytes] = 0
     allow(described_class).to receive(:faye_websocket_class).and_return(Class.new)
     allow(described_class).to receive(:event_machine_reactor_running?).and_return(false)
   end
@@ -20,6 +25,11 @@ RSpec.describe Vizcore::Server::WebSocketHandler do
   after do
     described_class.send(:sockets).clear
     described_class.instance_variable_set(:@dropped_frame_count, 0)
+    described_class.send(:socket_backpressure_metrics).clear
+    described_class.send(:socket_backpressure_totals)[:dropped_frames] = 0
+    described_class.send(:socket_backpressure_totals)[:dropped_payload_bytes] = 0
+    described_class.send(:socket_backpressure_totals)[:sent_frames] = 0
+    described_class.send(:socket_backpressure_totals)[:sent_payload_bytes] = 0
     described_class.clear_message_handler
   end
 
@@ -59,6 +69,36 @@ RSpec.describe Vizcore::Server::WebSocketHandler do
       "payload" => { "from" => "intro", "to" => "drop" }
     )
     expect(described_class.dropped_frame_count).to eq(0)
+  end
+
+  it "tracks backpressure metrics for audio_frame drops and successful sends" do
+    send_socket = FakeSocket.new([], 0)
+    described_class.send(:register, send_socket)
+
+    payload = { bpm: 120 }
+    message = JSON.generate(protocol: described_class::PROTOCOL_VERSION, type: "audio_frame", payload: payload)
+    described_class.send_to(send_socket, type: "audio_frame", payload: payload)
+
+    status = described_class.backpressure_status
+    expect(status[:threshold_bytes]).to eq(described_class::MAX_BUFFERED_FRAME_BYTES)
+    expect(status[:active_clients]).to eq(1)
+    expect(status[:total][:sent_frames]).to eq(1)
+    expect(status[:total][:sent_payload_bytes]).to eq(message.bytesize)
+    expect(status[:clients][0][:id]).to eq(send_socket.object_id.to_s)
+    expect(status[:clients][0][:sent_frames]).to eq(1)
+    expect(status[:clients][0][:sent_payload_bytes]).to eq(message.bytesize)
+    expect(status[:clients][0][:dropped_frames]).to eq(0)
+
+    drop_socket = FakeSocket.new([], described_class::MAX_BUFFERED_FRAME_BYTES + 1)
+    described_class.send(:register, drop_socket)
+    described_class.broadcast(type: "audio_frame", payload: payload)
+
+    status = described_class.backpressure_status
+    dropped_client = status[:clients].find { |entry| entry[:id] == drop_socket.object_id.to_s }
+    expect(dropped_client[:dropped_frames]).to eq(1)
+    expect(status[:total][:dropped_frames]).to eq(1)
+    expect(status[:total][:dropped_payload_bytes]).to be >= message.bytesize
+    expect(described_class.dropped_frame_count).to eq(1)
   end
 
   it "sends envelopes to a single socket" do

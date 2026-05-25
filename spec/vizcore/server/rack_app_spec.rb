@@ -43,6 +43,7 @@ RSpec.describe Vizcore::Server::RackApp do
     expect(response.body).to include("\"projector_mode\":false")
     expect(response.body).to include("\"websocket_clients\":")
     expect(response.body).to include("\"dropped_frames\":")
+    expect(response.body).to include("\"websocket_backpressure\":{")
     expect(response.body).to include("\"runtime\":{}")
   end
 
