@@ -54,7 +54,7 @@ module Vizcore
         silence_reset_frames: Vizcore::Analysis::Pipeline::SILENCE_RESET_FRAMES,
         error_reporter: nil
       )
-        @scene_name = scene_name
+        @scene_name = scene_name.to_s
         @scene_layers = Array(scene_layers)
         @scene_mutex = Mutex.new
         @input_manager = input_manager || Vizcore::Audio::InputManager.new(source: :mic)
@@ -85,6 +85,10 @@ module Vizcore
         @last_error = nil
         @frame_count = 0
         @last_frame_metrics = {}
+        @scene_version = 1
+        @last_sent_scene_version = nil
+        @last_sent_scene_payload = nil
+        @connected_client_count = 0
         @custom_shape_param_overrides = {}
         @layer_param_overrides = {}
         @custom_shape_param_mutex = Mutex.new
@@ -133,6 +137,7 @@ module Vizcore
         scene = current_scene
         {
           current_scene: scene[:name].to_s,
+          scene_version: @scene_version,
           fps: FRAME_RATE,
           frame_id: @frame_count,
           sample_rate: input_manager_value(:sample_rate),
@@ -184,8 +189,16 @@ module Vizcore
       # @return [void]
       def update_scene(scene_name:, scene_layers:)
         @scene_mutex.synchronize do
-          @scene_name = scene_name.to_s
-          @scene_layers = Array(scene_layers)
+          next_scene_name = scene_name.to_s
+          next_scene_layers = Array(scene_layers)
+          same_scene = @scene_name == next_scene_name &&
+            deep_layers_equal?(@scene_layers, next_scene_layers)
+
+          @scene_name = next_scene_name
+          @scene_layers = next_scene_layers
+          @scene_version += 1 unless same_scene
+          @last_sent_scene_version = nil unless same_scene
+          @last_sent_scene_payload = nil unless same_scene
           @mapping_resolver.reset! if @mapping_resolver.respond_to?(:reset!)
           reset_transition_trigger_counters!
         end
@@ -293,6 +306,7 @@ module Vizcore
       def build_frame(elapsed_seconds, samples = nil)
         started_at_ms = monotonic_ms
         audio_samples, audio_capture_ms = capture_or_use_samples(samples)
+        sync_last_scene_state_with_connections
         analyzed, audio_analysis_ms = measure_ms { @analysis_pipeline.call(audio_samples) }
         scene = current_scene
         layers, scene_build_ms = measure_ms { build_scene_layers(scene[:layers], analyzed, time: elapsed_seconds, frame: @frame_count) }
@@ -311,6 +325,23 @@ module Vizcore
             server_frame_ms: monotonic_ms - started_at_ms
           }
         )
+        frame[:scene_version] = scene[:version]
+        full_scene = deep_dup(frame[:scene])
+        send_full_scene = scene[:version] != @last_sent_scene_version
+        if send_full_scene
+          full_scene[:version] = scene[:version]
+          frame[:scene] = full_scene
+          @last_sent_scene_payload = deep_dup(full_scene)
+          @last_sent_scene_version = scene[:version]
+        else
+          patch = scene_delta(previous: @last_sent_scene_payload, current: full_scene, scene_name: scene[:name], scene_version: scene[:version])
+          if patch
+            frame[:scene] = patch
+          else
+            frame.delete(:scene)
+          end
+        end
+        @last_sent_scene_payload = deep_dup(full_scene) if scene[:version] == @last_sent_scene_version
         @last_frame_metrics = frame[:metrics] || {}
         frame
       rescue StandardError => e
@@ -447,10 +478,98 @@ module Vizcore
       def current_scene
         @scene_mutex.synchronize do
           {
+            version: @scene_version,
             name: @scene_name,
             layers: Array(@scene_layers)
           }
         end
+      end
+
+      def scene_delta(previous:, current:, scene_name:, scene_version:)
+        return nil unless previous.is_a?(Hash) && current.is_a?(Hash)
+
+        prev_layers = Array(previous[:layers])
+        curr_layers = Array(current[:layers])
+        delta_layers = []
+
+        max_count = [prev_layers.length, curr_layers.length].max
+        (0...max_count).each do |index|
+          previous_layer = prev_layers[index]
+          current_layer = curr_layers[index]
+          if current_layer.nil?
+            delta_layers << { index: index, remove: true }
+            next
+          end
+
+          if previous_layer.nil?
+            delta_layers << { index: index, layer: deep_dup(current_layer) }
+            next
+          end
+
+          next if current_layer[:name].to_s == previous_layer[:name].to_s && previous_layer == current_layer
+
+          if previous_layer[:name].to_s == current_layer[:name].to_s &&
+              !layer_diff_needed?(previous_layer, current_layer)
+            param_changes = param_delta(previous_layer[:params], current_layer[:params])
+            delta_layers << { index: index, params: param_changes } if param_changes.any?
+            next
+          end
+
+          delta_layers << { index: index, layer: deep_dup(current_layer) }
+        end
+
+        return nil if delta_layers.empty?
+
+        {
+          name: scene_name,
+          version: scene_version,
+          schema_version: current[:schema_version],
+          patch: true,
+          layers: delta_layers
+        }
+      end
+
+      def layer_diff_needed?(previous_layer, current_layer)
+        comparable_fields = %i[type shader glsl glsl_source param_schema]
+        comparable_fields.any? do |field|
+          previous_layer[field].to_s != current_layer[field].to_s
+        end
+      end
+
+      def sync_last_scene_state_with_connections
+        current_client_count = connection_count_for_broadcast
+        if current_client_count > @connected_client_count
+          @last_sent_scene_version = nil
+          @last_sent_scene_payload = nil
+        end
+        @connected_client_count = current_client_count
+      end
+
+      def connection_count_for_broadcast
+        Integer(Vizcore::Server::WebSocketHandler.connection_count)
+      rescue StandardError
+        0
+      end
+
+      def param_delta(previous_params, current_params)
+        previous_hash = Hash(previous_params || {})
+        current_hash = Hash(current_params || {})
+        keys = (previous_hash.keys | current_hash.keys)
+        delta = {}
+
+        keys.each do |key|
+          previous_value = previous_hash[key]
+          current_value = current_hash[key]
+          next if current_value == previous_value
+
+          delta[key] = deep_dup(current_value)
+        end
+
+        delta
+      end
+
+      def deep_layers_equal?(left, right)
+        deep_dup(left) == deep_dup(right)
       end
 
       def evaluate_transition(audio, frame_count:, elapsed_seconds:)

@@ -61,6 +61,7 @@ import {
   saveVisualSettingsPreset,
   visualSettingFromUnit
 } from "./visual-settings-preset.js";
+import { applyScenePayload, resolveScenePayload } from "./scene-patches.js";
 import { WebSocketClient } from "./websocket-client.js";
 
 window.__vizcoreMainStarted = true;
@@ -138,6 +139,7 @@ let runtimeGlobalsReceived = false;
 let runtimeControlPresetApplied = false;
 let controlPresetSaveUrl = null;
 let shaderParamOverrides = {};
+let scenePayload = null;
 let shaderParamControlsSignature = "";
 let shapeEditorOverrides = {};
 let shapeEditorControlsSignature = "";
@@ -187,10 +189,24 @@ startPerformanceMonitorLoop();
 const websocketUrl = buildWebSocketUrl();
 const client = new WebSocketClient(websocketUrl, {
   onFrame: (frame) => {
+    const resolvedScene = resolveScenePayload({
+      incomingScene: frame?.scene,
+      currentScene: scenePayload,
+      frameVersion: frame?.scene_version,
+    });
+    if (resolvedScene) {
+      scenePayload = resolvedScene;
+    }
+    const normalizedFrame = {
+      ...frame,
+      scene: scenePayload
+    };
+
     updatePerformanceMonitor(recordSocketFrame(performanceMonitor, frame, Date.now()));
-    engine.setAudioFrame(frame);
+    engine.setAudioFrame(normalizedFrame);
     frameCount += 1;
-    let sceneName = String(frame?.scene?.name || currentSceneName);
+    const scene = scenePayload;
+    let sceneName = String(scene?.name || currentSceneName);
     document.body.dataset.vizcoreFrameCount = String(frameCount);
     document.body.dataset.vizcoreScene = sceneName;
     const now = performance.now();
@@ -205,18 +221,7 @@ const client = new WebSocketClient(websocketUrl, {
       pendingSceneName = null;
       pendingSceneRequestedAt = 0;
     }
-    const sceneChanged = sceneName !== currentSceneName;
-    currentSceneName = sceneName;
-    if (sceneChanged) {
-      shaderParamControlsSignature = "";
-      shapeEditorControlsSignature = "";
-      customShapeParamControlsSignature = "";
-      mappingTargetSelectorSignature = "";
-    }
-    updateShaderParamControls(frame?.scene?.layers);
-    updateShapeEditorControls(frame?.scene?.layers);
-    updateCustomShapeParamControls(frame?.scene?.layers);
-    updateMappingTargetSelector(frame?.scene?.layers);
+    updateSceneControls(scene);
     const amplitude = Number(frame?.audio?.amplitude || 0).toFixed(4);
     const bpm = Number(frame?.audio?.bpm || 0);
     const beat = !!frame?.audio?.beat;
@@ -226,9 +231,6 @@ const client = new WebSocketClient(websocketUrl, {
     }
     const beatVisible = performance.now() < beatFlashUntil;
     sceneStatusElement.textContent = `Scene: ${sceneName}`;
-    if (sceneChanged) {
-      renderSceneButtons();
-    }
     frameStatusElement.textContent = `Amplitude: ${amplitude} | Frames: ${frameCount}`;
     bpmStatusElement.textContent = `BPM: ${bpm > 0 ? bpm.toFixed(1) : "--"}`;
     beatStatusElement.textContent = `Beat: ${beatVisible ? "ON" : "off"} | Count: ${beatCount}`;
@@ -249,17 +251,8 @@ const client = new WebSocketClient(websocketUrl, {
     updateAvailableScenes(payload?.scenes);
     const sceneName = payload?.scene?.name;
     if (sceneName) {
-      currentSceneName = String(sceneName);
-      sceneStatusElement.textContent = `Scene: ${currentSceneName}`;
-      renderSceneButtons();
-      shaderParamControlsSignature = "";
-      shapeEditorControlsSignature = "";
-      customShapeParamControlsSignature = "";
-      mappingTargetSelectorSignature = "";
-      updateShaderParamControls(payload?.scene?.layers);
-      updateShapeEditorControls(payload?.scene?.layers);
-      updateCustomShapeParamControls(payload?.scene?.layers);
-      updateMappingTargetSelector(payload?.scene?.layers);
+      scenePayload = applyScenePayload(payload.scene);
+      updateSceneControls(scenePayload, { forceReset: true });
     }
     if (Object.prototype.hasOwnProperty.call(payload || {}, "tap_tempo_key")) {
       updateTapTempoKey(payload?.tap_tempo_key);
@@ -409,6 +402,35 @@ function updateTapTempoKey(key) {
 function updateKeyboardMappings(mappings) {
   keyboardMappings = normalizeKeyboardMappings(mappings);
   renderSceneButtons();
+}
+
+function updateSceneControls(scene, { forceReset = false } = {}) {
+  const sceneLayers = scene?.layers;
+  const hasLayers = Array.isArray(sceneLayers);
+  const nextSceneName = String(scene?.name || currentSceneName);
+
+  if (currentSceneName !== nextSceneName) {
+    currentSceneName = nextSceneName;
+    sceneStatusElement.textContent = `Scene: ${currentSceneName}`;
+    renderSceneButtons();
+    forceReset = true;
+  }
+
+  if (!scene) {
+    return;
+  }
+
+  if (forceReset) {
+    shaderParamControlsSignature = "";
+    shapeEditorControlsSignature = "";
+    customShapeParamControlsSignature = "";
+    mappingTargetSelectorSignature = "";
+  }
+
+  updateShaderParamControls(hasLayers ? sceneLayers : null);
+  updateShapeEditorControls(hasLayers ? sceneLayers : null);
+  updateCustomShapeParamControls(hasLayers ? sceneLayers : null);
+  updateMappingTargetSelector(hasLayers ? sceneLayers : null);
 }
 
 function normalizeSceneNames(sceneValues) {

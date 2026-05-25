@@ -38,6 +38,7 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
       expect(frame[:audio]).to include(:amplitude, :bands, :fft, :onset, :onsets, :drums, :beat, :beat_count, :bpm)
       expect(frame[:scene]).to include(:schema_version, :name, :layers)
       expect(frame[:scene][:schema_version]).to eq("vizcore.scene.v1")
+      expect(frame[:scene_version]).to eq(frame.dig(:scene, :version))
       expect(frame[:metrics]).to include(
         :frame_id,
         :audio_capture_ms,
@@ -47,6 +48,119 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
       )
       expect(frame[:scene][:name]).to eq("basic")
       expect(frame[:audio][:fft].length).to eq(32)
+    end
+
+    it "omits full scene when nothing changes in an unchanged scene frame" do
+      input_manager = instance_double(
+        Vizcore::Audio::InputManager,
+        frame_size: 1024,
+        sample_rate: 44_100,
+        capture_frame: Array.new(1024, 0.0),
+        latest_samples: Array.new(1024, 0.0),
+        realtime_capture_size: 735,
+        start: nil,
+        stop: nil
+      )
+      pipeline = instance_double(
+        Vizcore::Analysis::Pipeline,
+        call: {
+          amplitude: 0.2,
+          bands: { sub: 0.0, low: 0.2, mid: 0.3, high: 0.4 },
+          fft: Array.new(32, 0.12),
+          beat: false,
+          beat_count: 7,
+          bpm: 120.0
+        }
+      )
+
+      broadcaster = described_class.new(
+        scene_name: :wire,
+        scene_layers: [
+          {
+            name: :wire,
+            type: :shader,
+            params: { opacity: 0.3 },
+            mappings: [{ source: { kind: :amplitude }, target: :opacity }]
+          }
+        ],
+        input_manager: input_manager,
+        analysis_pipeline: pipeline
+      )
+
+      first = broadcaster.build_frame(0.1, Array.new(1024, 0.0))
+      second = broadcaster.build_frame(0.2, Array.new(1024, 0.0))
+
+      expect(first).to have_key(:scene)
+      expect(second).not_to have_key(:scene)
+      expect(second[:scene_version]).to eq(first[:scene_version])
+    end
+
+    it "sends scene patch when only layer params change" do
+      input_manager = instance_double(
+        Vizcore::Audio::InputManager,
+        frame_size: 1024,
+        sample_rate: 44_100,
+        capture_frame: Array.new(1024, 0.0),
+        latest_samples: Array.new(1024, 0.0),
+        realtime_capture_size: 735,
+        start: nil,
+        stop: nil
+      )
+      pipeline = instance_double(
+        Vizcore::Analysis::Pipeline,
+        call: {
+          amplitude: 0.2,
+          bands: { sub: 0.0, low: 0.2, mid: 0.3, high: 0.4 },
+          fft: Array.new(32, 0.12),
+          beat: false,
+          beat_count: 7,
+          bpm: 120.0
+        }
+      )
+
+      broadcaster = described_class.new(
+        scene_name: :wire,
+        scene_layers: [
+          {
+            name: :wire,
+            type: :shader,
+            params: { opacity: 0.3 },
+            mappings: [{ source: { kind: :amplitude }, target: :opacity }]
+          }
+        ],
+        input_manager: input_manager,
+        analysis_pipeline: pipeline
+      )
+      allow(pipeline).to receive(:call).and_return(
+        {
+          amplitude: 0.2,
+          bands: { sub: 0.0, low: 0.2, mid: 0.3, high: 0.4 },
+          fft: Array.new(32, 0.12),
+          beat: false,
+          beat_count: 7,
+          bpm: 120.0
+        },
+        {
+          amplitude: 0.6,
+          bands: { sub: 0.0, low: 0.2, mid: 0.3, high: 0.4 },
+          fft: Array.new(32, 0.12),
+          beat: false,
+          beat_count: 7,
+          bpm: 120.0
+        }
+      )
+
+      first_frame = broadcaster.build_frame(0.1, Array.new(1024, 0.0))
+      second_frame = broadcaster.build_frame(0.2, Array.new(1024, 0.0))
+
+      expect(first_frame).to have_key(:scene)
+      expect(second_frame[:scene]).to include(
+        patch: true,
+        name: "wire",
+        version: 1,
+        layers: [{ index: 0, params: { opacity: 0.6 } }]
+      );
+      expect(second_frame[:scene_version]).to eq(1)
     end
 
     it "exposes runtime status after frame builds" do
