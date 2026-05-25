@@ -310,6 +310,8 @@ RSpec.describe Vizcore::Server::Runner do
       allow(Vizcore::Server::FrameBroadcaster).to receive(:new).and_return(broadcaster)
       allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
       allow(Vizcore::Server::SceneDependencyWatcher).to receive(:new) do |scene_file:, definition:, &block|
+        expect(scene_file).to eq(config.scene_file.to_s)
+        expect(definition).to include(:scenes)
         callback = block
         watcher
       end
