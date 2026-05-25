@@ -88,6 +88,10 @@ RSpec.describe Vizcore::Renderer::RenderSequence do
         fps: 24,
         width: 160,
         height: 90,
+        video_codec: "libx264",
+        video_bitrate: "4M",
+        video_crf: "18",
+        pixel_format: "yuv444p",
         command_runner: command_runner,
         ffmpeg_checker: -> { true }
       ).write(out: out)
@@ -95,6 +99,8 @@ RSpec.describe Vizcore::Renderer::RenderSequence do
       expect(result).to include(path: Pathname.new(out).expand_path, format: :mp4, frames: 2, fps: 24.0, width: 160, height: 90, scene: "basic")
       expect(File.binread(out)).to eq("fake-mp4")
       expect(command_runner.command).to include("ffmpeg", "-framerate", "24")
+      expect(command_runner.command).to include("-c:v", "libx264", "-b:v", "4M", "-crf", "18")
+      expect(command_runner.command).to include("-pix_fmt", "yuv444p")
     end
   end
 

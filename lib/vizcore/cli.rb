@@ -494,6 +494,10 @@ module Vizcore
     option :to_frame, type: :numeric, desc: "Last 1-based frame to write"
     option :resume, type: :boolean, default: false, desc: "Skip PNG frames that already exist"
     option :seed, type: :numeric, desc: "Deterministic random seed for render"
+    option :codec, type: :string, desc: "ffmpeg video codec for MP4 output"
+    option :bitrate, type: :string, desc: "ffmpeg video bitrate for MP4 output"
+    option :crf, type: :string, desc: "ffmpeg CRF value for MP4 output"
+    option :pix_fmt, type: :string, default: "yuv420p", desc: "ffmpeg pixel format for MP4 output"
     option :fps, type: :numeric, default: Vizcore::Renderer::RenderSequence::DEFAULT_FRAME_RATE, desc: "Render frame rate"
     option :width, type: :numeric, default: Vizcore::Renderer::SnapshotRenderer::DEFAULT_WIDTH, desc: "Frame width"
     option :height, type: :numeric, default: Vizcore::Renderer::SnapshotRenderer::DEFAULT_HEIGHT, desc: "Frame height"
@@ -524,7 +528,11 @@ module Vizcore
         from_frame: options.fetch(:from_frame),
         to_frame: options[:to_frame],
         resume: options.fetch(:resume),
-        seed: options[:seed]
+        seed: options[:seed],
+        video_codec: options[:codec],
+        video_bitrate: options[:bitrate],
+        video_crf: options[:crf],
+        pixel_format: options[:pix_fmt]
       ).write(out: options.fetch(:out))
       return say(render_video_message(result)) if result[:format] == :mp4
 

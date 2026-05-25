@@ -25,6 +25,10 @@ module Vizcore
         to_frame: nil,
         resume: false,
         seed: nil,
+        video_codec: nil,
+        video_bitrate: nil,
+        video_crf: nil,
+        pixel_format: "yuv420p",
         command_runner: Open3,
         ffmpeg_checker: nil
       )
@@ -41,6 +45,10 @@ module Vizcore
         @output_frames = @to_frame - @from_frame + 1
         @resume = !!resume
         @seed = normalize_seed(seed)
+        @video_codec = optional_string(video_codec, "video codec")
+        @video_bitrate = optional_string(video_bitrate, "video bitrate")
+        @video_crf = optional_string(video_crf, "video crf")
+        @pixel_format = optional_string(pixel_format, "pixel format") || "yuv420p"
         @width = width
         @height = height
         @command_runner = command_runner
@@ -131,7 +139,7 @@ module Vizcore
       end
 
       def ffmpeg_command(frame_dir:, output_file:)
-        [
+        command = [
           "ffmpeg",
           "-y",
           "-framerate",
@@ -139,11 +147,15 @@ module Vizcore
           "-i",
           frame_dir.join("frame_%05d.png").to_s,
           "-vf",
-          "format=yuv420p",
+          "format=#{@pixel_format}",
           "-pix_fmt",
-          "yuv420p",
-          output_file.to_s
+          @pixel_format
         ]
+        command.concat(["-c:v", @video_codec]) if @video_codec
+        command.concat(["-b:v", @video_bitrate]) if @video_bitrate
+        command.concat(["-crf", @video_crf]) if @video_crf
+        command << output_file.to_s
+        command
       end
 
       def ffmpeg_available?
@@ -195,6 +207,15 @@ module Vizcore
         Integer(value)
       rescue ArgumentError, TypeError
         raise ArgumentError, "seed must be an integer"
+      end
+
+      def optional_string(value, name)
+        return nil if value.nil?
+
+        normalized = value.to_s.strip
+        raise ArgumentError, "#{name} must not be empty" if normalized.empty?
+
+        normalized
       end
     end
   end

@@ -444,7 +444,15 @@ RSpec.describe Vizcore::CLI do
           "4",
           "--resume",
           "--seed",
-          "42"
+          "42",
+          "--codec",
+          "libx264",
+          "--bitrate",
+          "4M",
+          "--crf",
+          "18",
+          "--pix-fmt",
+          "yuv444p"
         ]
       )
 
@@ -455,7 +463,11 @@ RSpec.describe Vizcore::CLI do
           from_frame: 2,
           to_frame: 4,
           resume: true,
-          seed: 42
+          seed: 42,
+          video_codec: "libx264",
+          video_bitrate: "4M",
+          video_crf: "18",
+          pixel_format: "yuv444p"
         )
       )
     end
