@@ -5,6 +5,8 @@ require_relative "vizcore/errors"
 require_relative "vizcore/layer_catalog"
 require_relative "vizcore/shape"
 require_relative "vizcore/dsl"
+require_relative "vizcore/analysis"
+require_relative "vizcore/audio"
 require "pathname"
 
 # Main namespace for the Vizcore runtime and DSL entrypoints.
@@ -27,6 +29,19 @@ module Vizcore
   # @return [Pathname] absolute path to scaffold template files.
   def self.templates_root
     root.join("lib", "vizcore", "templates")
+  end
+
+  # @param command_available [#call, nil] optional command lookup for tests
+  # @return [Hash<Symbol, Boolean>] optional runtime feature availability
+  def self.features(command_available: nil)
+    command_available ||= method(:command_available?)
+    {
+      mic: feature_available? { Audio::PortAudioFFI.available? },
+      midi: feature_available? { Audio::MidiInput.available? },
+      ffmpeg: command_available.call("ffmpeg"),
+      browser_capture: root.join("scripts", "browser_capture.mjs").file? && command_available.call("node"),
+      fftw: feature_available? { Analysis::FFTProcessor.fftw_available? }
+    }
   end
 
   # Evaluate a Vizcore DSL definition block.
@@ -62,4 +77,19 @@ module Vizcore
       description: description
     )
   end
+
+  def self.feature_available?
+    !!yield
+  rescue StandardError
+    false
+  end
+  private_class_method :feature_available?
+
+  def self.command_available?(command)
+    ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).any? do |directory|
+      path = File.join(directory, command)
+      File.file?(path) && File.executable?(path)
+    end
+  end
+  private_class_method :command_available?
 end

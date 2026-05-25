@@ -18,6 +18,22 @@ RSpec.describe Vizcore do
     expect(Vizcore.root.join("lib", "vizcore.rb")).to exist
   end
 
+  it "reports optional runtime feature flags" do
+    allow(Vizcore::Audio::PortAudioFFI).to receive(:available?).and_return(true)
+    allow(Vizcore::Audio::MidiInput).to receive(:available?).and_return(false)
+    allow(Vizcore::Analysis::FFTProcessor).to receive(:fftw_available?).and_return(true)
+
+    features = Vizcore.features(command_available: ->(command) { command == "ffmpeg" })
+
+    expect(features).to include(
+      mic: true,
+      midi: false,
+      ffmpeg: true,
+      browser_capture: false,
+      fftw: true
+    )
+  end
+
   it "loads plugins that register layer capabilities" do
     Dir.mktmpdir("vizcore-plugin") do |dir|
       plugin_path = Pathname.new(dir).join("vizcore_test_plugin.rb")

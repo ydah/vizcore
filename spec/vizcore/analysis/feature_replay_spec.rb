@@ -54,6 +54,22 @@ RSpec.describe Vizcore::Analysis::FeatureReplay do
       expect(replay.call).to include(amplitude: 0.25, bands: include(sub: 0.4), beat: false)
       expect(replay.metadata).to include(frames: 2, fps: 30.0)
       expect(replay.frame_count).to eq(2)
+      expect(replay.cursor).to eq(1)
+    end
+  end
+
+  it "seeks by frame index and timestamp without mutating random frame reads" do
+    Dir.mktmpdir("vizcore-feature-replay") do |dir|
+      replay = described_class.new(path: write_feature_file(dir, payload))
+
+      expect(replay.seek(1).call).to include(amplitude: 0.75)
+      expect(replay.seek(4).call).to include(amplitude: 0.25)
+
+      replay.seek_seconds(1.0 / 30.0)
+      expect(replay.call).to include(amplitude: 0.75)
+
+      expect(replay.frame(0)).to include(amplitude: 0.25)
+      expect(replay.cursor).to eq(0)
     end
   end
 

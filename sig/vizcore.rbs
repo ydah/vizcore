@@ -4,6 +4,7 @@ module Vizcore
   def self.root: () -> Pathname
   def self.frontend_root: () -> Pathname
   def self.templates_root: () -> Pathname
+  def self.features: (?command_available: untyped? command_available) -> Hash[Symbol, bool]
   def self.define: () { () -> void } -> Hash[Symbol, untyped]
   def self.plugin: (String | Symbol name) -> bool
   def self.register_shape: (Symbol | String name, untyped renderer) -> Vizcore::Shape::Definition
@@ -208,10 +209,14 @@ module Vizcore::Analysis
 
   class FeatureReplay
     attr_reader metadata: Hash[Symbol, untyped]
+    attr_reader cursor: Integer
 
     def initialize: (path: String | Pathname path) -> void
     def call: (?Array[Float]? samples) -> Hash[Symbol, untyped]
     def frame_count: () -> Integer
+    def seek: (Integer index) -> FeatureReplay
+    def seek_seconds: (Numeric seconds) -> FeatureReplay
+    def frame: (Integer index) -> Hash[Symbol, untyped]
   end
 end
 

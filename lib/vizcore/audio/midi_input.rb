@@ -29,6 +29,11 @@ module Vizcore
           []
         end
 
+        # @return [Boolean] true when the optional UniMIDI backend can be loaded
+        def available?
+          !load_backend.nil?
+        end
+
         private
 
         def load_backend

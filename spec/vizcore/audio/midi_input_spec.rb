@@ -55,6 +55,12 @@ RSpec.describe Vizcore::Audio::MidiInput do
     expect(devices).to eq([{ id: 11, name: "Launchpad" }])
   end
 
+  it "reports whether the optional midi backend can be loaded" do
+    allow(described_class).to receive(:load_backend).and_return(build_backend([]))
+
+    expect(described_class).to be_available
+  end
+
   it "captures midi events and emits callback" do
     input = FakeMidiInput.new([[0x90, 60, 100], [0xB0, 1, 64]])
     device = FakeMidiDevice.new(name: "Controller", device_id: 3, input: input)

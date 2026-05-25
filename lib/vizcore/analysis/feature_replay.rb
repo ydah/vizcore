@@ -8,7 +8,7 @@ module Vizcore
   module Analysis
     # Replays recorded analysis features as a pipeline-compatible source.
     class FeatureReplay
-      attr_reader :metadata
+      attr_reader :metadata, :cursor
 
       def initialize(path:)
         @path = Pathname.new(path.to_s).expand_path
@@ -30,7 +30,47 @@ module Vizcore
         @features.length
       end
 
+      # Move the replay cursor to a frame index.
+      #
+      # @param index [Integer]
+      # @return [Vizcore::Analysis::FeatureReplay]
+      def seek(index)
+        @cursor = normalize_index(index)
+        self
+      end
+
+      # Move the replay cursor to the frame nearest to the given timestamp.
+      #
+      # @param seconds [Numeric]
+      # @return [Vizcore::Analysis::FeatureReplay]
+      def seek_seconds(seconds)
+        fps = metadata_fps
+        raise ArgumentError, "feature metadata fps must be positive to seek by seconds" unless fps.positive?
+
+        seek((numeric_seconds(seconds) * fps).floor)
+      end
+
+      # Read a specific feature frame without changing the replay cursor.
+      #
+      # @param index [Integer]
+      # @return [Hash<Symbol, Object>]
+      def frame(index)
+        deep_dup(@features.fetch(normalize_index(index)))
+      end
+
       private
+
+      def metadata_fps
+        Float(metadata[:fps] || metadata["fps"] || 0.0)
+      rescue ArgumentError, TypeError
+        0.0
+      end
+
+      def numeric_seconds(value)
+        Float(value)
+      rescue ArgumentError, TypeError
+        raise ArgumentError, "seconds must be numeric"
+      end
 
       def load_payload
         raise ArgumentError, "Feature file not found: #{@path}" unless @path.file?
@@ -54,6 +94,12 @@ module Vizcore
         raise ArgumentError, "Feature file contains no frames" if features.empty?
 
         features
+      end
+
+      def normalize_index(value)
+        Integer(value) % @features.length
+      rescue ArgumentError, TypeError
+        raise ArgumentError, "feature frame index must be an integer"
       end
 
       def deep_symbolize(value)
