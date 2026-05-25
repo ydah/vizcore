@@ -841,7 +841,9 @@ module Vizcore
       end
 
       # @return [Hash] source descriptor for completed 4-beat bars
-      def bar_count
+      def bar_count(value = NO_ARGUMENT)
+        return @params[:bar_count] = Integer(value) unless value.equal?(NO_ARGUMENT)
+
         mapping_source(:bar_count)
       end
 

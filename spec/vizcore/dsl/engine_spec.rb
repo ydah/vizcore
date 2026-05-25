@@ -506,6 +506,7 @@ RSpec.describe Vizcore::DSL::Engine do
             scroll :vertical
             bins 96
             history 128
+            bar_count 28
             map amplitude, to: :gain, range: 0.8..3.0
           end
         end
@@ -513,7 +514,7 @@ RSpec.describe Vizcore::DSL::Engine do
 
       layer = definition[:scenes].first[:layers].first
       expect(layer[:type]).to eq(:spectrogram)
-      expect(layer[:params]).to include(scroll: :vertical, bins: 96, history: 128)
+      expect(layer[:params]).to include(scroll: :vertical, bins: 96, history: 128, bar_count: 28)
       expect(layer[:mappings]).to include(
         source: { kind: :amplitude },
         target: :gain,
