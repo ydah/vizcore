@@ -937,6 +937,58 @@ RSpec.describe Vizcore::DSL::Engine do
       expect(drop_layers.last).to include(type: :particle_field)
     end
 
+    it "supports scene defaults and inherited layer edits" do
+      definition = described_class.define do
+        scene :base do
+          scene_defaults opacity: 0.5
+
+          layer :background do
+            shader :neon_grid
+          end
+
+          layer :old_particles do
+            type :particle_field
+          end
+
+          layer :scratch do
+            type :geometry
+          end
+        end
+
+        scene :drop, extends: :base do
+          remove_layer :scratch
+
+          override_layer :background do
+            blend :add
+          end
+
+          replace_layer :old_particles do
+            type :shape
+            circle :pulse, radius: 80
+          end
+
+          scene_defaults do
+            palette "#ff0000", "#00ffff"
+          end
+
+          layer :title do
+            type :text
+            content "DROP"
+          end
+        end
+      end
+
+      drop_layers = definition[:scenes].last[:layers]
+
+      expect(drop_layers.map { |layer| layer[:name] }).to eq(%i[background old_particles title])
+      expect(drop_layers.first).to include(type: :shader, shader: :neon_grid)
+      expect(drop_layers.first.dig(:params, :opacity)).to eq(0.5)
+      expect(drop_layers.first.dig(:params, :blend)).to eq(:add)
+      expect(drop_layers.first.dig(:params, :palette)).to eq(%w[#ff0000 #00ffff])
+      expect(drop_layers[1]).to include(type: :shape)
+      expect(drop_layers.last.dig(:params, :palette)).to eq(%w[#ff0000 #00ffff])
+    end
+
     it "builds mapping transforms from block syntax" do
       definition = described_class.define do
         scene :reactive do

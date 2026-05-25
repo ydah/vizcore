@@ -2,6 +2,7 @@
 
 require_relative "layer_builder"
 require_relative "layer_group_builder"
+require_relative "style_builder"
 
 module Vizcore
   module DSL
@@ -40,6 +41,65 @@ module Vizcore
         builder = LayerBuilder.new(name: name, styles: @styles, defaults: @theme_params, strict: @strict)
         builder.evaluate(&block)
         @layers << builder.to_h
+      end
+
+      # Set defaults applied to every layer in this scene.
+      #
+      # @param params [Hash] layer params
+      # @yield optional defaults block using style-like setters
+      # @return [Hash]
+      def scene_defaults(**params, &block)
+        defaults = params.each_with_object({}) { |(key, value), output| output[key.to_sym] = value }
+        if block
+          block_defaults = StyleBuilder.new(name: :scene_defaults, kind: "scene_defaults").evaluate(&block).to_h[:params]
+          defaults.merge!(block_defaults)
+        end
+        raise ArgumentError, "scene_defaults requires at least one parameter" if defaults.empty?
+
+        @theme_params = deep_dup(@theme_params).merge(defaults)
+        @layers = @layers.map { |layer| apply_theme_defaults(layer, defaults) }
+        deep_dup(@theme_params)
+      end
+
+      # Remove an inherited or previously declared layer by name.
+      #
+      # @param name [Symbol, String]
+      # @return [Hash] removed layer definition
+      def remove_layer(name)
+        index = layer_index!(name)
+        @layers.delete_at(index)
+      end
+
+      # Replace an inherited or previously declared layer while preserving order.
+      #
+      # @param name [Symbol, String]
+      # @yield Layer definition block
+      # @return [Hash] replacement layer definition
+      def replace_layer(name, &block)
+        index = layer_index!(name)
+        builder = LayerBuilder.new(name: name, styles: @styles, defaults: @theme_params, strict: @strict)
+        builder.evaluate(&block)
+        @layers[index] = builder.to_h
+      end
+
+      # Override params on an existing layer without changing its type/shader.
+      #
+      # @param name [Symbol, String]
+      # @param params [Hash]
+      # @yield optional style-like param block
+      # @return [Hash] updated layer definition
+      def override_layer(name, **params, &block)
+        index = layer_index!(name)
+        overrides = params.each_with_object({}) { |(key, value), output| output[key.to_sym] = value }
+        if block
+          block_overrides = StyleBuilder.new(name: name, kind: "override_layer").evaluate(&block).to_h[:params]
+          overrides.merge!(block_overrides)
+        end
+        raise ArgumentError, "override_layer #{name} requires at least one parameter" if overrides.empty?
+
+        layer = deep_dup(@layers[index])
+        layer[:params] = Hash(layer[:params] || {}).merge(overrides)
+        @layers[index] = layer
       end
 
       # Define a related group of layers with shared params.
@@ -83,6 +143,14 @@ module Vizcore
         themed_layer = deep_dup(layer)
         themed_layer[:params] = deep_dup(theme_params).merge(Hash(themed_layer[:params] || {}))
         themed_layer
+      end
+
+      def layer_index!(name)
+        normalized = name.to_sym
+        index = @layers.index { |layer| layer[:name]&.to_sym == normalized }
+        raise ArgumentError, "unknown layer: #{normalized}" unless index
+
+        index
       end
 
       def deep_dup(value)
