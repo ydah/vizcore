@@ -133,6 +133,14 @@ RSpec.describe Vizcore::DSL::Engine do
           layer :meters do
             type :geometry
             map peak => :peak_level
+            map beat_phase => :phase
+            map beat_2 => :half_step
+            map beat_4 => :quarter_step
+            map beat_8 => :eighth_step
+            map triplet => :triplet_step
+            map bar_phase => :bar_loop
+            map bar_count => :bars
+            map phrase_count => :phrases
             map bpm_confidence => :tempo_lock
             map spectral_centroid => :brightness
             map spectral_rolloff => :rolloff
@@ -147,6 +155,14 @@ RSpec.describe Vizcore::DSL::Engine do
 
       expect(mappings).to include(
         { source: { kind: :peak }, target: :peak_level },
+        { source: { kind: :beat_phase }, target: :phase },
+        { source: { kind: :beat_2 }, target: :half_step },
+        { source: { kind: :beat_4 }, target: :quarter_step },
+        { source: { kind: :beat_8 }, target: :eighth_step },
+        { source: { kind: :beat_triplet }, target: :triplet_step },
+        { source: { kind: :bar_phase }, target: :bar_loop },
+        { source: { kind: :bar_count }, target: :bars },
+        { source: { kind: :phrase_count }, target: :phrases },
         { source: { kind: :bpm_confidence }, target: :tempo_lock },
         { source: { kind: :spectral_centroid }, target: :brightness },
         { source: { kind: :spectral_rolloff }, target: :rolloff },

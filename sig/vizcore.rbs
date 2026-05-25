@@ -92,6 +92,10 @@ module Vizcore::Shape
     def fft: () -> Array[untyped]
     def beat?: () -> bool
     def beat_pulse: () -> Float
+    def beat_phase: () -> Float
+    def bar_phase: () -> Float
+    def bar_count: () -> Integer
+    def phrase_count: () -> Integer
     def kick: () -> Float
     def snare: () -> Float
     def hihat: () -> Float
@@ -423,6 +427,15 @@ module Vizcore::DSL
     def beat_confidence: () -> source
     def beat_pulse: () -> source
     def beat_count: () -> source
+    def beat_phase: () -> source
+    def beat_2: () -> source
+    def beat_4: () -> source
+    def beat_8: () -> source
+    def beat_triplet: () -> source
+    def triplet: () -> source
+    def bar_phase: () -> source
+    def bar_count: () -> source
+    def phrase_count: () -> source
     def bpm: () -> source
     def to_h: () -> layer
   end

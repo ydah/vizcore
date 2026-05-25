@@ -393,6 +393,14 @@ export class LayerManager {
     this.setUniform1f(program, "u_high", bands.high || 0);
     this.setUniform1f(program, "u_beat", audio?.beat ? 1 : 0);
     this.setUniform1f(program, "u_beat_pulse", audio?.beat_pulse || (audio?.beat ? 1 : 0));
+    this.setUniform1f(program, "u_beat_phase", audio?.beat_phase || 0);
+    this.setUniform1f(program, "u_bar_phase", audio?.bar_phase || 0);
+    this.setUniform1f(program, "u_bar_count", audio?.bar_count || 0);
+    this.setUniform1f(program, "u_phrase_count", audio?.phrase_count || 0);
+    this.setUniform1f(program, "u_beat_2", audio?.beat_2 ? 1 : 0);
+    this.setUniform1f(program, "u_beat_4", audio?.beat_4 ? 1 : 0);
+    this.setUniform1f(program, "u_beat_8", audio?.beat_8 ? 1 : 0);
+    this.setUniform1f(program, "u_beat_triplet", audio?.beat_triplet ? 1 : 0);
     this.setUniform1f(program, "u_onset", audio?.onset || 0);
     this.setUniform1f(program, "u_sub_onset", onsets.sub || 0);
     this.setUniform1f(program, "u_low_onset", onsets.low || 0);

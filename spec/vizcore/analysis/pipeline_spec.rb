@@ -26,6 +26,14 @@ RSpec.describe Vizcore::Analysis::Pipeline do
       :beat_confidence,
       :beat_pulse,
       :beat_count,
+      :beat_phase,
+      :beat_2,
+      :beat_4,
+      :beat_8,
+      :beat_triplet,
+      :bar_phase,
+      :bar_count,
+      :phrase_count,
       :bpm,
       :bpm_confidence,
       :spectral_centroid,
@@ -56,6 +64,14 @@ RSpec.describe Vizcore::Analysis::Pipeline do
     expect(result[:fft]).to eq(Array.new(32, 0.0))
     expect(result[:beat_confidence]).to eq(0.0)
     expect(result[:beat_pulse]).to eq(0.0)
+    expect(result[:beat_phase]).to eq(0.0)
+    expect(result[:beat_2]).to eq(false)
+    expect(result[:beat_4]).to eq(false)
+    expect(result[:beat_8]).to eq(false)
+    expect(result[:beat_triplet]).to eq(false)
+    expect(result[:bar_phase]).to eq(0.0)
+    expect(result[:bar_count]).to eq(0)
+    expect(result[:phrase_count]).to eq(0)
     expect(result[:onset]).to eq(0.0)
     expect(result[:onsets]).to eq(sub: 0.0, low: 0.0, mid: 0.0, high: 0.0)
     expect(result[:drums]).to eq(kick: 0.0, snare: 0.0, hihat: 0.0)
@@ -263,6 +279,14 @@ RSpec.describe Vizcore::Analysis::Pipeline do
     expect(result[:beat_count]).to eq(7)
     expect(result[:beat_confidence]).to eq(1.0)
     expect(result[:beat_pulse]).to eq(1.0)
+    expect(result[:beat_phase]).to eq(0.0)
+    expect(result[:beat_2]).to eq(true)
+    expect(result[:beat_4]).to eq(true)
+    expect(result[:beat_8]).to eq(true)
+    expect(result[:beat_triplet]).to eq(true)
+    expect(result[:bar_phase]).to eq(0.5)
+    expect(result[:bar_count]).to eq(1)
+    expect(result[:phrase_count]).to eq(0)
     expect(result[:bpm]).to eq(126.5)
     expect(result[:bpm_confidence]).to eq(1.0)
   end
@@ -301,5 +325,33 @@ RSpec.describe Vizcore::Analysis::Pipeline do
 
     expect(first[:beat_pulse]).to eq(1.0)
     expect(second[:beat_pulse]).to be_between(0.0, 1.0).exclusive
+  end
+
+  it "emits BPM-derived beat and bar phases between detected beats" do
+    beat_detector = instance_double(Vizcore::Analysis::BeatDetector)
+    allow(beat_detector).to receive(:call).and_return(
+      { beat: false, beat_count: 5 },
+      { beat: false, beat_count: 5 }
+    )
+    pipeline = described_class.new(
+      sample_rate: 128,
+      fft_size: 64,
+      beat_detector: beat_detector,
+      bpm: 60,
+      bpm_lock: true,
+      noise_gate: 0.0
+    )
+    samples = Array.new(64, 0.5)
+
+    first = pipeline.call(samples)
+    second = pipeline.call(samples)
+
+    expect(first[:beat_phase]).to eq(0.5)
+    expect(first[:bar_phase]).to eq(0.125)
+    expect(first[:bar_count]).to eq(1)
+    expect(first[:phrase_count]).to eq(0)
+    expect(first[:beat_2]).to eq(true)
+    expect(second[:beat_phase]).to eq(0.0)
+    expect(second[:beat_4]).to eq(true)
   end
 end

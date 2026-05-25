@@ -13,7 +13,8 @@ module Vizcore
       SHAPE_SCHEMA_VERSION = 2
       MAPPING_SOURCE_KINDS = %i[
         amplitude peak frequency_band fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
-        bpm_confidence spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate global
+        beat_phase beat_2 beat_4 beat_8 beat_triplet triplet bar_phase bar_count phrase_count bpm_confidence
+        spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate global
       ].freeze
       PATH_DEFAULT_DETAIL = 32
       PATH_MIN_DETAIL = 4
@@ -767,6 +768,51 @@ module Vizcore
       # @return [Hash] source descriptor for beat counter
       def beat_count
         mapping_source(:beat_count)
+      end
+
+      # @return [Hash] source descriptor for 0.0..1.0 phase within the current beat
+      def beat_phase
+        mapping_source(:beat_phase)
+      end
+
+      # @return [Hash] source descriptor for half-beat subdivision pulses
+      def beat_2
+        mapping_source(:beat_2)
+      end
+
+      # @return [Hash] source descriptor for quarter-beat subdivision pulses
+      def beat_4
+        mapping_source(:beat_4)
+      end
+
+      # @return [Hash] source descriptor for eighth-beat subdivision pulses
+      def beat_8
+        mapping_source(:beat_8)
+      end
+
+      # @return [Hash] source descriptor for triplet subdivision pulses
+      def beat_triplet
+        mapping_source(:beat_triplet)
+      end
+
+      # @return [Hash] source descriptor for triplet subdivision pulses
+      def triplet
+        mapping_source(:beat_triplet)
+      end
+
+      # @return [Hash] source descriptor for 0.0..1.0 phase within the current 4-beat bar
+      def bar_phase
+        mapping_source(:bar_phase)
+      end
+
+      # @return [Hash] source descriptor for completed 4-beat bars
+      def bar_count
+        mapping_source(:bar_count)
+      end
+
+      # @return [Hash] source descriptor for completed 8-bar phrases
+      def phrase_count
+        mapping_source(:phrase_count)
       end
 
       # @return [Hash] source descriptor for estimated BPM

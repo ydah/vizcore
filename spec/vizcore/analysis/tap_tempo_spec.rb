@@ -20,6 +20,18 @@ RSpec.describe Vizcore::Analysis::TapTempo do
     expect(bpm).to be_within(0.01).of(109.09)
   end
 
+  it "uses a trimmed interval mean to ignore a single shaky tap" do
+    tap_tempo = described_class.new(history_size: 4)
+
+    tap_tempo.tap(timestamp_ms: 1_000.0)
+    tap_tempo.tap(timestamp_ms: 1_500.0)
+    tap_tempo.tap(timestamp_ms: 2_000.0)
+    tap_tempo.tap(timestamp_ms: 2_800.0)
+    bpm = tap_tempo.tap(timestamp_ms: 3_300.0)
+
+    expect(bpm).to eq(120.0)
+  end
+
   it "resets after a stale gap" do
     tap_tempo = described_class.new(reset_after_ms: 1_000.0)
 

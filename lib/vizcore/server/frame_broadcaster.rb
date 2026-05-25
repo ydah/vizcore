@@ -492,7 +492,7 @@ module Vizcore
         global_beat_count = extract_beat_count(audio_hash)
         scene_beat_count = [global_beat_count - @transition_counter_beat_base, 0].max
 
-        [scene_frame_count, audio_hash.merge(beat_count: scene_beat_count)]
+        [scene_frame_count, audio_hash.merge(scene_musical_counts(audio_hash, beat_count: scene_beat_count))]
       rescue StandardError
         [0, { beat_count: 0 }]
       end
@@ -536,6 +536,19 @@ module Vizcore
         Integer(audio[:beat_count] || audio["beat_count"] || 0)
       rescue StandardError
         0
+      end
+
+      def scene_musical_counts(audio, beat_count:)
+        beat_index = beat_count.positive? ? beat_count - 1 : 0
+        beat_phase = Float(audio[:beat_phase] || audio["beat_phase"] || 0.0).clamp(0.0, 1.0)
+        {
+          beat_count: beat_count,
+          bar_phase: (((beat_index % 4) + beat_phase) / 4.0).clamp(0.0, 1.0),
+          bar_count: beat_index / 4,
+          phrase_count: beat_index / 32
+        }
+      rescue StandardError
+        { beat_count: beat_count, bar_phase: 0.0, bar_count: 0, phrase_count: 0 }
       end
 
       def truthy_audio_beat?(audio)

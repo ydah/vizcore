@@ -66,8 +66,23 @@ module Vizcore
       def bpm_from_intervals
         return nil if @intervals.empty?
 
-        average_interval = @intervals.sum / @intervals.length.to_f
-        (60_000.0 / average_interval).clamp(@min_bpm, @max_bpm)
+        interval = robust_interval(@intervals)
+        (60_000.0 / interval).clamp(@min_bpm, @max_bpm)
+      end
+
+      def robust_interval(intervals)
+        sorted = intervals.sort
+        return median(sorted) if sorted.length < 4
+
+        trimmed = sorted[1...-1]
+        trimmed.sum / trimmed.length.to_f
+      end
+
+      def median(sorted)
+        midpoint = sorted.length / 2
+        return sorted[midpoint] if sorted.length.odd?
+
+        (sorted[midpoint - 1] + sorted[midpoint]) / 2.0
       end
     end
   end

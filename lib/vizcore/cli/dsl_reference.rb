@@ -51,7 +51,8 @@ module Vizcore
 
       SOURCES = %w[
         amplitude frequency_band(:low) sub low bass mid high treble fft_spectrum
-        onset onset(:high) kick snare hihat beat? beat beat_confidence beat_pulse beat_count bpm
+        onset onset(:high) kick snare hihat beat? beat beat_confidence beat_pulse beat_count
+        beat_phase beat_2 beat_4 beat_8 triplet bar_phase bar_count phrase_count bpm
       ].freeze
 
       TRANSFORMS = %w[

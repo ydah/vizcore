@@ -259,6 +259,22 @@ module Vizcore
           audio[:beat_pulse]
         when :beat_count
           audio[:beat_count]
+        when :beat_phase
+          audio[:beat_phase]
+        when :beat_2
+          audio[:beat_2]
+        when :beat_4
+          audio[:beat_4]
+        when :beat_8
+          audio[:beat_8]
+        when :beat_triplet, :triplet
+          audio[:beat_triplet]
+        when :bar_phase
+          audio[:bar_phase]
+        when :bar_count
+          audio[:bar_count]
+        when :phrase_count
+          audio[:phrase_count]
         when :bpm
           audio[:bpm]
         when :bpm_confidence

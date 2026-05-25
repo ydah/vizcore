@@ -14,6 +14,10 @@ export const buildAudioInspectorState = (audio, fftBins = DEFAULT_FFT_BINS) => {
     bpm: Number(audio?.bpm || 0),
     beat: !!audio?.beat,
     beatPulse: clamp01(audio?.beat_pulse),
+    beatPhase: clamp01(audio?.beat_phase),
+    barPhase: clamp01(audio?.bar_phase),
+    barCount: Math.max(0, Number(audio?.bar_count || 0) || 0),
+    phraseCount: Math.max(0, Number(audio?.phrase_count || 0) || 0),
     peakFrequency: Math.max(0, Number(audio?.peak_frequency || 0) || 0),
   };
 };

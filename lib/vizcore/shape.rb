@@ -349,6 +349,26 @@ module Vizcore
         numeric(@payload[:beat_pulse])
       end
 
+      def beat_phase
+        numeric(@payload[:beat_phase])
+      end
+
+      def bar_phase
+        numeric(@payload[:bar_phase])
+      end
+
+      def bar_count
+        Integer(@payload[:bar_count] || 0)
+      rescue ArgumentError, TypeError
+        0
+      end
+
+      def phrase_count
+        Integer(@payload[:phrase_count] || 0)
+      rescue ArgumentError, TypeError
+        0
+      end
+
       def kick
         numeric(drum(:kick))
       end

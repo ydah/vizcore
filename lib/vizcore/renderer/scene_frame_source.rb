@@ -103,7 +103,9 @@ module Vizcore
       end
 
       def transition_audio(audio)
-        Hash(audio).merge(beat_count: scene_beat_count(audio))
+        audio_hash = Hash(audio)
+        scene_count = scene_beat_count(audio_hash)
+        audio_hash.merge(scene_musical_counts(audio_hash, beat_count: scene_count))
       rescue StandardError
         { beat_count: 0 }
       end
@@ -132,6 +134,19 @@ module Vizcore
         @scene_frame_base = @frame_count
         @scene_elapsed_base = frame_time
         @scene_beat_base = 0
+      end
+
+      def scene_musical_counts(audio, beat_count:)
+        beat_index = beat_count.positive? ? beat_count - 1 : 0
+        beat_phase = Float(audio[:beat_phase] || audio["beat_phase"] || 0.0).clamp(0.0, 1.0)
+        {
+          beat_count: beat_count,
+          bar_phase: (((beat_index % 4) + beat_phase) / 4.0).clamp(0.0, 1.0),
+          bar_count: beat_index / 4,
+          phrase_count: beat_index / 32
+        }
+      rescue StandardError
+        { beat_count: beat_count, bar_phase: 0.0, bar_count: 0, phrase_count: 0 }
       end
 
       def build_input_manager

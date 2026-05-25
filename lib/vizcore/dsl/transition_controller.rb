@@ -235,6 +235,55 @@ module Vizcore
         end
 
         # @return [Float]
+        def beat_phase
+          @audio[:beat_phase].to_f
+        end
+
+        # @return [Boolean]
+        def beat_2
+          !!@audio[:beat_2]
+        end
+
+        # @return [Boolean]
+        def beat_4
+          !!@audio[:beat_4]
+        end
+
+        # @return [Boolean]
+        def beat_8
+          !!@audio[:beat_8]
+        end
+
+        # @return [Boolean]
+        def beat_triplet
+          !!@audio[:beat_triplet]
+        end
+
+        # @return [Boolean]
+        def triplet
+          beat_triplet
+        end
+
+        # @return [Float]
+        def bar_phase
+          @audio[:bar_phase].to_f
+        end
+
+        # @return [Integer]
+        def bar_count
+          Integer(@audio[:bar_count] || 0)
+        rescue StandardError
+          0
+        end
+
+        # @return [Integer]
+        def phrase_count
+          Integer(@audio[:phrase_count] || 0)
+        rescue StandardError
+          0
+        end
+
+        # @return [Float]
         def bpm
           @audio[:bpm].to_f
         end

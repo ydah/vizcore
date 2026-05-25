@@ -8,6 +8,9 @@ module Vizcore
       BEAT_PULSE_FLOOR = 0.001
       DEFAULT_NOISE_GATE = 0.01
       DEFAULT_AUDIO_NORMALIZE = { mode: :off }.freeze
+      BEATS_PER_BAR = 4
+      BEATS_PER_PHRASE = 32
+      BEAT_SUBDIVISIONS = { beat_2: 2, beat_4: 4, beat_8: 8, beat_triplet: 3 }.freeze
       SILENCE_RESET_FRAMES = 90
 
       attr_reader :fft_processor, :band_splitter, :beat_detector, :bpm_estimator, :smoother
@@ -30,10 +33,11 @@ module Vizcore
         @bpm_estimator = bpm_estimator || BPMEstimator.new(frame_rate: @analysis_frame_rate)
         @smoother = smoother || Smoother.new(alpha: 0.35)
         @noise_gate = normalize_noise_gate(noise_gate)
+        @beat_pulse = 0.0
+        @beat_phase = 0.0
+        @last_bpm = 0.0
         self.bpm_lock = { bpm: bpm, locked: bpm_lock }
         self.audio_normalize = audio_normalize
-        @beat_pulse = 0.0
-        @last_bpm = 0.0
         @silent_frame_count = 0
         @previous_onset_amplitude = 0.0
         @previous_onset_bands = {}
@@ -74,6 +78,7 @@ module Vizcore
         @beat_pulse = beat_detected ? 1.0 : @beat_pulse * BEAT_PULSE_DECAY
         @beat_pulse = 0.0 if @beat_pulse < BEAT_PULSE_FLOOR
         bpm = resolve_bpm(beat_detected)
+        tempo = tempo_features(beat_detected: beat_detected, beat_count: beat[:beat_count], bpm: bpm)
         peak = peak_level(samples)
         spectrum_preview = preview_spectrum(fft[:magnitudes])
         spectral = spectral_features(fft[:magnitudes], spectrum_preview)
@@ -97,6 +102,14 @@ module Vizcore
           beat_confidence: confidence,
           beat_pulse: @beat_pulse,
           beat_count: beat[:beat_count],
+          beat_phase: tempo[:beat_phase],
+          beat_2: tempo[:beat_2],
+          beat_4: tempo[:beat_4],
+          beat_8: tempo[:beat_8],
+          beat_triplet: tempo[:beat_triplet],
+          bar_phase: tempo[:bar_phase],
+          bar_count: tempo[:bar_count],
+          phrase_count: tempo[:phrase_count],
           bpm: bpm,
           bpm_confidence: bpm_confidence,
           spectral_centroid: spectral[:centroid],
@@ -209,6 +222,7 @@ module Vizcore
       def silent_frame(reset_tempo:)
         @beat_pulse = 0.0
         reset_tempo_state if reset_tempo
+        tempo = tempo_features(beat_detected: false, beat_count: current_beat_count, bpm: @last_bpm, advance: !reset_tempo)
         @smoother.reset if @smoother.respond_to?(:reset)
         @previous_onset_amplitude = 0.0
         @previous_onset_bands = {}
@@ -226,6 +240,14 @@ module Vizcore
           beat_confidence: 0.0,
           beat_pulse: 0.0,
           beat_count: current_beat_count,
+          beat_phase: tempo[:beat_phase],
+          beat_2: tempo[:beat_2],
+          beat_4: tempo[:beat_4],
+          beat_8: tempo[:beat_8],
+          beat_triplet: tempo[:beat_triplet],
+          bar_phase: tempo[:bar_phase],
+          bar_count: tempo[:bar_count],
+          phrase_count: tempo[:phrase_count],
           bpm: @last_bpm,
           bpm_confidence: bpm_confidence,
           spectral_centroid: 0.0,
@@ -239,6 +261,7 @@ module Vizcore
 
       def reset_tempo_state
         @last_bpm = @locked_bpm || 0.0
+        @beat_phase = 0.0
         @previous_flux_spectrum = nil
         @bpm_estimator.reset if @bpm_estimator.respond_to?(:reset)
       end
@@ -278,6 +301,49 @@ module Vizcore
 
         bpm = @bpm_estimator.call(beat: beat_detected)
         @last_bpm = @smoother.smooth(:bpm, bpm, alpha: 0.2).to_f
+      end
+
+      def tempo_features(beat_detected:, beat_count:, bpm:, advance: true)
+        previous_phase = @beat_phase
+        @beat_phase = advance ? next_beat_phase(beat_detected: beat_detected, bpm: bpm) : 0.0
+        count = non_negative_integer(beat_count)
+        beat_index = count.positive? ? count - 1 : 0
+
+        subdivision_pulses = BEAT_SUBDIVISIONS.transform_values do |divisions|
+          beat_detected || crossed_subdivision?(previous_phase, @beat_phase, divisions)
+        end
+
+        {
+          beat_phase: @beat_phase,
+          bar_phase: (((beat_index % BEATS_PER_BAR) + @beat_phase) / BEATS_PER_BAR.to_f).clamp(0.0, 1.0),
+          bar_count: beat_index / BEATS_PER_BAR,
+          phrase_count: beat_index / BEATS_PER_PHRASE
+        }.merge(subdivision_pulses)
+      end
+
+      def next_beat_phase(beat_detected:, bpm:)
+        return 0.0 if beat_detected
+
+        numeric_bpm = Float(bpm)
+        return 0.0 unless numeric_bpm.positive? && @analysis_frame_rate.positive?
+
+        (@beat_phase + (numeric_bpm / 60.0 / @analysis_frame_rate)) % 1.0
+      rescue ArgumentError, TypeError
+        0.0
+      end
+
+      def crossed_subdivision?(previous_phase, current_phase, divisions)
+        previous_step = (Float(previous_phase) * divisions).floor
+        current_step = (Float(current_phase) * divisions).floor
+        current_phase < previous_phase || current_step > previous_step
+      rescue ArgumentError, TypeError
+        false
+      end
+
+      def non_negative_integer(value)
+        [Integer(value || 0), 0].max
+      rescue ArgumentError, TypeError
+        0
       end
 
       def bpm_confidence

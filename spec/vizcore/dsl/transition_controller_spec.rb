@@ -158,6 +158,45 @@ RSpec.describe Vizcore::DSL::TransitionController do
       )
     end
 
+    it "exposes musical timing sources to transition trigger context" do
+      controller = described_class.new(
+        scenes: [
+          { name: :intro, layers: [] },
+          { name: :drop, layers: [] }
+        ],
+        transitions: [
+          {
+            from: :intro,
+            to: :drop,
+            trigger: proc {
+              beat_phase > 0.2 &&
+                beat_4 &&
+                !beat_8 &&
+                triplet &&
+                bar_phase > 0.5 &&
+                bar_count >= 2 &&
+                phrase_count >= 1
+            }
+          }
+        ]
+      )
+
+      expect(
+        controller.next_transition(
+          scene_name: :intro,
+          audio: {
+            beat_phase: 0.25,
+            beat_4: true,
+            beat_8: false,
+            beat_triplet: true,
+            bar_phase: 0.75,
+            bar_count: 2,
+            phrase_count: 1
+          }
+        )
+      ).to include(from: :intro, to: :drop)
+    end
+
     it "exposes beat_confidence to transition trigger context" do
       controller = described_class.new(
         scenes: [

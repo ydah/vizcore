@@ -13,7 +13,8 @@ module Vizcore
 
       MAPPING_SOURCE_KINDS = %i[
         amplitude peak frequency_band fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
-        bpm_confidence spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate global
+        beat_phase beat_2 beat_4 beat_8 beat_triplet triplet bar_phase bar_count phrase_count bpm_confidence
+        spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate global
       ].freeze
 
       FREQUENCY_BANDS = %i[sub low mid high].freeze

@@ -41,6 +41,14 @@ export class Engine {
         beat: false,
         beat_pulse: 0,
         beat_count: 0,
+        beat_phase: 0,
+        beat_2: false,
+        beat_4: false,
+        beat_8: false,
+        beat_triplet: false,
+        bar_phase: 0,
+        bar_count: 0,
+        phrase_count: 0,
         bpm: 0
       },
       scene: {

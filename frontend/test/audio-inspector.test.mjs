@@ -10,6 +10,10 @@ test("buildAudioInspectorState clamps audio meters and fft bins", () => {
     fft: [0, 0.4, 1.5, "bad"],
     beat: true,
     beat_pulse: 0.7,
+    beat_phase: 0.25,
+    bar_phase: 0.5,
+    bar_count: 3,
+    phrase_count: 1,
     peak_frequency: 440.4,
   }, 4);
 
@@ -18,6 +22,10 @@ test("buildAudioInspectorState clamps audio meters and fft bins", () => {
   assert.deepEqual(state.fft, [0, 0.4, 1, 0]);
   assert.equal(state.beat, true);
   assert.equal(state.beatPulse, 0.7);
+  assert.equal(state.beatPhase, 0.25);
+  assert.equal(state.barPhase, 0.5);
+  assert.equal(state.barCount, 3);
+  assert.equal(state.phraseCount, 1);
   assert.equal(state.peakFrequency, 440.4);
 });
 
