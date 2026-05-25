@@ -274,6 +274,7 @@ module Vizcore
             type: "runtime_error",
             payload: {
               source: "scene_reload",
+              event: "scene_reload_failed",
               context: "Scene reload failed",
               message: message,
               keeping_last_good_scene: true

@@ -342,6 +342,7 @@ RSpec.describe Vizcore::Server::Runner do
         type: "runtime_error",
         payload: hash_including(
           source: "scene_reload",
+          event: "scene_reload_failed",
           context: "Scene reload failed",
           keeping_last_good_scene: true
         )

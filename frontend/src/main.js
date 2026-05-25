@@ -73,6 +73,7 @@ const wsStatusElement = document.querySelector("#ws-status");
 const sceneStatusElement = document.querySelector("#scene-status");
 const transitionStatusElement = document.querySelector("#transition-status");
 const frameStatusElement = document.querySelector("#frame-status");
+const runtimeErrorStatusElement = document.querySelector("#runtime-error-status");
 const bpmStatusElement = document.querySelector("#bpm-status");
 const beatStatusElement = document.querySelector("#beat-status");
 const blackoutButton = document.querySelector("#blackout-toggle");
@@ -275,12 +276,18 @@ const client = new WebSocketClient(websocketUrl, {
   onLatencyProbe: (payload) => {
     updatePerformanceMonitor(recordLatencyProbe(performanceMonitor, payload, Date.now()));
   },
+  onRuntimeError: (payload) => {
+    updateRuntimeErrorStatus(payload);
+  },
   onStatus: (status) => {
     updatePerformanceMonitor(recordConnectionStatus(performanceMonitor, status));
     if (status === "connected") {
       lastConnectedAt = new Date();
       startLatencyProbeLoop();
       syncAudioTransportToServer({ force: true });
+      if (runtimeErrorStatusElement) {
+        runtimeErrorStatusElement.textContent = "Runtime: ok";
+      }
     } else {
       stopLatencyProbeLoop();
       pendingSceneName = null;
@@ -288,9 +295,12 @@ const client = new WebSocketClient(websocketUrl, {
       currentSceneName = "unknown";
       sceneStatusElement.textContent = "Scene: unknown";
       renderSceneButtons();
+      if (runtimeErrorStatusElement) {
+        runtimeErrorStatusElement.textContent = "Runtime: disconnected";
+      }
     }
-    const connectedAt = lastConnectedAt ? ` | Last connected: ${formatClock(lastConnectedAt)}` : "";
-    wsStatusElement.textContent = `WebSocket: ${status} (${websocketUrl})${connectedAt}`;
+  const connectedAt = lastConnectedAt ? ` | Last connected: ${formatClock(lastConnectedAt)}` : "";
+  wsStatusElement.textContent = `WebSocket: ${status} (${websocketUrl})${connectedAt}`;
   }
 });
 
@@ -1442,6 +1452,26 @@ function renderAudioInspector(audio) {
       ? `Peak: ${Math.round(state.peakFrequency)} Hz`
       : "Peak: --";
   }
+}
+
+function updateRuntimeErrorStatus(payload = {}) {
+  if (!runtimeErrorStatusElement) {
+    return;
+  }
+
+  const source = String(payload?.source || "runtime").trim();
+  const event = String(payload?.event || "").trim();
+  const context = String(payload?.context || "runtime error").trim();
+  const message = String(payload?.message || "").trim();
+  const frameId = payload?.frame_id;
+
+  const detail = [context, event].filter(Boolean).join(" / ");
+  const frameText = Number.isFinite(frameId) ? ` (frame ${frameId})` : "";
+  const text = message
+    ? `Runtime (${source}): ${detail}${frameText} | ${message}`
+    : `Runtime (${source}): ${detail}${frameText}`;
+
+  runtimeErrorStatusElement.textContent = text;
 }
 
 function setMeter(fill, valueElement, value, digits) {

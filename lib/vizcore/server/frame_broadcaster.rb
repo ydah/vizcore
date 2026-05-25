@@ -79,7 +79,12 @@ module Vizcore
           transitions: transitions || [],
           error_reporter: lambda do |message|
             @error_reporter.call(message)
-            report_runtime_message(message, context: "transition trigger failed", source: "transition")
+            report_runtime_message(
+              message,
+              context: "transition trigger failed",
+              source: "transition",
+              event: "transition_failed"
+            )
           end
         )
         @last_error = nil
@@ -716,23 +721,40 @@ module Vizcore
         @last_error = error
         message = Vizcore::ErrorFormatting.summarize(error, context: context)
         @error_reporter.call(message)
-        report_runtime_message(message, context: context, source: "runtime")
+        report_runtime_message(message, context: context, source: "runtime", event: runtime_error_event(context))
       rescue StandardError
         nil
       end
 
-      def report_runtime_message(message, context:, source:)
-        WebSocketHandler.broadcast(
-          type: "runtime_error",
-          payload: {
-            source: source,
-            context: context,
-            message: message.to_s,
-            frame_id: @frame_count
-          }
-        )
+      def report_runtime_message(message, context:, source:, event: nil)
+        payload = {
+          source: source,
+          context: context,
+          message: message.to_s,
+          frame_id: @frame_count
+        }
+        payload[:event] = event.to_s if event && !event.to_s.empty?
+
+        WebSocketHandler.broadcast(type: "runtime_error", payload: payload)
       rescue StandardError
         nil
+      end
+
+      def runtime_error_event(context)
+        case context.to_s.strip
+        when "frame build failed"
+          "frame_build_failed"
+        when "audio capture failed"
+          "audio_capture_failed"
+        when "audio transport sync failed"
+          "audio_transport_sync_failed"
+        when "frame broadcaster start failed"
+          "frame_broadcaster_start_failed"
+        when "transition trigger failed"
+          "transition_failed"
+        else
+          nil
+        end
       end
 
     end

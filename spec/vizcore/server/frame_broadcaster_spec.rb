@@ -384,6 +384,7 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
         start: nil,
         stop: nil
       )
+      allow(input_manager).to receive(:capture_frame).with(any_args).and_return(Array.new(1024, 0.0))
       allow(input_manager).to receive(:capture_frame).and_raise(StandardError.new("device busy"))
       reports = []
       allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
@@ -404,7 +405,116 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
         payload: hash_including(
           source: "runtime",
           context: "audio capture failed",
+          event: "audio_capture_failed",
           message: /device busy/
+        )
+      )
+    end
+
+    it "includes runtime event when frame build fails" do
+      input_manager = instance_double(
+        Vizcore::Audio::InputManager,
+        frame_size: 1024,
+        sample_rate: 44_100,
+        latest_samples: Array.new(1024, 0.0),
+        realtime_capture_size: 735,
+        start: nil,
+        stop: nil
+      )
+      allow(input_manager).to receive(:capture_frame).with(any_args).and_return(Array.new(1024, 0.0))
+      pipeline = instance_double(Vizcore::Analysis::Pipeline, call: {
+        amplitude: 0.2,
+        bands: { sub: 0.0, low: 0.0, mid: 0.0, high: 0.0 },
+        fft: Array.new(32, 0.1),
+        beat: false,
+        beat_count: 0,
+        bpm: 0.0
+      })
+      resolver = instance_double(
+        Vizcore::DSL::MappingResolver,
+        resolve_layers: nil
+      )
+      allow(resolver).to receive(:resolve_layers).and_raise(StandardError.new("mapping exploded"))
+
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+
+      broadcaster = described_class.new(
+        scene_name: "intro",
+        scene_layers: [
+          {
+            name: :rings,
+            type: :shape,
+            params: { opacity: 0.3 },
+            mappings: [{ source: { kind: :amplitude }, target: :opacity }]
+          }
+        ],
+        input_manager: input_manager,
+        analysis_pipeline: pipeline,
+        mapping_resolver: resolver
+      )
+
+      expect { broadcaster.build_frame(0.2) }.to raise_error(Vizcore::FrameBuildError)
+
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "runtime_error",
+        payload: hash_including(
+          source: "runtime",
+          event: "frame_build_failed",
+          context: "frame build failed"
+        )
+      )
+    end
+
+    it "includes runtime event for transition trigger failures" do
+      input_manager = instance_double(
+        Vizcore::Audio::InputManager,
+        frame_size: 1024,
+        sample_rate: 44_100,
+        capture_frame: Array.new(1024, 0.0),
+        latest_samples: Array.new(1024, 0.0),
+        realtime_capture_size: 735,
+        start: nil,
+        stop: nil
+      )
+      pipeline = instance_double(
+        Vizcore::Analysis::Pipeline,
+        call: {
+          amplitude: 0.9,
+          bands: { sub: 0.0, low: 0.4, mid: 0.3, high: 0.2 },
+          fft: Array.new(32, 0.01),
+          beat: true,
+          beat_count: 1,
+          bpm: 128.0
+        }
+      )
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+
+      broadcaster = described_class.new(
+        scene_name: :intro,
+        scene_layers: [{ name: :intro_layer, type: :geometry, params: {} }],
+        scene_catalog: [
+          { name: :intro, layers: [{ name: :intro_layer, type: :geometry, params: {} }] },
+          { name: :drop, layers: [{ name: :drop_layer, type: :shader, params: {} }] }
+        ],
+        transitions: [
+          {
+            from: :intro,
+            to: :drop,
+            trigger: proc { raise StandardError, "transition boom" }
+          }
+        ],
+        input_manager: input_manager,
+        analysis_pipeline: pipeline
+      )
+
+      broadcaster.tick(0.5, Array.new(1024, 0.0))
+
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "runtime_error",
+        payload: hash_including(
+          source: "transition",
+          event: "transition_failed",
+          context: "transition trigger failed"
         )
       )
     end

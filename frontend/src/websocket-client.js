@@ -10,6 +10,7 @@ export class WebSocketClient {
     this.onSceneChange = callbacks.onSceneChange || (() => {});
     this.onConfigUpdate = callbacks.onConfigUpdate || (() => {});
     this.onLatencyProbe = callbacks.onLatencyProbe || (() => {});
+    this.onRuntimeError = callbacks.onRuntimeError || (() => {});
     this.onStatus = callbacks.onStatus || (() => {});
     this.socket = null;
     this.reconnectTimer = null;
@@ -120,6 +121,11 @@ export class WebSocketClient {
 
     if (message.type === "latency_probe") {
       this.onLatencyProbe(message.payload);
+      return;
+    }
+
+    if (message.type === "runtime_error") {
+      this.onRuntimeError(message.payload);
     }
   }
 
