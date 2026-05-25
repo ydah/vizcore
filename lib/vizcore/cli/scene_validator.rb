@@ -3,6 +3,7 @@
 require "set"
 require_relative "../../vizcore"
 require_relative "../dsl"
+require_relative "../dsl/midi_map_executor"
 require_relative "../layer_catalog"
 
 module Vizcore
@@ -81,7 +82,7 @@ module Vizcore
         validate_transitions(Array(definition[:transitions]), names, issues)
         validate_timelines(Array(definition[:timelines]), names, issues)
         validate_key_mappings(Array(definition[:key_mappings]), names, issues)
-        validate_midi_maps(Array(definition[:midi_maps]), issues)
+        validate_midi_maps(Array(definition[:midi_maps]), scenes, issues)
         issues
       end
 
@@ -379,12 +380,45 @@ module Vizcore
         end
       end
 
-      def validate_midi_maps(mappings, issues)
+      def validate_midi_maps(mappings, scenes, issues)
         duplicate_values(mappings.filter_map { |mapping| midi_trigger_key(mapping[:trigger] || mapping["trigger"]) }).each do |trigger|
           issues << error("duplicate MIDI mapping: #{trigger}", code: "E_DUPLICATE_MIDI_MAPPING")
         end
         mappings.each do |mapping|
           validate_midi_trigger(Hash(mapping[:trigger] || mapping["trigger"] || {}), issues)
+          validate_midi_action(mapping[:action] || mapping["action"], scenes, issues)
+        end
+      end
+
+      def validate_midi_action(action, scenes, issues)
+        return unless action.respond_to?(:call)
+
+        context = Vizcore::DSL::MidiMapExecutor::ActionContext.new(
+          scenes: scene_lookup(scenes),
+          globals: {}
+        )
+        if action.arity.zero?
+          context.instance_exec(&action)
+        else
+          context.instance_exec(64, &action)
+        end
+
+        context.unknown_scene_names.each do |scene|
+          issues << error("MIDI mapping switches to unknown scene: #{scene}", code: "E_UNKNOWN_MIDI_SCENE")
+        end
+      rescue StandardError
+        nil
+      end
+
+      def scene_lookup(scenes)
+        Array(scenes).each_with_object({}) do |scene, output|
+          next unless (name = scene[:name])
+
+          key = name.to_sym
+          output[key] = {
+            name: key,
+            layers: Array(scene[:layers]).map { |layer| Vizcore::DeepCopy.copy(layer) }
+          }
         end
       end
 

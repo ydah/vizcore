@@ -155,6 +155,38 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
     end
   end
 
+  it "flags MIDI actions that switch to unknown scenes" do
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :known do
+          layer :shape do
+            type :shape
+          end
+        end
+
+        midi_map note: 36 do
+          switch_scene :missing_scene
+        end
+
+        midi_map pc: 9 do |value|
+          if value.zero?
+            blackout
+          else
+            switch_scene :also_missing
+          end
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+      messages = result.issues.map(&:message)
+
+      expect(result).not_to be_valid
+      expect(result.issues.map(&:code)).to include("E_UNKNOWN_MIDI_SCENE")
+      expect(messages).to include("MIDI mapping switches to unknown scene: missing_scene")
+      expect(messages).to include("MIDI mapping switches to unknown scene: also_missing")
+    end
+  end
+
   it "accepts added shader presets" do
     with_scene_file(<<~RUBY) do |scene_path|
       Vizcore.define do

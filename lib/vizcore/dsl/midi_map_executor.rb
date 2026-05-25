@@ -190,6 +190,7 @@ module Vizcore
       class ActionContext
         # Collected runtime actions emitted by DSL calls.
         attr_reader :actions
+        attr_reader :unknown_scene_names
 
         # @param scenes [Hash]
         # @param globals [Hash]
@@ -197,6 +198,7 @@ module Vizcore
           @scenes = scenes
           @globals = globals
           @actions = []
+          @unknown_scene_names = []
         end
 
         # @param name [Symbol, String]
@@ -204,7 +206,11 @@ module Vizcore
         # @return [void]
         def switch_scene(name, effect: nil)
           scene = @scenes[name.to_sym]
-          return unless scene
+          unless scene
+            unknown = name.to_s
+            @unknown_scene_names << unknown unless @unknown_scene_names.include?(unknown)
+            return
+          end
 
           @actions << {
             type: :switch_scene,
