@@ -257,7 +257,17 @@ module Vizcore
           )
           @output.puts("Scene reloaded: #{scene[:name]}")
         rescue StandardError => e
-          @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "Scene reload failed"))
+          message = Vizcore::ErrorFormatting.summarize(e, context: "Scene reload failed")
+          @output.puts(message)
+          WebSocketHandler.broadcast(
+            type: "runtime_error",
+            payload: {
+              source: "scene_reload",
+              context: "Scene reload failed",
+              message: message,
+              keeping_last_good_scene: true
+            }
+          )
         end
         watcher.start
         watcher

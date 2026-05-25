@@ -20,12 +20,27 @@ module Vizcore
         fps: DEFAULT_FRAME_RATE,
         width: SnapshotRenderer::DEFAULT_WIDTH,
         height: SnapshotRenderer::DEFAULT_HEIGHT,
+        duration: nil,
+        from_frame: 1,
+        to_frame: nil,
+        resume: false,
+        seed: nil,
         command_runner: Open3,
         ffmpeg_checker: nil
       )
         @config = config
-        @frames = normalize_frame_count(frames)
         @fps = normalize_frame_rate(fps)
+        @frames = normalize_frame_count(duration ? (Float(duration) * @fps).ceil : frames)
+        @from_frame = normalize_frame_index(from_frame, "from-frame")
+        @to_frame = normalize_optional_frame_index(to_frame, "to-frame")
+        @to_frame = @frames if @to_frame.nil?
+        raise ArgumentError, "to-frame must be greater than or equal to from-frame" if @to_frame < @from_frame
+        raise ArgumentError, "from-frame must be within rendered frame count" if @from_frame > @frames
+
+        @to_frame = [@to_frame, @frames].min
+        @output_frames = @to_frame - @from_frame + 1
+        @resume = !!resume
+        @seed = normalize_seed(seed)
         @width = width
         @height = height
         @command_runner = command_runner
@@ -56,29 +71,39 @@ module Vizcore
         metadata = nil
         Dir.mktmpdir("vizcore-render-frames") do |dir|
           frame_dir = Pathname.new(dir)
-          metadata = render_frames(frame_dir)
+          metadata = render_frames(frame_dir, preserve_frame_numbers: false)
           encode_mp4(frame_dir: frame_dir, output_file: output_file)
         end
         metadata.merge(path: output_file, format: :mp4)
       end
 
-      def render_frames(output_dir)
-        source = SceneFrameSource.new(config: @config, frame_rate: @fps)
+      def render_frames(output_dir, preserve_frame_numbers: true)
+        source = SceneFrameSource.new(config: @config, frame_rate: @fps, seed: @seed)
         source.start
         renderer = SnapshotRenderer.new(width: @width, height: @height)
         scene_name = nil
 
         @frames.times do |index|
+          frame_number = index + 1
+          break if frame_number > @to_frame
+
           frame = source.capture
           scene_name ||= frame.fetch(:scene_name)
+          next if frame_number < @from_frame || frame_number > @to_frame
+          output_frame_number = preserve_frame_numbers ? frame_number : frame_number - @from_frame + 1
+          next if @resume && frame_path(output_dir, output_frame_number).file?
+
           File.binwrite(
-            frame_path(output_dir, index),
+            frame_path(output_dir, output_frame_number),
             renderer.render(scene: frame.fetch(:scene), audio: frame.fetch(:audio))
           )
         end
 
         {
-          frames: @frames,
+          frames: @output_frames,
+          total_frames: @frames,
+          from_frame: @from_frame,
+          to_frame: @to_frame,
           fps: @fps,
           width: renderer.width,
           height: renderer.height,
@@ -92,8 +117,8 @@ module Vizcore
         %w[.mp4 .mov .webm].include?(path.extname.downcase)
       end
 
-      def frame_path(output_dir, index)
-        output_dir.join(format("frame_%05d.png", index + 1))
+      def frame_path(output_dir, frame_number)
+        output_dir.join(format("frame_%05d.png", frame_number))
       end
 
       def encode_mp4(frame_dir:, output_file:)
@@ -140,6 +165,21 @@ module Vizcore
         raise ArgumentError, "frames must be a positive integer"
       end
 
+      def normalize_frame_index(value, name)
+        index = Integer(value)
+        raise ArgumentError, "#{name} must be positive" unless index.positive?
+
+        index
+      rescue ArgumentError, TypeError
+        raise ArgumentError, "#{name} must be a positive integer"
+      end
+
+      def normalize_optional_frame_index(value, name)
+        return nil if value.nil?
+
+        normalize_frame_index(value, name)
+      end
+
       def normalize_frame_rate(value)
         rate = Float(value)
         raise ArgumentError, "fps must be positive" unless rate.positive?
@@ -147,6 +187,14 @@ module Vizcore
         rate
       rescue ArgumentError, TypeError
         raise ArgumentError, "fps must be a positive number"
+      end
+
+      def normalize_seed(value)
+        return nil if value.nil?
+
+        Integer(value)
+      rescue ArgumentError, TypeError
+        raise ArgumentError, "seed must be an integer"
       end
     end
   end

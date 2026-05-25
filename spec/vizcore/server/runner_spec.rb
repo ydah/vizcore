@@ -300,6 +300,50 @@ RSpec.describe Vizcore::Server::Runner do
       )
     end
 
+    it "broadcasts scene reload failures while keeping the last good scene" do
+      callback = nil
+      allow(Vizcore::Server::RackApp).to receive(:new).and_return(rack_app)
+      allow(Puma::Server).to receive(:new).and_return(puma_server)
+      allow(Vizcore::Audio::InputManager).to receive(:new).and_return(input_manager)
+      allow(Vizcore::Server::FrameBroadcaster).to receive(:new).and_return(broadcaster)
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+      allow(Vizcore::Server::SceneDependencyWatcher).to receive(:new) do |scene_file:, definition:, &block|
+        callback = block
+        watcher
+      end
+      allow(watcher).to receive(:start) do
+        callback&.call(
+          {
+            scenes: [
+              {
+                name: :broken,
+                layers: [{ name: :shader_art, type: :shader, glsl: "missing.frag", params: {} }]
+              }
+            ]
+          },
+          scene_file
+        )
+      end
+
+      runner = described_class.new(config, output: output)
+      allow(runner).to receive(:wait_for_interrupt)
+
+      runner.run
+
+      expect(broadcaster).not_to have_received(:update_scene).with(
+        scene_name: :broken,
+        scene_layers: anything
+      )
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "runtime_error",
+        payload: hash_including(
+          source: "scene_reload",
+          context: "Scene reload failed",
+          keeping_last_good_scene: true
+        )
+      )
+    end
+
     it "switches scene from client websocket message" do
       runner = described_class.new(config, output: output)
       broadcaster = instance_double(

@@ -8,15 +8,17 @@ module Vizcore
   module Renderer
     # Produces analyzed scene frames for offline renderers.
     class SceneFrameSource
-      def initialize(config:, frame_rate: nil)
+      def initialize(config:, frame_rate: nil, seed: nil)
         @config = config
         @frame_rate = frame_rate
+        @seed = seed
         @shader_source_resolver = Vizcore::DSL::ShaderSourceResolver.new
       end
 
       # @return [Vizcore::Renderer::SceneFrameSource]
       def start
         @definition = resolve_shader_sources(Vizcore::DSL::Engine.load_file(@config.scene_file.to_s))
+        apply_seed!
         @scene = first_scene(@definition)
         @transition_controller = Vizcore::DSL::TransitionController.new(
           scenes: Array(@definition[:scenes]),
@@ -69,6 +71,15 @@ module Vizcore
 
       def resolve_shader_sources(definition)
         @shader_source_resolver.resolve(definition: definition, scene_file: @config.scene_file.to_s)
+      end
+
+      def apply_seed!
+        seed = @seed || @definition[:seed]
+        return if seed.nil?
+
+        Kernel.srand(Integer(seed))
+      rescue ArgumentError, TypeError
+        raise ArgumentError, "render seed must be an integer"
       end
 
       def first_scene(definition)

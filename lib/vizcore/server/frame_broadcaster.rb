@@ -64,7 +64,10 @@ module Vizcore
         @transition_controller = transition_controller || Vizcore::DSL::TransitionController.new(
           scenes: scene_catalog || [],
           transitions: transitions || [],
-          error_reporter: @error_reporter
+          error_reporter: lambda do |message|
+            @error_reporter.call(message)
+            report_runtime_message(message, context: "transition trigger failed", source: "transition")
+          end
         )
         @last_error = nil
         @frame_count = 0
@@ -541,7 +544,23 @@ module Vizcore
 
       def report_error(error, context:)
         @last_error = error
-        @error_reporter.call(Vizcore::ErrorFormatting.summarize(error, context: context))
+        message = Vizcore::ErrorFormatting.summarize(error, context: context)
+        @error_reporter.call(message)
+        report_runtime_message(message, context: context, source: "runtime")
+      rescue StandardError
+        nil
+      end
+
+      def report_runtime_message(message, context:, source:)
+        WebSocketHandler.broadcast(
+          type: "runtime_error",
+          payload: {
+            source: source,
+            context: context,
+            message: message.to_s,
+            frame_id: @frame_count
+          }
+        )
       rescue StandardError
         nil
       end

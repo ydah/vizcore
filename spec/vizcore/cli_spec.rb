@@ -413,6 +413,53 @@ RSpec.describe Vizcore::CLI do
       end
     end
 
+    it "passes render range and seed options to render sequence" do
+      sequence = instance_double(
+        Vizcore::Renderer::RenderSequence,
+        write: {
+          path: Pathname.new("frames").expand_path,
+          format: :png_sequence,
+          scene: "basic",
+          frames: 3,
+          fps: 12.0,
+          width: 160,
+          height: 90
+        }
+      )
+      allow(Vizcore::Renderer::RenderSequence).to receive(:new).and_return(sequence)
+
+      described_class.start(
+        [
+          "render",
+          "examples/basic.rb",
+          "--audio-source",
+          "dummy",
+          "--duration",
+          "0.25",
+          "--fps",
+          "12",
+          "--from-frame",
+          "2",
+          "--to-frame",
+          "4",
+          "--resume",
+          "--seed",
+          "42"
+        ]
+      )
+
+      expect(Vizcore::Renderer::RenderSequence).to have_received(:new).with(
+        hash_including(
+          duration: 0.25,
+          fps: 12,
+          from_frame: 2,
+          to_frame: 4,
+          resume: true,
+          seed: 42
+        )
+      )
+    end
+
     it "records audio features to JSON" do
       Dir.mktmpdir("vizcore-cli-features") do |dir|
         audio_file = Vizcore.root.join("spec", "fixtures", "audio", "kick_120bpm.wav")

@@ -489,6 +489,11 @@ module Vizcore
     option :bpm_lock, type: :boolean, default: false, desc: "Lock analysis BPM output to --bpm"
     option :out, type: :string, default: "frames", desc: "Output directory for PNG frames, or .mp4 video path"
     option :frames, type: :numeric, default: Vizcore::Renderer::RenderSequence::DEFAULT_FRAME_COUNT, desc: "Number of frames to write"
+    option :duration, type: :numeric, desc: "Render duration in seconds; overrides --frames"
+    option :from_frame, type: :numeric, default: 1, desc: "First 1-based frame to write"
+    option :to_frame, type: :numeric, desc: "Last 1-based frame to write"
+    option :resume, type: :boolean, default: false, desc: "Skip PNG frames that already exist"
+    option :seed, type: :numeric, desc: "Deterministic random seed for render"
     option :fps, type: :numeric, default: Vizcore::Renderer::RenderSequence::DEFAULT_FRAME_RATE, desc: "Render frame rate"
     option :width, type: :numeric, default: Vizcore::Renderer::SnapshotRenderer::DEFAULT_WIDTH, desc: "Frame width"
     option :height, type: :numeric, default: Vizcore::Renderer::SnapshotRenderer::DEFAULT_HEIGHT, desc: "Frame height"
@@ -514,7 +519,12 @@ module Vizcore
         frames: options.fetch(:frames),
         fps: options.fetch(:fps),
         width: options.fetch(:width),
-        height: options.fetch(:height)
+        height: options.fetch(:height),
+        duration: options[:duration],
+        from_frame: options.fetch(:from_frame),
+        to_frame: options[:to_frame],
+        resume: options.fetch(:resume),
+        seed: options[:seed]
       ).write(out: options.fetch(:out))
       return say(render_video_message(result)) if result[:format] == :mp4
 

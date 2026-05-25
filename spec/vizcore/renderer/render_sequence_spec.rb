@@ -23,6 +23,48 @@ RSpec.describe Vizcore::Renderer::RenderSequence do
     end
   end
 
+  it "writes a selected frame range and preserves existing frames when resuming" do
+    Dir.mktmpdir("vizcore-render-range") do |dir|
+      config = Vizcore::Config.new(
+        scene_file: Vizcore.root.join("examples", "basic.rb").to_s,
+        audio_source: :dummy
+      )
+      existing = File.join(dir, "frame_00002.png")
+      File.binwrite(existing, "keep")
+
+      result = described_class.new(
+        config: config,
+        frames: 5,
+        fps: 15,
+        from_frame: 2,
+        to_frame: 3,
+        resume: true,
+        width: 160,
+        height: 90
+      ).write(out: dir)
+      frames = Dir[File.join(dir, "frame_*.png")].sort
+
+      expect(result).to include(frames: 2, total_frames: 5, from_frame: 2, to_frame: 3)
+      expect(frames.map { |path| File.basename(path) }).to eq(%w[frame_00002.png frame_00003.png])
+      expect(File.binread(existing)).to eq("keep")
+      expect(File.binread(File.join(dir, "frame_00003.png"), 8)).to eq(Vizcore::Renderer::PngWriter::SIGNATURE)
+    end
+  end
+
+  it "derives frame count from duration" do
+    Dir.mktmpdir("vizcore-render-duration") do |dir|
+      config = Vizcore::Config.new(
+        scene_file: Vizcore.root.join("examples", "basic.rb").to_s,
+        audio_source: :dummy
+      )
+
+      result = described_class.new(config: config, duration: 0.2, fps: 10, width: 160, height: 90).write(out: dir)
+
+      expect(result).to include(frames: 2, total_frames: 2, from_frame: 1, to_frame: 2)
+      expect(Dir[File.join(dir, "frame_*.png")].length).to eq(2)
+    end
+  end
+
   it "writes an MP4 video through ffmpeg" do
     Dir.mktmpdir("vizcore-render-mp4") do |dir|
       config = Vizcore::Config.new(

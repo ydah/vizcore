@@ -83,6 +83,7 @@ module Vizcore
         @themes = {}
         @scene_registry = {}
         @strict = false
+        @seed = nil
       end
 
       # Evaluate DSL methods on this engine instance.
@@ -139,6 +140,16 @@ module Vizcore
       # @return [Boolean]
       def strict!
         @strict = true
+      end
+
+      # Set a deterministic Ruby random seed for offline rendering.
+      #
+      # @param value [Integer]
+      # @return [Integer]
+      def seed(value)
+        @seed = Integer(value)
+      rescue ArgumentError, TypeError
+        raise ArgumentError, "seed must be an integer"
       end
 
       # Configure analysis-level audio feature normalization.
@@ -303,6 +314,7 @@ module Vizcore
           themes: @themes.map { |name, params| { name: name, params: deep_dup(params) } }
         }
         definition[:strict] = true if @strict
+        definition[:seed] = @seed unless @seed.nil?
         definition[:timelines] = @timelines.map { |timeline| deep_dup(timeline) } unless @timelines.empty?
         definition
       end

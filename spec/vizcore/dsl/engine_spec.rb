@@ -171,6 +171,16 @@ RSpec.describe Vizcore::DSL::Engine do
       end.to raise_error(ArgumentError, /unknown params in strict mode: opactiy/)
     end
 
+    it "stores an offline render seed" do
+      definition = described_class.define do
+        seed 1234
+
+        scene(:main) { layer(:cube) { type :wireframe_cube } }
+      end
+
+      expect(definition[:seed]).to eq(1234)
+    end
+
     it "applies named styles to layer params" do
       definition = described_class.define do
         style :neon do

@@ -227,6 +227,7 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
       )
       allow(input_manager).to receive(:capture_frame).and_raise(StandardError.new("device busy"))
       reports = []
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
       broadcaster = described_class.new(
         scene_name: "basic",
         input_manager: input_manager,
@@ -239,6 +240,14 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
       expect(frame.dig(:audio, :fft).length).to eq(32)
       expect(reports.join("\n")).to include("audio capture failed")
       expect(broadcaster.last_error).to be_a(StandardError)
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "runtime_error",
+        payload: hash_including(
+          source: "runtime",
+          context: "audio capture failed",
+          message: /device busy/
+        )
+      )
     end
   end
 
