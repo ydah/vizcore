@@ -6,6 +6,8 @@ module Vizcore
     class SceneSerializer
       SCENE_SCHEMA_VERSION = "vizcore.scene.v1"
       FRAME_SCHEMA_VERSION = "vizcore.frame.v1"
+      LAYER_SCHEMA_VERSION = "vizcore.layer.v1"
+      MAPPING_SCHEMA_VERSION = "vizcore.mapping.v1"
 
       # @param timestamp [Numeric]
       # @param audio [Hash]
@@ -80,12 +82,14 @@ module Vizcore
         output = {
           name: values.fetch(:name).to_s,
           type: (values[:type] || :geometry).to_s,
+          schema_version: LAYER_SCHEMA_VERSION,
           params: symbolize_hash(values[:params])
         }
         output[:shader] = values[:shader].to_s if values[:shader]
         output[:glsl] = values[:glsl].to_s if values[:glsl]
         output[:glsl_source] = values[:glsl_source].to_s if values[:glsl_source]
         output[:param_schema] = serialize_param_schema(values[:param_schema]) if values[:param_schema]
+        output[:mappings] = serialize_mappings(values[:mappings]) unless Array(values[:mappings]).empty?
         output
       end
 
@@ -99,6 +103,18 @@ module Vizcore
             max: round_float(values[:max]),
             step: round_float(values[:step])
           }.compact
+        end
+      end
+
+      def serialize_mappings(mappings)
+        Array(mappings).map do |mapping|
+          values = symbolize_hash(mapping)
+          {
+            schema_version: MAPPING_SCHEMA_VERSION,
+            source: values[:source],
+            target: values[:target].to_s,
+            transform: symbolize_hash(values[:transform])
+          }
         end
       end
 

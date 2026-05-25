@@ -96,6 +96,7 @@ RSpec.describe Vizcore::Renderer::SceneSerializer do
           {
             name: "background",
             type: "shader",
+            schema_version: "vizcore.layer.v1",
             shader: "gradient_pulse",
             glsl: "shaders/custom_wave.frag",
             glsl_source: "void main() { }",
@@ -117,6 +118,48 @@ RSpec.describe Vizcore::Renderer::SceneSerializer do
         frame_id: 12,
         audio_capture_ms: 0.1235,
         audio_analysis_ms: 1.9877
+      )
+    end
+
+    it "serializes layer mappings with schema version" do
+      serializer = described_class.new
+      frame = serializer.audio_frame(
+        timestamp: 0.1,
+        audio: {
+          amplitude: 1.0,
+          peak: 0.0,
+          bands: {},
+          onsets: {},
+          drums: {},
+          fft: []
+        },
+        scene_name: :intro,
+        scene_layers: [
+          {
+            name: :foreground,
+            type: :shader,
+            mappings: [
+              {
+                source: { kind: :amplitude },
+                target: :opacity,
+                transform: { gain: 2.5 }
+              }
+            ]
+          }
+        ],
+        metrics: { frame_id: 1 }
+      )
+
+      expect(frame[:scene][:layers][0][:schema_version]).to eq("vizcore.layer.v1")
+      expect(frame[:scene][:layers][0][:mappings]).to eq(
+        [
+          {
+            schema_version: "vizcore.mapping.v1",
+            source: { kind: :amplitude },
+            target: "opacity",
+            transform: { gain: 2.5 }
+          }
+        ]
       )
     end
   end
