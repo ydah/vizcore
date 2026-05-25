@@ -5,6 +5,10 @@ export const createPerformanceMonitorState = () => ({
   audioLatencyMs: null,
   clockOffsetMs: null,
   droppedFrames: 0,
+  wsDroppedFrames: 0,
+  wsActiveClients: 0,
+  wsEstimatedLagFrames: 0,
+  wsAvgPayloadBytes: 0,
   fps: 0,
   frameMs: 0,
   lastRenderAtMs: null,
@@ -154,6 +158,22 @@ export const recordRendererSafeMode = (state, detail) => {
   };
 };
 
+export const recordWebSocketBackpressure = (state, detail) => {
+  const total = detail?.total || {};
+  const clients = Array.isArray(detail?.clients) ? detail.clients : [];
+  const averageLag = clients.length > 0
+    ? Math.max(0, clients.reduce((acc, entry) => acc + coerceFiniteNumber(entry?.estimated_lag_frames || 0), 0) / clients.length)
+    : 0;
+
+  return {
+    ...state,
+    wsDroppedFrames: Number(total?.dropped_frames || 0),
+    wsActiveClients: Number(detail?.active_clients || 0),
+    wsAvgPayloadBytes: Number(coerceMetric(total?.avg_payload_bytes) || 0),
+    wsEstimatedLagFrames: averageLag,
+  };
+};
+
 export const formatPerformanceMonitorText = (state) => {
   const fps = Number(state?.fps || 0) > 0 ? Number(state.fps).toFixed(1) : "--";
   const frameMs = Number(state?.frameMs || 0) > 0 ? `${Number(state.frameMs).toFixed(1)}ms` : "--";
@@ -166,9 +186,12 @@ export const formatPerformanceMonitorText = (state) => {
   const maxTexture = Number.isFinite(state?.rendererMaxTextureSize) ? Math.round(state.rendererMaxTextureSize) : "--";
   const safeMode = state?.rendererSafeMode ? "on" : "off";
   const droppedFrames = Math.max(0, Number(state?.droppedFrames || 0));
+  const wsDroppedFrames = Math.max(0, Number(state?.wsDroppedFrames || 0));
+  const wsEstimatedLagFrames = Math.max(0, Number(state?.wsEstimatedLagFrames || 0));
   const reconnects = Math.max(0, Number(state?.reconnects || 0));
+  const wsAvgPayload = Number.isFinite(state?.wsAvgPayloadBytes) ? `${Math.round(state.wsAvgPayloadBytes)}B` : "--";
 
-  return `Perf: ${fps} FPS | Frame ${frameMs} | WS ${wsLatency} | RTT ${rtt} | Clock ${clockOffset} | Drop ${droppedFrames} | Audio ${audioLatency} | Shader ${shaderCompile} | DPR ${rendererDpr} | MaxTex ${maxTexture} | Safe ${safeMode} | Reconnect ${reconnects}`;
+  return `Perf: ${fps} FPS | Frame ${frameMs} | WS ${wsLatency} | RTT ${rtt} | Clock ${clockOffset} | Drop ${droppedFrames} | BDrop ${wsDroppedFrames} | WSLag ${wsEstimatedLagFrames.toFixed(1)}f | Audio ${audioLatency} | Shader ${shaderCompile} | DPR ${rendererDpr} | MaxTex ${maxTexture} | Safe ${safeMode} | Backpressure ${wsAvgPayload} | Reconnect ${reconnects}`;
 };
 
 export const estimateDroppedFrames = (frameGapMs, expectedFrameMs = DEFAULT_EXPECTED_FRAME_MS) => {
@@ -201,6 +224,11 @@ const coerceMetric = (value) => {
 };
 
 const roundOneDecimal = (value) => Math.round(value * 10) / 10;
+
+const coerceFiniteNumber = (value) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+};
 
 const formatSignedInteger = (value) => {
   const rounded = Math.round(Number(value) || 0);

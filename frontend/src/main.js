@@ -18,6 +18,7 @@ import {
   recordRendererCapabilities,
   recordRendererSafeMode,
   recordShaderCompile,
+  recordWebSocketBackpressure,
   recordSocketFrame,
 } from "./performance-monitor.js";
 import {
@@ -338,6 +339,7 @@ function applyRuntime(runtime) {
     applyRuntimeGlobals(runtime?.globals);
   }
   applyRuntimeControlPreset(runtime?.control_preset);
+  updatePerformanceMonitor(recordWebSocketBackpressure(performanceMonitor, runtime?.websocket_backpressure));
 
   const fileName = runtime?.audio_file_name;
   const fileUrl = runtime?.audio_file_url;

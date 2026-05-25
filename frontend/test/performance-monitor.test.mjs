@@ -11,6 +11,7 @@ import {
   recordRendererCapabilities,
   recordRendererSafeMode,
   recordShaderCompile,
+  recordWebSocketBackpressure,
   recordSocketFrame,
 } from "../src/performance-monitor.js";
 
@@ -119,13 +120,35 @@ test("formatPerformanceMonitorText produces stable HUD copy", () => {
     rendererDpr: 1.5,
     rendererMaxTextureSize: 8192,
     rendererSafeMode: true,
+    wsDroppedFrames: 4,
+    wsEstimatedLagFrames: 2.5,
+    wsAvgPayloadBytes: 1024,
     wsLatencyMs: 12.4,
   };
 
   assert.equal(
     formatPerformanceMonitorText(state),
-    "Perf: 59.9 FPS | Frame 16.7ms | WS 12ms | RTT 8ms | Clock -2ms | Drop 3 | Audio 1.2ms | Shader 3.4ms | DPR 1.50x | MaxTex 8192 | Safe on | Reconnect 1",
+    "Perf: 59.9 FPS | Frame 16.7ms | WS 12ms | RTT 8ms | Clock -2ms | Drop 3 | BDrop 4 | WSLag 2.5f | Audio 1.2ms | Shader 3.4ms | DPR 1.50x | MaxTex 8192 | Safe on | Backpressure 1024B | Reconnect 1",
   );
+});
+
+test("recordWebSocketBackpressure tracks dropped frames and lag estimates", () => {
+  const state = recordWebSocketBackpressure(createPerformanceMonitorState(), {
+    active_clients: 2,
+    clients: [
+      { estimated_lag_frames: 2.5 },
+      { estimated_lag_frames: 0.5 },
+    ],
+    total: {
+      dropped_frames: 3,
+      avg_payload_bytes: 512,
+    },
+  });
+
+  assert.equal(state.wsDroppedFrames, 3);
+  assert.equal(state.wsActiveClients, 2);
+  assert.equal(state.wsEstimatedLagFrames, 1.5);
+  assert.equal(state.wsAvgPayloadBytes, 512);
 });
 
 test("estimateDroppedFrames ignores normal jitter", () => {
