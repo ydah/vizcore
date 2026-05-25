@@ -66,6 +66,10 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
       )
       expect(status[:sample_rate]).to be_a(Integer)
       expect(status[:frame_size]).to be_a(Integer)
+      expect(status[:input]).to include(
+        source: "mic",
+        ring_buffer: include(:capacity, :overrun_count, :underrun_count)
+      )
       expect(status[:metrics]).to include(:server_frame_ms)
     end
 

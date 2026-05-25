@@ -19,9 +19,10 @@ module Vizcore
         [250, 204, 21]
       ].freeze
 
-      def initialize(width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT)
+      def initialize(width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT, transparent: false)
         @width = normalize_dimension(width)
         @height = normalize_dimension(height)
+        @transparent = !!transparent
       end
 
       attr_reader :width, :height
@@ -30,8 +31,8 @@ module Vizcore
       # @param audio [Hash]
       # @return [String] PNG bytes
       def render(scene:, audio:)
-        canvas = Canvas.new(width: width, height: height)
-        canvas.fill_gradient(background_top(audio), background_bottom(audio))
+        canvas = Canvas.new(width: width, height: height, transparent: @transparent)
+        canvas.fill_gradient(background_top(audio), background_bottom(audio)) unless @transparent
         layers = Array(scene[:layers] || scene["layers"])
         layers = [default_layer] if layers.empty?
         layers.each_with_index { |layer, index| render_layer(canvas, layer, audio, index) }
@@ -808,11 +809,12 @@ module Vizcore
 
       # Tiny RGBA canvas with alpha blending and a few primitive drawing helpers.
       class Canvas
-        def initialize(width:, height:)
+        def initialize(width:, height:, transparent: false)
           @width = width
           @height = height
           @bytes = String.new(capacity: width * height * 4, encoding: Encoding::BINARY)
-          @bytes << ([0, 0, 0, 255].pack("C4") * (width * height))
+          alpha = transparent ? 0 : 255
+          @bytes << ([0, 0, 0, alpha].pack("C4") * (width * height))
         end
 
         attr_reader :width, :height, :bytes
@@ -918,7 +920,8 @@ module Vizcore
             current = bytes.getbyte(offset + index)
             bytes.setbyte(offset + index, interpolate(current, color[index], amount).round)
           end
-          bytes.setbyte(offset + 3, 255)
+          alpha = bytes.getbyte(offset + 3)
+          bytes.setbyte(offset + 3, [alpha + (255 - alpha) * amount, 255].min.round)
         end
 
         def set_pixel(x, y, color, alpha)

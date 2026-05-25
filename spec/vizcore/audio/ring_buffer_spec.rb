@@ -40,6 +40,23 @@ RSpec.describe Vizcore::Audio::RingBuffer do
     end
   end
 
+  describe "#metrics" do
+    it "tracks writes, overruns, and underruns" do
+      buffer = described_class.new(3)
+
+      buffer.write([1, 2, 3, 4])
+      buffer.latest(5)
+
+      expect(buffer.metrics).to include(
+        capacity: 3,
+        size: 3,
+        write_count: 4,
+        overrun_count: 1,
+        underrun_count: 2
+      )
+    end
+  end
+
   describe "#clear" do
     it "removes all buffered samples" do
       buffer = described_class.new(3)
@@ -49,6 +66,7 @@ RSpec.describe Vizcore::Audio::RingBuffer do
 
       expect(buffer.size).to eq(0)
       expect(buffer.latest).to eq([])
+      expect(buffer.metrics).to include(write_count: 0, overrun_count: 0, underrun_count: 0)
     end
   end
 

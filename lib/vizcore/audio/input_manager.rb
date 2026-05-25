@@ -28,7 +28,8 @@ module Vizcore
       # @param audio_device [String, Integer, nil] input device index/name for `:mic`
       def initialize(source: :mic, sample_rate: DEFAULT_SAMPLE_RATE, frame_size: DEFAULT_FRAME_SIZE, ring_buffer_size: DEFAULT_RING_BUFFER_SIZE, file_path: nil, audio_device: nil)
         @source_name = source.to_sym
-        @sample_rate = Integer(sample_rate)
+        @requested_sample_rate = Integer(sample_rate)
+        @sample_rate = @requested_sample_rate
         @frame_size = Integer(frame_size)
         @ring_buffer = RingBuffer.new(ring_buffer_size)
         @audio_device = audio_device
@@ -67,6 +68,18 @@ module Vizcore
       # @return [Array<Float>] recent samples from the ring buffer
       def latest_samples(count = frame_size)
         ring_buffer.latest(count)
+      end
+
+      # @return [Hash] current input health values for runtime status endpoints.
+      def status
+        {
+          source: source_name.to_s,
+          sample_rate: sample_rate,
+          frame_size: frame_size,
+          ring_buffer: ring_buffer.respond_to?(:metrics) ? ring_buffer.metrics : {},
+          requested_sample_rate: @requested_sample_rate,
+          sample_rate_mismatch: sample_rate_mismatch?
+        }
       end
 
       # @param frame_rate [Numeric]
@@ -129,6 +142,14 @@ module Vizcore
         Integer(rate)
       rescue StandardError
         fallback
+      end
+
+      def sample_rate_mismatch?
+        return false unless @input.respond_to?(:stream_sample_rate)
+
+        Integer(@input.stream_sample_rate) != Integer(@requested_sample_rate)
+      rescue StandardError
+        false
       end
     end
   end

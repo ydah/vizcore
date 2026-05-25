@@ -25,10 +25,12 @@ module Vizcore
         to_frame: nil,
         resume: false,
         seed: nil,
+        transparent: false,
         video_codec: nil,
         video_bitrate: nil,
         video_crf: nil,
         pixel_format: "yuv420p",
+        progress_reporter: nil,
         command_runner: Open3,
         ffmpeg_checker: nil
       )
@@ -45,10 +47,12 @@ module Vizcore
         @output_frames = @to_frame - @from_frame + 1
         @resume = !!resume
         @seed = normalize_seed(seed)
+        @transparent = !!transparent
         @video_codec = optional_string(video_codec, "video codec")
         @video_bitrate = optional_string(video_bitrate, "video bitrate")
         @video_crf = optional_string(video_crf, "video crf")
         @pixel_format = optional_string(pixel_format, "pixel format") || "yuv420p"
+        @progress_reporter = progress_reporter
         @width = width
         @height = height
         @command_runner = command_runner
@@ -88,7 +92,7 @@ module Vizcore
       def render_frames(output_dir, preserve_frame_numbers: true)
         source = SceneFrameSource.new(config: @config, frame_rate: @fps, seed: @seed)
         source.start
-        renderer = SnapshotRenderer.new(width: @width, height: @height)
+        renderer = SnapshotRenderer.new(width: @width, height: @height, transparent: @transparent)
         scene_name = nil
 
         @frames.times do |index|
@@ -105,6 +109,7 @@ module Vizcore
             frame_path(output_dir, output_frame_number),
             renderer.render(scene: frame.fetch(:scene), audio: frame.fetch(:audio))
           )
+          emit_progress(frame_number: frame_number, output_frame_number: output_frame_number)
         end
 
         {
@@ -115,6 +120,7 @@ module Vizcore
           fps: @fps,
           width: renderer.width,
           height: renderer.height,
+          transparent: @transparent,
           scene: scene_name
         }
       ensure
@@ -160,6 +166,22 @@ module Vizcore
 
       def ffmpeg_available?
         system("ffmpeg", "-version", out: File::NULL, err: File::NULL)
+      end
+
+      def emit_progress(frame_number:, output_frame_number:)
+        return unless @progress_reporter.respond_to?(:call)
+
+        @progress_reporter.call(
+          frame: frame_number,
+          output_frame: output_frame_number,
+          from_frame: @from_frame,
+          to_frame: @to_frame,
+          total_frames: @frames,
+          output_frames: @output_frames,
+          percent: ((frame_number - @from_frame + 1).to_f / @output_frames * 100).clamp(0.0, 100.0)
+        )
+      rescue StandardError
+        nil
       end
 
       def format_frame_rate

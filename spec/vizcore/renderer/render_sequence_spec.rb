@@ -65,6 +65,29 @@ RSpec.describe Vizcore::Renderer::RenderSequence do
     end
   end
 
+  it "emits progress events for written frames" do
+    Dir.mktmpdir("vizcore-render-progress") do |dir|
+      config = Vizcore::Config.new(
+        scene_file: Vizcore.root.join("examples", "basic.rb").to_s,
+        audio_source: :dummy
+      )
+      events = []
+
+      described_class.new(
+        config: config,
+        frames: 3,
+        from_frame: 2,
+        to_frame: 3,
+        width: 160,
+        height: 90,
+        progress_reporter: ->(event) { events << event }
+      ).write(out: dir)
+
+      expect(events.map { |event| event[:frame] }).to eq([2, 3])
+      expect(events.last).to include(output_frames: 2, percent: 100.0)
+    end
+  end
+
   it "writes an MP4 video through ffmpeg" do
     Dir.mktmpdir("vizcore-render-mp4") do |dir|
       config = Vizcore::Config.new(

@@ -45,6 +45,22 @@ jobs:
       - name: Run RuboCop
         run: bundle exec rubocop --no-server
 
+  example-validation:
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    name: Example Validation
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
+      - name: Validate bundled examples
+        run: bundle exec rake ci:validate_examples
+
   cross-platform-smoke:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'release' }}
     name: Cross-platform smoke (${{ matrix.os }})

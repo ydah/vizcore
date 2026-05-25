@@ -2,6 +2,7 @@
 
 require_relative "../audio"
 require_relative "../analysis"
+require_relative "../deep_copy"
 require_relative "../dsl"
 require_relative "../errors"
 require_relative "../renderer"
@@ -136,6 +137,7 @@ module Vizcore
           frame_id: @frame_count,
           sample_rate: input_manager_value(:sample_rate),
           frame_size: input_manager_value(:frame_size),
+          input: input_manager_status,
           transport_playing: @scene_mutex.synchronize { @transport_playing },
           websocket_clients: WebSocketHandler.connection_count,
           dropped_frames: WebSocketHandler.dropped_frame_count,
@@ -331,6 +333,14 @@ module Vizcore
         nil
       end
 
+      def input_manager_status
+        return @input_manager.status if @input_manager.respond_to?(:status)
+
+        {}
+      rescue StandardError
+        {}
+      end
+
       def formatted_last_error
         error = @last_error
         return nil unless error
@@ -414,14 +424,7 @@ module Vizcore
       end
 
       def deep_dup(value)
-        case value
-        when Hash
-          value.each_with_object({}) { |(key, entry), output| output[key] = deep_dup(entry) }
-        when Array
-          value.map { |entry| deep_dup(entry) }
-        else
-          value
-        end
+        Vizcore::DeepCopy.copy(value)
       end
 
       def default_scene_layers(analyzed)

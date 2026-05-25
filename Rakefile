@@ -14,6 +14,36 @@ def ensure_command!(command, install_hint:)
   raise "Missing command: #{command}. #{install_hint}"
 end
 
+namespace :ci do
+  desc "Validate every bundled Ruby example scene"
+  task :validate_examples do
+    ruby "-Ilib", "-e", <<~'RUBY'
+      require "vizcore/cli/scene_diagnostics"
+
+      failed = []
+      Dir["examples/*.rb"].sort.each do |path|
+        result = Vizcore::CLISupport::SceneDiagnostics.new(scene_file: path).validate
+        if result.valid?
+          puts "[ok] #{path}"
+        else
+          failed << path
+          result.issues.each do |issue|
+            label = issue.error? ? "error" : "warn"
+            puts "[#{label}] #{path} #{issue.code}: #{issue.message}"
+          end
+        end
+      end
+
+      abort("Example validation failed: #{failed.join(', ')}") unless failed.empty?
+    RUBY
+  end
+
+  desc "Run browser smoke tests when Playwright is available"
+  task :browser_smoke do
+    sh "npm --prefix frontend run test:browser"
+  end
+end
+
 namespace :release do
   def run_rubocop
     Bundler.with_unbundled_env do

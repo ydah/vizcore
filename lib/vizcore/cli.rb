@@ -509,6 +509,7 @@ module Vizcore
     option :out, type: :string, default: "snapshot.png", desc: "Output PNG path"
     option :width, type: :numeric, default: Vizcore::Renderer::SnapshotRenderer::DEFAULT_WIDTH, desc: "Snapshot width"
     option :height, type: :numeric, default: Vizcore::Renderer::SnapshotRenderer::DEFAULT_HEIGHT, desc: "Snapshot height"
+    option :transparent, type: :boolean, default: false, desc: "Render a transparent PNG background"
     option :trust, type: :boolean, default: false, desc: "Suppress Ruby scene execution safety warning"
     # Load a scene DSL file and write a software-rendered PNG preview.
     #
@@ -531,7 +532,8 @@ module Vizcore
       result = Vizcore::Renderer::Snapshot.new(
         config: config,
         width: options.fetch(:width),
-        height: options.fetch(:height)
+        height: options.fetch(:height),
+        transparent: options.fetch(:transparent)
       ).write(out: options.fetch(:out))
       say("Snapshot written: #{result[:path]} (scene=#{result[:scene]}, #{result[:width]}x#{result[:height]})")
     rescue StandardError => e
@@ -552,6 +554,8 @@ module Vizcore
     option :to_frame, type: :numeric, desc: "Last 1-based frame to write"
     option :resume, type: :boolean, default: false, desc: "Skip PNG frames that already exist"
     option :seed, type: :numeric, desc: "Deterministic random seed for render"
+    option :transparent, type: :boolean, default: false, desc: "Render transparent PNG frames"
+    option :progress, type: :boolean, default: false, desc: "Print render progress for long renders"
     option :codec, type: :string, desc: "ffmpeg video codec for MP4 output"
     option :bitrate, type: :string, desc: "ffmpeg video bitrate for MP4 output"
     option :crf, type: :string, desc: "ffmpeg CRF value for MP4 output"
@@ -589,10 +593,12 @@ module Vizcore
         to_frame: options[:to_frame],
         resume: options.fetch(:resume),
         seed: options[:seed],
+        transparent: options.fetch(:transparent),
         video_codec: options[:codec],
         video_bitrate: options[:bitrate],
         video_crf: options[:crf],
-        pixel_format: options[:pix_fmt]
+        pixel_format: options[:pix_fmt],
+        progress_reporter: render_progress_reporter
       ).write(out: options.fetch(:out))
       return say(render_video_message(result)) if result[:format] == :mp4
 
@@ -741,6 +747,17 @@ module Vizcore
     def render_video_message(result)
       "Video written: #{result[:path]} " \
         "(scene=#{result[:scene]}, frames=#{result[:frames]}, fps=#{result[:fps]}, #{result[:width]}x#{result[:height]})"
+    end
+
+    def render_progress_reporter
+      return nil unless options.fetch(:progress)
+
+      lambda do |event|
+        say(
+          "Render progress: frame #{event.fetch(:frame)}/#{event.fetch(:to_frame)} " \
+          "(#{event.fetch(:percent).round(1)}%)"
+        )
+      end
     end
 
     def run_browser_capture(url, out:, selector:, wait:, width:, height:)

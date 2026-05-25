@@ -9,10 +9,11 @@ module Vizcore
   module Renderer
     # Builds one analyzed scene frame and writes a PNG preview.
     class Snapshot
-      def initialize(config:, width: SnapshotRenderer::DEFAULT_WIDTH, height: SnapshotRenderer::DEFAULT_HEIGHT)
+      def initialize(config:, width: SnapshotRenderer::DEFAULT_WIDTH, height: SnapshotRenderer::DEFAULT_HEIGHT, transparent: false)
         @config = config
         @width = width
         @height = height
+        @transparent = !!transparent
       end
 
       # @param out [String, Pathname]
@@ -22,14 +23,14 @@ module Vizcore
         frame_source = SceneFrameSource.new(config: @config)
         frame_source.start
         frame = frame_source.capture
-        png = SnapshotRenderer.new(width: @width, height: @height).render(
+        png = SnapshotRenderer.new(width: @width, height: @height, transparent: @transparent).render(
           scene: frame.fetch(:scene),
           audio: frame.fetch(:audio)
         )
 
         FileUtils.mkdir_p(output_path.dirname)
         File.binwrite(output_path, png)
-        { path: output_path, scene: frame.fetch(:scene_name), width: @width, height: @height }
+        { path: output_path, scene: frame.fetch(:scene_name), width: @width, height: @height, transparent: @transparent }
       ensure
         frame_source&.stop
       end

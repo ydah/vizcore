@@ -6,6 +6,7 @@ module Vizcore
   end
 end
 
+require_relative "deep_copy"
 require_relative "dsl/file_watcher"
 require_relative "dsl/mapping_resolver"
 require_relative "dsl/mapping_transform_builder"

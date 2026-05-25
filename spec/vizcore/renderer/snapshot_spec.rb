@@ -52,6 +52,17 @@ RSpec.describe Vizcore::Renderer::Snapshot do
     expect(png.bytesize).to be > 128
   end
 
+  it "can render a transparent PNG background" do
+    png = Vizcore::Renderer::SnapshotRenderer.new(width: 8, height: 8, transparent: true).render(
+      scene: { layers: [{ name: :empty_shape, type: :shape, params: { shapes: [] } }] },
+      audio: { amplitude: 0.0, beat_pulse: 0.0, bands: { low: 0.0, high: 0.0 } }
+    )
+    scanlines = png_scanlines(png)
+
+    expect(scanlines.getbyte(0)).to eq(0)
+    expect(scanlines.getbyte(4)).to eq(0)
+  end
+
   it "caps flattened path segments in software snapshots" do
     canvas = Class.new do
       attr_reader :lines

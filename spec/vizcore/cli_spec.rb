@@ -482,6 +482,8 @@ RSpec.describe Vizcore::CLI do
           "--resume",
           "--seed",
           "42",
+          "--transparent",
+          "--progress",
           "--codec",
           "libx264",
           "--bitrate",
@@ -501,10 +503,12 @@ RSpec.describe Vizcore::CLI do
           to_frame: 4,
           resume: true,
           seed: 42,
+          transparent: true,
           video_codec: "libx264",
           video_bitrate: "4M",
           video_crf: "18",
-          pixel_format: "yuv444p"
+          pixel_format: "yuv444p",
+          progress_reporter: an_instance_of(Proc)
         )
       )
     end

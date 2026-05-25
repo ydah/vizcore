@@ -64,6 +64,26 @@ RSpec.describe Vizcore::Audio::InputManager do
     end
   end
 
+  describe "#status" do
+    it "reports input and ring buffer health" do
+      manager = described_class.new(source: :dummy, frame_size: 4, ring_buffer_size: 4)
+      manager.start
+      manager.capture_frame(8)
+      manager.latest_samples(8)
+
+      expect(manager.status).to include(
+        source: "dummy",
+        sample_rate: 44_100,
+        frame_size: 4,
+        requested_sample_rate: 44_100,
+        sample_rate_mismatch: false
+      )
+      expect(manager.status[:ring_buffer]).to include(overrun_count: 4, underrun_count: 4)
+    ensure
+      manager&.stop
+    end
+  end
+
   describe ".available_audio_devices" do
     it "returns at least one device entry" do
       devices = described_class.available_audio_devices

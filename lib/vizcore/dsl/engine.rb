@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "pathname"
+require_relative "../deep_copy"
 require_relative "file_watcher"
 require_relative "scene_builder"
 require_relative "style_builder"
@@ -452,16 +453,7 @@ module Vizcore
       end
 
       def deep_dup(value)
-        case value
-        when Hash
-          value.each_with_object({}) do |(key, entry), output|
-            output[key] = deep_dup(entry)
-          end
-        when Array
-          value.map { |entry| deep_dup(entry) }
-        else
-          value
-        end
+        Vizcore::DeepCopy.copy(value)
       end
 
       # Builder object for `transition` block internals.

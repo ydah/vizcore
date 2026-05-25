@@ -16,6 +16,9 @@ module Vizcore
         @buffer = Array.new(@capacity, 0.0)
         @write_index = 0
         @size = 0
+        @write_count = 0
+        @overrun_count = 0
+        @underrun_count = 0
         @mutex = Mutex.new
       end
 
@@ -27,8 +30,10 @@ module Vizcore
 
         @mutex.synchronize do
           normalized.each do |sample|
+            @overrun_count += 1 if @size == @capacity
             @buffer[@write_index] = sample
             @write_index = (@write_index + 1) % @capacity
+            @write_count += 1
             @size += 1 if @size < @capacity
           end
         end
@@ -49,6 +54,7 @@ module Vizcore
           requested = count ? Integer(count) : @size
           return [] if requested <= 0
 
+          @underrun_count += requested - @size if requested > @size
           length = [requested, @size].min
           start = (@write_index - length) % @capacity
 
@@ -61,12 +67,28 @@ module Vizcore
         @mutex.synchronize { @size }
       end
 
+      # @return [Hash] buffer health counters for runtime diagnostics.
+      def metrics
+        @mutex.synchronize do
+          {
+            capacity: @capacity,
+            size: @size,
+            write_count: @write_count,
+            overrun_count: @overrun_count,
+            underrun_count: @underrun_count
+          }
+        end
+      end
+
       # @return [void]
       def clear
         @mutex.synchronize do
           @buffer.fill(0.0)
           @write_index = 0
           @size = 0
+          @write_count = 0
+          @overrun_count = 0
+          @underrun_count = 0
         end
       end
 

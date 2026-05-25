@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "vizcore/version"
+require_relative "vizcore/deep_copy"
 require_relative "vizcore/errors"
 require_relative "vizcore/layer_catalog"
 require_relative "vizcore/plugin_asset_policy"
