@@ -24,7 +24,10 @@ module Vizcore
         @scene = resolve_initial_scene(scenes, initial_timeline_entry)
         @transition_controller = Vizcore::DSL::TransitionController.new(
           scenes: scenes,
-          transitions: Array(@definition[:transitions])
+          transitions: Array(@definition[:transitions]),
+          error_reporter: lambda do |message|
+            report_transition_error(message)
+          end
         )
         @mapping_resolver = Vizcore::DSL::MappingResolver.new
         @input_manager = build_input_manager
@@ -193,6 +196,10 @@ module Vizcore
         return @input_manager.frame_size unless @frame_rate
 
         @input_manager.realtime_capture_size(@frame_rate)
+      end
+
+      def report_transition_error(message)
+        warn(message)
       end
 
       def build_pipeline
