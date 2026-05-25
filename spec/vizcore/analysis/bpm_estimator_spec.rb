@@ -21,6 +21,7 @@ RSpec.describe Vizcore::Analysis::BPMEstimator do
     end
 
     expect(bpm).to be_within(2.0).of(120.0)
+    expect(estimator.confidence).to be > 0.0
   end
 
   it "keeps the previous estimate when no additional beats are detected" do
@@ -44,6 +45,7 @@ RSpec.describe Vizcore::Analysis::BPMEstimator do
     20.times { estimator.call(beat: false) }
 
     expect(estimator.call(beat: true)).to eq(0.0)
+    expect(estimator.confidence).to eq(0.0)
   end
 
   it "can reset the accumulated tempo estimate" do
@@ -57,5 +59,6 @@ RSpec.describe Vizcore::Analysis::BPMEstimator do
     estimator.reset
 
     expect(estimator.call(beat: false)).to eq(0.0)
+    expect(estimator.confidence).to eq(0.0)
   end
 end

@@ -53,6 +53,30 @@ module Vizcore
         @values[:deadzone] = value
       end
 
+      # @param value [Numeric]
+      # @return [Numeric]
+      def threshold(value)
+        @values[:threshold] = value
+      end
+
+      # @param value [Numeric]
+      # @return [Numeric]
+      def hysteresis(value)
+        @values[:hysteresis] = value
+      end
+
+      # @param value [Numeric] hold duration in seconds at the runtime frame cadence
+      # @return [Numeric]
+      def hold(value)
+        @values[:hold] = value
+      end
+
+      # @param value [Numeric] per-frame decay multiplier
+      # @return [Numeric]
+      def decay(value)
+        @values[:decay] = value
+      end
+
       # @param attack [Numeric, nil]
       # @param release [Numeric, nil]
       # @return [Hash]

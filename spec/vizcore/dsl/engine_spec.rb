@@ -96,6 +96,7 @@ RSpec.describe Vizcore::DSL::Engine do
             map amplitude, to: :wobble, gain: 3.0, range: 0.1..1.2, curve: :sqrt
             map frequency_band(:low) => { to: :warp, gain: 2.0, min: 0.2, max: 2.5 }
             map beat_pulse => { to: :flash, range: [0.0, 1.0], attack: 1.0, release: 0.2 }
+            map spectral_flux, to: :spark, threshold: 0.4, hysteresis: 0.1, hold: 0.2, decay: 0.8, curve: :smoothstep
           end
         end
       end
@@ -117,7 +118,39 @@ RSpec.describe Vizcore::DSL::Engine do
           source: { kind: :beat_pulse },
           target: :flash,
           transform: { min: 0.0, max: 1.0, attack: 1.0, release: 0.2 }
+        },
+        {
+          source: { kind: :spectral_flux },
+          target: :spark,
+          transform: { threshold: 0.4, hysteresis: 0.1, curve: :smoothstep, hold: 0.2, decay: 0.8 }
         }
+      )
+    end
+
+    it "builds extended audio feature mapping sources" do
+      definition = described_class.define do
+        scene :features do
+          layer :meters do
+            type :geometry
+            map peak => :peak_level
+            map bpm_confidence => :tempo_lock
+            map spectral_centroid => :brightness
+            map spectral_rolloff => :rolloff
+            map spectral_flatness => :noise
+            map zero_crossing_rate => :crossings
+          end
+        end
+      end
+
+      mappings = definition[:scenes].first[:layers].first[:mappings]
+
+      expect(mappings).to include(
+        { source: { kind: :peak }, target: :peak_level },
+        { source: { kind: :bpm_confidence }, target: :tempo_lock },
+        { source: { kind: :spectral_centroid }, target: :brightness },
+        { source: { kind: :spectral_rolloff }, target: :rolloff },
+        { source: { kind: :spectral_flatness }, target: :noise },
+        { source: { kind: :zero_crossing_rate }, target: :crossings }
       )
     end
 

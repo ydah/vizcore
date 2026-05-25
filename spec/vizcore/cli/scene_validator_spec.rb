@@ -31,6 +31,8 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
             map onset(:high) => :spark
             map kick => :pulse
             map hihat => :scatter
+            map spectral_flux => :glitch
+            map zero_crossing_rate => :noise
           end
         end
 

@@ -22,12 +22,20 @@ RSpec.describe Vizcore::DSL::MappingResolver do
             { source: { kind: :onset, band: :high }, target: :spark },
             { source: { kind: :kick }, target: :kick_flash },
             { source: { kind: :hihat }, target: :hihat_scatter },
-            { source: { kind: :bpm }, target: :tempo }
+            { source: { kind: :bpm }, target: :tempo },
+            { source: { kind: :peak }, target: :peak_level },
+            { source: { kind: :bpm_confidence }, target: :tempo_lock },
+            { source: { kind: :spectral_centroid }, target: :brightness },
+            { source: { kind: :spectral_rolloff }, target: :rolloff },
+            { source: { kind: :spectral_flatness }, target: :noise },
+            { source: { kind: :spectral_flux }, target: :flux },
+            { source: { kind: :zero_crossing_rate }, target: :crossings }
           ]
         }
       ]
       audio = {
         amplitude: 0.72,
+        peak: 0.95,
         bands: { sub: 0.1, low: 0.88, mid: 0.4, high: 0.2 },
         fft: Array.new(8, 0.05),
         beat: true,
@@ -37,7 +45,13 @@ RSpec.describe Vizcore::DSL::MappingResolver do
         onsets: { high: 0.44 },
         drums: { kick: 0.51, hihat: 0.29 },
         beat_count: 12,
-        bpm: 128.5
+        bpm: 128.5,
+        bpm_confidence: 0.7,
+        spectral_centroid: 1_200.0,
+        spectral_rolloff: 4_500.0,
+        spectral_flatness: 0.33,
+        spectral_flux: 0.27,
+        zero_crossing_rate: 0.08
       }
 
       resolved = resolver.resolve_layers(scene_layers: scene_layers, audio: audio)
@@ -57,7 +71,14 @@ RSpec.describe Vizcore::DSL::MappingResolver do
         spark: 0.44,
         kick_flash: 0.51,
         hihat_scatter: 0.29,
-        tempo: 128.5
+        tempo: 128.5,
+        peak_level: 0.95,
+        tempo_lock: 0.7,
+        brightness: 1_200.0,
+        rolloff: 4_500.0,
+        noise: 0.33,
+        flux: 0.27,
+        crossings: 0.08
       )
     end
 
@@ -154,6 +175,56 @@ RSpec.describe Vizcore::DSL::MappingResolver do
 
       expect(quiet[0][:params][:wobble]).to eq(0.0)
       expect(active[0][:params][:wobble]).to eq(0.75)
+    end
+
+    it "applies additional curves" do
+      resolver = described_class.new
+      curves = {
+        ease_in: 0.25,
+        ease_in_out: 0.5,
+        smoothstep: 0.5,
+        step: 1.0
+      }
+      scene_layers = [
+        {
+          name: :curves,
+          params: {},
+          mappings: curves.keys.map do |curve|
+            { source: { kind: :amplitude }, target: curve, transform: { curve: curve } }
+          end
+        }
+      ]
+
+      resolved = resolver.resolve_layers(scene_layers: scene_layers, audio: { amplitude: 0.5, bands: {} })
+
+      curves.each do |target, expected|
+        expect(resolved[0][:params][target]).to be_within(0.0001).of(expected)
+      end
+    end
+
+    it "applies threshold hysteresis hold and decay transforms" do
+      resolver = described_class.new
+      scene_layers = [
+        {
+          name: :triggered,
+          params: {},
+          mappings: [
+            {
+              source: { kind: :spectral_flux },
+              target: :flash,
+              transform: { threshold: 0.5, hysteresis: 0.1, hold: 0.05, decay: 0.5 }
+            }
+          ]
+        }
+      ]
+
+      high = resolver.resolve_layers(scene_layers: scene_layers, audio: { spectral_flux: 0.6, bands: {} }, frame: 1)
+      held = resolver.resolve_layers(scene_layers: scene_layers, audio: { spectral_flux: 0.0, bands: {} }, frame: 3)
+      decayed = resolver.resolve_layers(scene_layers: scene_layers, audio: { spectral_flux: 0.0, bands: {} }, frame: 10)
+
+      expect(high[0][:params][:flash]).to eq(0.6)
+      expect(held[0][:params][:flash]).to eq(0.6)
+      expect(decayed[0][:params][:flash]).to eq(0.3)
     end
 
     it "applies square curve after gain and before range clamping" do

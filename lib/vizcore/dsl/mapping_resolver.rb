@@ -24,7 +24,7 @@ module Vizcore
       def resolve_layer(layer, audio, time:, frame:, resolution:, globals:, custom_shape_overrides:)
         params = deep_dup(layer[:params] || {})
         apply_custom_shape_overrides!(params, layer_name: layer[:name], custom_shape_overrides: custom_shape_overrides)
-        merge_resolved_mappings!(params, resolve_mappings(layer[:mappings], audio, layer_name: layer[:name]))
+        merge_resolved_mappings!(params, resolve_mappings(layer[:mappings], audio, layer_name: layer[:name], frame: frame))
         expand_dynamic_custom_shapes!(params, layer: layer, audio: audio, time: time, frame: frame, resolution: resolution, globals: globals)
 
         output = {
@@ -39,14 +39,14 @@ module Vizcore
         output
       end
 
-      def resolve_mappings(mappings, audio, layer_name:)
+      def resolve_mappings(mappings, audio, layer_name:, frame:)
         Array(mappings).each_with_object({}) do |mapping, resolved|
           source = mapping[:source]
           target = mapping[:target]
           next unless source && target
 
           value = resolve_source_value(source, audio)
-          value = apply_transform(value, mapping[:transform], state_key: [layer_name, target, source])
+          value = apply_transform(value, mapping[:transform], state_key: [layer_name, target, source], frame: frame)
           resolved[target.to_s] = value unless value.nil?
         end
       end
@@ -234,6 +234,8 @@ module Vizcore
         case source[:kind]&.to_sym
         when :amplitude
           audio[:amplitude]
+        when :peak
+          audio[:peak]
         when :frequency_band
           audio.dig(:bands, source[:band]&.to_sym)
         when :fft_spectrum
@@ -252,6 +254,18 @@ module Vizcore
           audio[:beat_count]
         when :bpm
           audio[:bpm]
+        when :bpm_confidence
+          audio[:bpm_confidence]
+        when :spectral_centroid
+          audio[:spectral_centroid]
+        when :spectral_rolloff
+          audio[:spectral_rolloff]
+        when :spectral_flatness
+          audio[:spectral_flatness]
+        when :spectral_flux
+          audio[:spectral_flux]
+        when :zero_crossing_rate
+          audio[:zero_crossing_rate]
         else
           nil
         end
@@ -264,14 +278,15 @@ module Vizcore
         audio.dig(:onsets, band)
       end
 
-      def apply_transform(value, transform, state_key:)
+      def apply_transform(value, transform, state_key:, frame:)
         return value if transform.nil? || transform.empty?
         return transform_array(value, transform) if value.is_a?(Array)
         return nil if value.is_a?(Hash) || value.nil?
 
-        transformed = transform_scalar(value, transform)
+        transformed = transform_scalar(value, transform, state_key: state_key)
         return nil if transformed.nil?
 
+        transformed = apply_event_shaping(transformed, transform, state_key: state_key, frame: frame)
         apply_smoothing(transformed, transform, state_key)
       end
 
@@ -281,16 +296,31 @@ module Vizcore
         end
       end
 
-      def transform_scalar(value, transform, fallback: nil)
+      def transform_scalar(value, transform, fallback: nil, state_key: nil)
         numeric = numeric_value(value, fallback: fallback)
         return nil if numeric.nil?
 
         numeric = 0.0 if transform.key?(:deadzone) && numeric.abs < Float(transform[:deadzone])
+        numeric = apply_threshold(numeric, transform, state_key: state_key)
         numeric *= Float(transform[:gain]) if transform.key?(:gain)
         numeric = apply_curve(numeric, transform[:curve]) if transform[:curve]
         numeric = [numeric, Float(transform[:min])].max if transform.key?(:min)
         numeric = [numeric, Float(transform[:max])].min if transform.key?(:max)
         numeric
+      end
+
+      def apply_threshold(value, transform, state_key:)
+        return value unless transform.key?(:threshold) || transform.key?(:hysteresis)
+
+        threshold = Float(transform.fetch(:threshold, 0.5))
+        hysteresis = Float(transform.fetch(:hysteresis, 0.0))
+        return value >= threshold ? value : 0.0 if hysteresis <= 0.0 || state_key.nil?
+
+        key = [:hysteresis, state_key]
+        active = !!@mapping_state[key]
+        active = value >= (active ? threshold - hysteresis : threshold)
+        @mapping_state[key] = active
+        active ? value : 0.0
       end
 
       def numeric_value(value, fallback:)
@@ -312,12 +342,66 @@ module Vizcore
         when :ease_out
           clamped = [[value, 0.0].max, 1.0].min
           1.0 - ((1.0 - clamped) * (1.0 - clamped))
+        when :ease_in
+          clamped = [[value, 0.0].max, 1.0].min
+          clamped * clamped
+        when :ease_in_out
+          clamped = [[value, 0.0].max, 1.0].min
+          clamped < 0.5 ? 2.0 * clamped * clamped : 1.0 - ((-2.0 * clamped + 2.0)**2 / 2.0)
+        when :smoothstep
+          clamped = [[value, 0.0].max, 1.0].min
+          clamped * clamped * (3.0 - 2.0 * clamped)
+        when :exp
+          clamped = [[value, 0.0].max, 1.0].min
+          ((Math.exp(clamped) - 1.0) / (Math::E - 1.0)).clamp(0.0, 1.0)
+        when :log
+          clamped = [[value, 0.0].max, 1.0].min
+          Math.log1p(clamped * (Math::E - 1.0))
+        when :step
+          value >= 0.5 ? 1.0 : 0.0
         end
+      end
+
+      def apply_event_shaping(value, transform, state_key:, frame:)
+        shaped = value
+        shaped = apply_hold(shaped, transform, state_key: state_key, frame: frame) if transform.key?(:hold)
+        shaped = apply_decay(shaped, transform, state_key: state_key) if transform.key?(:decay)
+        shaped
+      end
+
+      def apply_hold(value, transform, state_key:, frame:)
+        hold_frames = (Float(transform[:hold]) * 60.0).ceil
+        return value unless hold_frames.positive?
+
+        key = [:hold, state_key]
+        state = @mapping_state[key] || { until_frame: -1, value: 0.0 }
+        current_frame = Integer(frame)
+        if value.to_f.positive?
+          state = { until_frame: current_frame + hold_frames, value: value }
+        elsif current_frame <= state[:until_frame]
+          value = state[:value]
+        end
+        @mapping_state[key] = state
+        value
+      rescue StandardError
+        value
+      end
+
+      def apply_decay(value, transform, state_key:)
+        decay = Float(transform[:decay]).clamp(0.0, 1.0)
+        key = [:decay, state_key]
+        previous = @mapping_state[key].to_f
+        output = [value.to_f, previous * decay].max
+        @mapping_state[key] = output
+        output
+      rescue StandardError
+        value
       end
 
       def apply_smoothing(value, transform, state_key)
         return value unless transform.key?(:attack) || transform.key?(:release)
 
+        state_key = [:smooth, state_key]
         previous = @mapping_state[state_key]
         if previous.nil?
           @mapping_state[state_key] = value

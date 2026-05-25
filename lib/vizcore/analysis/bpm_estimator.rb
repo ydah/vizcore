@@ -4,7 +4,7 @@ module Vizcore
   module Analysis
     # Estimates tempo (BPM) from beat onsets using lag autocorrelation.
     class BPMEstimator
-      attr_reader :frame_rate
+      attr_reader :confidence, :frame_rate
 
       # @param frame_rate [Float] analysis frames per second
       # @param min_bpm [Float] minimum candidate BPM
@@ -21,6 +21,7 @@ module Vizcore
         @min_onsets = Integer(min_onsets)
         @history = []
         @current_bpm = 0.0
+        @confidence = 0.0
       end
 
       # @param beat [Boolean] whether the current frame contains a beat onset
@@ -29,10 +30,17 @@ module Vizcore
         @history << (beat ? 1.0 : 0.0)
         @history.shift while @history.length > @history_size
 
-        return @current_bpm if onset_count < @min_onsets
+        if onset_count < @min_onsets
+          @confidence = 0.0
+          return @current_bpm
+        end
 
-        candidate = estimate_candidate_bpm
-        return @current_bpm if candidate <= 0.0
+        candidate, confidence = estimate_candidate_bpm
+        if candidate <= 0.0
+          @confidence = 0.0
+          return @current_bpm
+        end
+        @confidence = confidence
 
         @current_bpm =
           if @current_bpm <= 0.0
@@ -50,6 +58,7 @@ module Vizcore
       def reset
         @history.clear
         @current_bpm = 0.0
+        @confidence = 0.0
       end
 
       private
@@ -60,11 +69,11 @@ module Vizcore
 
       def estimate_candidate_bpm
         n = @history.length
-        return 0.0 if n < 2
+        return [0.0, 0.0] if n < 2
 
         min_lag = [(60.0 * @frame_rate / @max_bpm).round, 1].max
         max_lag = [(60.0 * @frame_rate / @min_bpm).round, n - 1].min
-        return 0.0 if min_lag > max_lag
+        return [0.0, 0.0] if min_lag > max_lag
 
         best_lag = nil
         best_score = -Float::INFINITY
@@ -77,9 +86,10 @@ module Vizcore
           best_lag = lag
         end
 
-        return 0.0 unless best_lag && best_score.positive?
+        return [0.0, 0.0] unless best_lag && best_score.positive?
 
-        (60.0 * @frame_rate / best_lag).clamp(@min_bpm, @max_bpm)
+        bpm = (60.0 * @frame_rate / best_lag).clamp(@min_bpm, @max_bpm)
+        [bpm, (best_score / onset_count.to_f).clamp(0.0, 1.0)]
       end
 
       def autocorrelation_at_lag(lag)

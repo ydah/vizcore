@@ -11,7 +11,8 @@ module Vizcore
       NO_ARGUMENT = Object.new.freeze
       SHAPE_SCHEMA_VERSION = 2
       MAPPING_SOURCE_KINDS = %i[
-        amplitude frequency_band fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
+        amplitude peak frequency_band fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
+        bpm_confidence spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate
       ].freeze
       PATH_DEFAULT_DETAIL = 32
       PATH_MIN_DETAIL = 4
@@ -663,6 +664,11 @@ module Vizcore
         mapping_source(:amplitude)
       end
 
+      # @return [Hash] source descriptor for absolute sample peak level
+      def peak
+        mapping_source(:peak)
+      end
+
       # @param name [Symbol, String] band key (`sub`, `low`, `mid`, `high`)
       # @return [Hash] source descriptor for a frequency band
       def frequency_band(name)
@@ -760,6 +766,36 @@ module Vizcore
       # @return [Hash] source descriptor for estimated BPM
       def bpm
         mapping_source(:bpm)
+      end
+
+      # @return [Hash] source descriptor for tempo estimator confidence
+      def bpm_confidence
+        mapping_source(:bpm_confidence)
+      end
+
+      # @return [Hash] source descriptor for spectral centroid in Hz
+      def spectral_centroid
+        mapping_source(:spectral_centroid)
+      end
+
+      # @return [Hash] source descriptor for spectral rolloff in Hz
+      def spectral_rolloff
+        mapping_source(:spectral_rolloff)
+      end
+
+      # @return [Hash] source descriptor for spectral flatness
+      def spectral_flatness
+        mapping_source(:spectral_flatness)
+      end
+
+      # @return [Hash] source descriptor for positive spectrum delta
+      def spectral_flux
+        mapping_source(:spectral_flux)
+      end
+
+      # @return [Hash] source descriptor for time-domain zero crossing rate
+      def zero_crossing_rate
+        mapping_source(:zero_crossing_rate)
       end
 
       # @return [Hash] serialized layer payload
@@ -1365,19 +1401,23 @@ module Vizcore
         raise ArgumentError, "param min must be less than or equal to max"
       end
 
-      def normalize_transform(gain: nil, range: nil, min: nil, max: nil, curve: nil, attack: nil, release: nil, deadzone: nil)
+      def normalize_transform(gain: nil, range: nil, min: nil, max: nil, curve: nil, attack: nil, release: nil, deadzone: nil, threshold: nil, hysteresis: nil, hold: nil, decay: nil)
         range_min, range_max = normalize_range(range, context: "mapping")
         min = range_min if min.nil?
         max = range_max if max.nil?
 
         output = {}
         output[:deadzone] = normalize_non_negative_float(deadzone, :deadzone) unless deadzone.nil?
+        output[:threshold] = normalize_float(threshold, :threshold) unless threshold.nil?
+        output[:hysteresis] = normalize_non_negative_float(hysteresis, :hysteresis) unless hysteresis.nil?
         output[:gain] = normalize_float(gain, :gain) unless gain.nil?
         output[:min] = normalize_float(min, :min) unless min.nil?
         output[:max] = normalize_float(max, :max) unless max.nil?
         output[:curve] = normalize_curve(curve) unless curve.nil?
         output[:attack] = clamp(normalize_float(attack, :attack), 0.0, 1.0) unless attack.nil?
         output[:release] = clamp(normalize_float(release, :release), 0.0, 1.0) unless release.nil?
+        output[:hold] = normalize_non_negative_float(hold, :hold) unless hold.nil?
+        output[:decay] = clamp(normalize_float(decay, :decay), 0.0, 1.0) unless decay.nil?
         output
       end
 
@@ -1419,7 +1459,7 @@ module Vizcore
 
       def normalize_curve(value)
         curve = value.to_sym
-        return curve if %i[linear sqrt square ease_out].include?(curve)
+        return curve if %i[linear sqrt square ease_out ease_in ease_in_out smoothstep exp log step].include?(curve)
 
         raise ArgumentError, "unsupported mapping curve: #{value.inspect}"
       end

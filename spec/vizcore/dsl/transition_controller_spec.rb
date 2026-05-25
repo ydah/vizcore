@@ -274,5 +274,44 @@ RSpec.describe Vizcore::DSL::TransitionController do
         )
       ).to include(from: :intro, to: :drop)
     end
+
+    it "exposes extended audio features to transition triggers" do
+      controller = described_class.new(
+        scenes: [
+          { name: :intro, layers: [] },
+          { name: :drop, layers: [] }
+        ],
+        transitions: [
+          {
+            from: :intro,
+            to: :drop,
+            trigger: proc {
+              peak > 0.8 &&
+                bpm_confidence > 0.5 &&
+                spectral_centroid > 1_000.0 &&
+                spectral_rolloff > 4_000.0 &&
+                spectral_flatness > 0.2 &&
+                spectral_flux > 0.1 &&
+                zero_crossing_rate > 0.01
+            }
+          }
+        ]
+      )
+
+      expect(
+        controller.next_transition(
+          scene_name: :intro,
+          audio: {
+            peak: 0.9,
+            bpm_confidence: 0.7,
+            spectral_centroid: 1_200.0,
+            spectral_rolloff: 4_500.0,
+            spectral_flatness: 0.3,
+            spectral_flux: 0.2,
+            zero_crossing_rate: 0.02
+          }
+        )
+      ).to include(from: :intro, to: :drop)
+    end
   end
 end

@@ -12,7 +12,8 @@ module Vizcore
       BUILTIN_SHADERS = Vizcore::LayerCatalog::BUILTIN_SHADERS
 
       MAPPING_SOURCE_KINDS = %i[
-        amplitude frequency_band fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
+        amplitude peak frequency_band fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
+        bpm_confidence spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate
       ].freeze
 
       FREQUENCY_BANDS = %i[sub low mid high].freeze

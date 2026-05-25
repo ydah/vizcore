@@ -138,6 +138,11 @@ module Vizcore
           @audio[:amplitude].to_f
         end
 
+        # @return [Float]
+        def peak
+          @audio[:peak].to_f
+        end
+
         # @param name [Symbol, String]
         # @return [Float]
         def frequency_band(name)
@@ -232,6 +237,36 @@ module Vizcore
         # @return [Float]
         def bpm
           @audio[:bpm].to_f
+        end
+
+        # @return [Float]
+        def bpm_confidence
+          @audio[:bpm_confidence].to_f
+        end
+
+        # @return [Float]
+        def spectral_centroid
+          @audio[:spectral_centroid].to_f
+        end
+
+        # @return [Float]
+        def spectral_rolloff
+          @audio[:spectral_rolloff].to_f
+        end
+
+        # @return [Float]
+        def spectral_flatness
+          @audio[:spectral_flatness].to_f
+        end
+
+        # @return [Float]
+        def spectral_flux
+          @audio[:spectral_flux].to_f
+        end
+
+        # @return [Float]
+        def zero_crossing_rate
+          @audio[:zero_crossing_rate].to_f
         end
 
         # @return [Integer]

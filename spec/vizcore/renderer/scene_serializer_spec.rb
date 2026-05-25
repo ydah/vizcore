@@ -10,6 +10,7 @@ RSpec.describe Vizcore::Renderer::SceneSerializer do
         timestamp: 1.23456,
         audio: {
           amplitude: 0.123456,
+          peak: 0.876543,
           bands: { low: 0.987654, high: 0.333333 },
           fft: [0.123456, 0.987654],
           onset: 0.234567,
@@ -20,6 +21,12 @@ RSpec.describe Vizcore::Renderer::SceneSerializer do
           beat_pulse: 0.765432,
           beat_count: 7,
           bpm: 126.7,
+          bpm_confidence: 0.555555,
+          spectral_centroid: 1234.56789,
+          spectral_rolloff: 4567.89123,
+          spectral_flatness: 0.246813,
+          spectral_flux: 0.135791,
+          zero_crossing_rate: 0.02468,
           peak_frequency: 440.12345
         },
         scene_name: :intro,
@@ -45,6 +52,7 @@ RSpec.describe Vizcore::Renderer::SceneSerializer do
       expect(frame[:schema_version]).to eq("vizcore.frame.v1")
       expect(frame[:audio]).to eq(
         amplitude: 0.1235,
+        peak: 0.8765,
         bands: { low: 0.9877, high: 0.3333 },
         fft: [0.1235, 0.9877],
         onset: 0.2346,
@@ -55,6 +63,12 @@ RSpec.describe Vizcore::Renderer::SceneSerializer do
         beat_pulse: 0.7654,
         beat_count: 7,
         bpm: 126.7,
+        bpm_confidence: 0.5556,
+        spectral_centroid: 1234.5679,
+        spectral_rolloff: 4567.8912,
+        spectral_flatness: 0.2468,
+        spectral_flux: 0.1358,
+        zero_crossing_rate: 0.0247,
         peak_frequency: 440.1235
       )
       expect(frame[:scene]).to eq(

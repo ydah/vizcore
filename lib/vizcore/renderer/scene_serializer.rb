@@ -35,6 +35,7 @@ module Vizcore
 
         {
           amplitude: round_float(audio[:amplitude]),
+          peak: round_float(audio[:peak]),
           bands: bands.transform_values { |value| round_float(value) },
           fft: Array(audio[:fft]).map { |value| round_float(value) },
           onset: round_float(audio[:onset]),
@@ -45,6 +46,12 @@ module Vizcore
           beat_pulse: round_float(audio[:beat_pulse]),
           beat_count: Integer(audio[:beat_count] || 0),
           bpm: audio[:bpm],
+          bpm_confidence: round_float(audio[:bpm_confidence]),
+          spectral_centroid: round_float(audio[:spectral_centroid]),
+          spectral_rolloff: round_float(audio[:spectral_rolloff]),
+          spectral_flatness: round_float(audio[:spectral_flatness]),
+          spectral_flux: round_float(audio[:spectral_flux]),
+          zero_crossing_rate: round_float(audio[:zero_crossing_rate]),
           peak_frequency: round_float(audio[:peak_frequency])
         }
       end

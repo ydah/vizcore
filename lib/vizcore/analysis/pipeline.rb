@@ -37,6 +37,7 @@ module Vizcore
         @silent_frame_count = 0
         @previous_onset_amplitude = 0.0
         @previous_onset_bands = {}
+        @previous_flux_spectrum = nil
       end
 
       # @param settings [Hash, nil]
@@ -73,16 +74,20 @@ module Vizcore
         @beat_pulse = beat_detected ? 1.0 : @beat_pulse * BEAT_PULSE_DECAY
         @beat_pulse = 0.0 if @beat_pulse < BEAT_PULSE_FLOOR
         bpm = resolve_bpm(beat_detected)
+        peak = peak_level(samples)
+        spectrum_preview = preview_spectrum(fft[:magnitudes])
+        spectral = spectral_features(fft[:magnitudes], spectrum_preview)
         normalized = normalize_features(
           amplitude: amplitude,
           bands: bands,
-          fft: preview_spectrum(fft[:magnitudes])
+          fft: spectrum_preview
         )
         onsets = detect_onsets(amplitude: normalized[:amplitude], bands: normalized[:bands])
         drums = detect_drum_sources(bands: normalized[:bands], onsets: onsets[:bands])
 
         {
           amplitude: @smoother.smooth(:amplitude, normalized[:amplitude]),
+          peak: peak,
           bands: @smoother.smooth_hash(normalized[:bands], namespace: :bands),
           fft: @smoother.smooth_array(normalized[:fft], namespace: :fft),
           onset: onsets[:amplitude],
@@ -93,6 +98,12 @@ module Vizcore
           beat_pulse: @beat_pulse,
           beat_count: beat[:beat_count],
           bpm: bpm,
+          bpm_confidence: bpm_confidence,
+          spectral_centroid: spectral[:centroid],
+          spectral_rolloff: spectral[:rolloff],
+          spectral_flatness: spectral[:flatness],
+          spectral_flux: spectral[:flux],
+          zero_crossing_rate: zero_crossing_rate(samples),
           peak_frequency: fft[:peak_frequency]
         }
       end
@@ -201,9 +212,11 @@ module Vizcore
         @smoother.reset if @smoother.respond_to?(:reset)
         @previous_onset_amplitude = 0.0
         @previous_onset_bands = {}
+        @previous_flux_spectrum = nil
 
         {
           amplitude: 0.0,
+          peak: 0.0,
           bands: { sub: 0.0, low: 0.0, mid: 0.0, high: 0.0 },
           fft: Array.new(32, 0.0),
           onset: 0.0,
@@ -214,12 +227,19 @@ module Vizcore
           beat_pulse: 0.0,
           beat_count: current_beat_count,
           bpm: @last_bpm,
+          bpm_confidence: bpm_confidence,
+          spectral_centroid: 0.0,
+          spectral_rolloff: 0.0,
+          spectral_flatness: 0.0,
+          spectral_flux: 0.0,
+          zero_crossing_rate: 0.0,
           peak_frequency: 0.0
         }
       end
 
       def reset_tempo_state
         @last_bpm = @locked_bpm || 0.0
+        @previous_flux_spectrum = nil
         @bpm_estimator.reset if @bpm_estimator.respond_to?(:reset)
       end
 
@@ -260,6 +280,73 @@ module Vizcore
         @last_bpm = @smoother.smooth(:bpm, bpm, alpha: 0.2).to_f
       end
 
+      def bpm_confidence
+        return 1.0 if @locked_bpm
+        return @bpm_estimator.confidence.to_f if @bpm_estimator.respond_to?(:confidence)
+
+        @last_bpm.to_f.positive? ? 1.0 : 0.0
+      rescue StandardError
+        0.0
+      end
+
+      def spectral_features(magnitudes, spectrum_preview)
+        values = Array(magnitudes).map { |value| Float(value).abs }
+        return zero_spectral_features if values.empty?
+
+        total = values.sum
+        return zero_spectral_features unless total.positive?
+
+        {
+          centroid: spectral_centroid(values, total),
+          rolloff: spectral_rolloff(values, total),
+          flatness: spectral_flatness(values),
+          flux: spectral_flux(spectrum_preview)
+        }
+      rescue StandardError
+        zero_spectral_features
+      end
+
+      def zero_spectral_features
+        { centroid: 0.0, rolloff: 0.0, flatness: 0.0, flux: 0.0 }
+      end
+
+      def spectral_centroid(values, total)
+        weighted = values.each_with_index.sum do |magnitude, index|
+          @fft_processor.bin_frequency(index) * magnitude
+        end
+        weighted / total
+      end
+
+      def spectral_rolloff(values, total, threshold: 0.85)
+        target = total * threshold
+        running = 0.0
+        index = values.index do |magnitude|
+          running += magnitude
+          running >= target
+        end
+        @fft_processor.bin_frequency(index || 0)
+      end
+
+      def spectral_flatness(values)
+        epsilon = 1e-12
+        arithmetic_mean = values.sum / values.length.to_f
+        return 0.0 unless arithmetic_mean.positive?
+
+        log_mean = values.sum { |value| Math.log([value, epsilon].max) } / values.length.to_f
+        (Math.exp(log_mean) / arithmetic_mean).clamp(0.0, 1.0)
+      end
+
+      def spectral_flux(spectrum_preview)
+        current = Array(spectrum_preview).map { |value| Float(value).clamp(0.0, 1.0) }
+        previous = @previous_flux_spectrum
+        @previous_flux_spectrum = current
+        return 0.0 unless previous && previous.length == current.length
+
+        Math.sqrt(current.each_with_index.sum { |value, index| [value - previous[index], 0.0].max**2 }).clamp(0.0, 1.0)
+      rescue StandardError
+        0.0
+      end
+
       def preview_spectrum(magnitudes, bins: 32)
         values = Array(magnitudes)
         return Array.new(bins, 0.0) if values.empty?
@@ -281,6 +368,24 @@ module Vizcore
         sum = values.reduce(0.0) { |acc, sample| acc + sample * sample }
         Math.sqrt(sum / values.length.to_f).clamp(0.0, 1.0)
       rescue ArgumentError, TypeError
+        0.0
+      end
+
+      def peak_level(samples)
+        Array(samples).map { |sample| Float(sample).abs }.max.to_f.clamp(0.0, 1.0)
+      rescue StandardError
+        0.0
+      end
+
+      def zero_crossing_rate(samples)
+        values = Array(samples).map { |sample| Float(sample) }
+        return 0.0 if values.length < 2
+
+        crossings = values.each_cons(2).count do |previous, current|
+          (previous.negative? && current >= 0.0) || (previous.positive? && current <= 0.0)
+        end
+        (crossings / (values.length - 1).to_f).clamp(0.0, 1.0)
+      rescue StandardError
         0.0
       end
 
