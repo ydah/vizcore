@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "json"
 require "net/http"
 require "pathname"
 require "thor"
@@ -10,11 +11,13 @@ require_relative "audio"
 require_relative "cli/doctor"
 require_relative "cli/dsl_reference"
 require_relative "cli/layer_docs"
+require_relative "cli/plugin_checker"
 require_relative "cli/scene_diagnostics"
 require_relative "cli/shader_template"
 require_relative "cli/shader_uniform_docs"
 require_relative "config"
 require_relative "project_manifest"
+require_relative "scene_trust"
 require_relative "server"
 
 module Vizcore
@@ -123,6 +126,7 @@ module Vizcore
     option :reload, type: :boolean, default: Config::DEFAULT_RELOAD, desc: "Reload the scene file when it changes"
     option :projector, type: :boolean, default: false, desc: "Hide browser operator UI for projection output"
     option :allow_public_control, type: :boolean, default: false, desc: "Allow control panel/WebSocket when binding to a public host"
+    option :trust, type: :boolean, default: false, desc: "Suppress Ruby scene execution safety warning"
     # Start the Vizcore server with the given scene file.
     #
     # @param scene_file [String] path to a Ruby scene DSL file
@@ -151,6 +155,7 @@ module Vizcore
         projector_mode: options.fetch(:projector),
         allow_public_control: options.fetch(:allow_public_control)
       )
+      warn_untrusted_scene(config.scene_file, project_root: manifest&.root || Dir.pwd) unless options.fetch(:trust)
       Server::Runner.new(config).run
     rescue ArgumentError => e
       raise Thor::Error, e.message
@@ -260,6 +265,53 @@ module Vizcore
       raise Thor::Error, "vizcore doctor found required failures" if report.failure?
     end
 
+    desc "features", "Print optional runtime feature availability"
+    option :format, type: :string, default: "text", desc: "Output format: text or json"
+    # Print optional dependency feature flags for automation and doctor-style checks.
+    #
+    # @raise [Thor::Error] when the output format is unsupported
+    # @return [void]
+    def features
+      payload = Vizcore.features
+      case options.fetch(:format).to_s
+      when "json"
+        say(JSON.pretty_generate(payload.transform_keys(&:to_s)))
+      when "text"
+        payload.each do |name, available|
+          say("#{available ? '[ok]' : '[warn]'} #{name}: #{available ? 'available' : 'unavailable'}")
+        end
+      else
+        raise Thor::Error, "unsupported features format: #{options.fetch(:format)}"
+      end
+    end
+
+    desc "calibrate COMMAND", "Measure input levels for audio calibration"
+    option :audio_source, type: :string, default: "mic", desc: "Audio source: mic, file, dummy"
+    option :audio_file, type: :string, desc: "Path to audio file used when --audio-source file"
+    option :audio_device, type: :string, desc: "Audio input device index or name used when --audio-source mic"
+    option :duration, type: :numeric, default: Vizcore::Audio::Calibration::DEFAULT_DURATION, desc: "Calibration duration in seconds"
+    option :fps, type: :numeric, default: Vizcore::Audio::Calibration::DEFAULT_FPS, desc: "Calibration sampling rate"
+    option :format, type: :string, default: "text", desc: "Output format: text or json"
+    # Run calibration helpers.
+    #
+    # @param command [String, nil]
+    # @raise [Thor::Error] when arguments are invalid
+    # @return [void]
+    def calibrate(command = nil)
+      raise Thor::Error, "Unknown calibrate command: #{command || '(nil)'}. Use `vizcore calibrate audio`." unless command.to_s == "audio"
+
+      result = Vizcore::Audio::Calibration.new(
+        source: options.fetch(:audio_source),
+        file_path: options[:audio_file],
+        audio_device: options[:audio_device],
+        duration: options.fetch(:duration),
+        fps: options.fetch(:fps)
+      ).call
+      print_calibration_result(result, format: options.fetch(:format))
+    rescue ArgumentError => e
+      raise Thor::Error, e.message
+    end
+
     map "inspect" => :inspect_scene
     desc "inspect SCENE_FILE", "Print scenes, layers, mappings, and transitions"
     option :format, type: :string, default: "text", desc: "Output format: text or json"
@@ -361,8 +413,10 @@ module Vizcore
       case command.to_s
       when "new"
         create_plugin_scaffold(name)
+      when "check"
+        check_plugin_scaffold(name)
       else
-        raise Thor::Error, "Unknown plugin command: #{command || '(nil)'}. Use `vizcore plugin new NAME`."
+        raise Thor::Error, "Unknown plugin command: #{command || '(nil)'}. Use `vizcore plugin new NAME` or `vizcore plugin check PATH`."
       end
     rescue ArgumentError => e
       raise Thor::Error, e.message
@@ -405,6 +459,7 @@ module Vizcore
     option :width, type: :numeric, default: 1280, desc: "Browser viewport width"
     option :height, type: :numeric, default: 720, desc: "Browser viewport height"
     option :allow_public_control, type: :boolean, default: false, desc: "Allow control panel/WebSocket when binding to a public host"
+    option :trust, type: :boolean, default: false, desc: "Suppress Ruby scene execution safety warning"
     # Start Vizcore and capture a browser-rendered canvas from the projector route.
     #
     # @param scene_file [String]
@@ -424,6 +479,7 @@ module Vizcore
         allow_public_control: options.fetch(:allow_public_control)
       )
       validate_snapshot_config!(config)
+      warn_untrusted_scene(config.scene_file) unless options.fetch(:trust)
 
       pid = Kernel.spawn(*temporary_server_command(config), out: File::NULL, err: File::NULL)
       begin
@@ -453,6 +509,7 @@ module Vizcore
     option :out, type: :string, default: "snapshot.png", desc: "Output PNG path"
     option :width, type: :numeric, default: Vizcore::Renderer::SnapshotRenderer::DEFAULT_WIDTH, desc: "Snapshot width"
     option :height, type: :numeric, default: Vizcore::Renderer::SnapshotRenderer::DEFAULT_HEIGHT, desc: "Snapshot height"
+    option :trust, type: :boolean, default: false, desc: "Suppress Ruby scene execution safety warning"
     # Load a scene DSL file and write a software-rendered PNG preview.
     #
     # @param scene_file [String] path to a Ruby scene DSL file
@@ -469,6 +526,7 @@ module Vizcore
         bpm_lock: options.fetch(:bpm_lock)
       )
       validate_snapshot_config!(config)
+      warn_untrusted_scene(config.scene_file) unless options.fetch(:trust)
 
       result = Vizcore::Renderer::Snapshot.new(
         config: config,
@@ -501,6 +559,7 @@ module Vizcore
     option :fps, type: :numeric, default: Vizcore::Renderer::RenderSequence::DEFAULT_FRAME_RATE, desc: "Render frame rate"
     option :width, type: :numeric, default: Vizcore::Renderer::SnapshotRenderer::DEFAULT_WIDTH, desc: "Frame width"
     option :height, type: :numeric, default: Vizcore::Renderer::SnapshotRenderer::DEFAULT_HEIGHT, desc: "Frame height"
+    option :trust, type: :boolean, default: false, desc: "Suppress Ruby scene execution safety warning"
     # Load a scene DSL file and write a software-rendered PNG image sequence or MP4.
     #
     # @param scene_file [String] path to a Ruby scene DSL file
@@ -517,6 +576,7 @@ module Vizcore
         bpm_lock: options.fetch(:bpm_lock)
       )
       validate_snapshot_config!(config)
+      warn_untrusted_scene(config.scene_file) unless options.fetch(:trust)
 
       result = Vizcore::Renderer::RenderSequence.new(
         config: config,
@@ -594,6 +654,25 @@ module Vizcore
         label = issue.error? ? "[error]" : "[warn]"
         code = issue.respond_to?(:code) && issue.code ? " #{issue.code}" : ""
         say("#{label}#{code} #{issue.message}")
+      end
+    end
+
+    def warn_untrusted_scene(scene_file, project_root: Dir.pwd)
+      warning = Vizcore::SceneTrust.warning_for(scene_file, project_root: project_root)
+      warn("[warn] #{warning}") if warning
+    end
+
+    def print_calibration_result(result, format:)
+      case format.to_s
+      when "json"
+        say(JSON.pretty_generate(result.to_h.transform_keys(&:to_s)))
+      when "text"
+        say("Audio calibration:")
+        result.to_h.each do |key, value|
+          say("  #{key}: #{value}")
+        end
+      else
+        raise Thor::Error, "unsupported calibration format: #{format}"
       end
     end
 
@@ -749,6 +828,16 @@ module Vizcore
 
       say("Created plugin scaffold: #{root}")
       say("Next: require_relative \"#{root.basename}/lib/#{metadata.fetch(:plugin_name)}\" in your scene")
+    end
+
+    def check_plugin_scaffold(path)
+      raise ArgumentError, "plugin path is required" if path.to_s.strip.empty?
+
+      report = Vizcore::CLISupport::PluginChecker.new(path).call
+      report.checks.each do |check|
+        say("#{status_label(check.status)} #{check.name}: #{check.message}")
+      end
+      raise Thor::Error, "plugin check failed" if report.failure?
     end
 
     def plugin_scaffold_metadata(name)

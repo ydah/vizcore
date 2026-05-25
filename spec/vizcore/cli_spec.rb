@@ -98,6 +98,31 @@ RSpec.describe Vizcore::CLI do
       end.to output(/\[ok\] Ruby: 3\.2\.0 satisfies >= 3\.2\.0/).to_stdout
     end
 
+    it "prints optional feature flags as JSON" do
+      allow(Vizcore).to receive(:features).and_return(mic: false, midi: true, ffmpeg: true)
+
+      expect do
+        described_class.start(["features", "--format", "json"])
+      end.to output(/"mic": false.*"midi": true/m).to_stdout
+    end
+
+    it "calibrates dummy audio input" do
+      expect do
+        described_class.start(
+          [
+            "calibrate",
+            "audio",
+            "--audio-source",
+            "dummy",
+            "--duration",
+            "0.05",
+            "--fps",
+            "2"
+          ]
+        )
+      end.to output(/Audio calibration:.*recommended_noise_gate:/m).to_stdout
+    end
+
     it "validates a scene file" do
       Dir.mktmpdir("vizcore-cli-validate") do |dir|
         scene_path = File.join(dir, "scene.rb")
@@ -226,6 +251,18 @@ RSpec.describe Vizcore::CLI do
             'const layerType = "laser_grid_layer"',
             "globalThis.VizcorePlugins"
           )
+        end
+      end
+    end
+
+    it "checks a plugin scaffold" do
+      Dir.mktmpdir("vizcore-cli-plugin-check") do |dir|
+        Dir.chdir(dir) do
+          described_class.start(["plugin", "new", "laser-grid"])
+
+          expect do
+            described_class.start(["plugin", "check", "laser_grid"])
+          end.to output(/Ruby layer: .*valid Ruby syntax.*Frontend renderer: .*is loadable.*Example scene: .*valid Ruby syntax/m).to_stdout
         end
       end
     end

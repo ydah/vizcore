@@ -7,6 +7,7 @@ module Vizcore
 end
 
 require_relative "audio/base_input"
+require_relative "audio/calibration"
 require_relative "audio/dummy_sine_input"
 require_relative "audio/file_input"
 require_relative "audio/fixture_input"

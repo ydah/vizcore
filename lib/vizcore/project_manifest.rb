@@ -2,6 +2,7 @@
 
 require "pathname"
 require "yaml"
+require_relative "plugin_asset_policy"
 
 module Vizcore
   # Reads a project-level manifest such as vizcore.yml.
@@ -49,7 +50,8 @@ module Vizcore
     def plugin_assets(profile: nil)
       entries = plugin_entries(profile: profile)
       assets = base_values("plugin_assets", "frontend_plugins") + profile_values(profile, "plugin_assets", "frontend_plugins")
-      (entries.filter_map { |entry| plugin_asset_path(entry) } + assets.filter_map { |entry| expand_path(entry) }).uniq
+      manifest_assets = assets.filter_map { |entry| validate_plugin_asset_path(expand_path(entry)) }
+      (entries.filter_map { |entry| plugin_asset_path(entry) } + manifest_assets).uniq
     end
 
     # @return [Array<String>] configured profile names
@@ -124,7 +126,7 @@ module Vizcore
     def plugin_asset_path(entry)
       return nil unless entry.is_a?(Hash)
 
-      expand_path(entry["asset"] || entry[:asset] || entry["frontend"] || entry[:frontend])
+      validate_plugin_asset_path(expand_path(entry["asset"] || entry[:asset] || entry["frontend"] || entry[:frontend]))
     end
 
     def expand_path(value)
@@ -133,6 +135,12 @@ module Vizcore
 
       path_value = Pathname.new(raw_value)
       path_value.absolute? ? path_value : @root.join(path_value).expand_path
+    end
+
+    def validate_plugin_asset_path(path)
+      return nil unless path
+
+      Vizcore::PluginAssetPolicy.validate!(path, root: @root)
     end
 
     def deep_merge(base, overlay)

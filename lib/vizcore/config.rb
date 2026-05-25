@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "pathname"
+require_relative "plugin_asset_policy"
 
 module Vizcore
   # Runtime configuration for CLI/server startup.
@@ -148,7 +149,8 @@ module Vizcore
         raw_value = value.to_s.strip
         next if raw_value.empty?
 
-        value.is_a?(Pathname) ? value.expand_path : Pathname.new(raw_value).expand_path
+        path = value.is_a?(Pathname) ? value.expand_path : Pathname.new(raw_value).expand_path
+        Vizcore::PluginAssetPolicy.validate!(path)
       end
     end
   end

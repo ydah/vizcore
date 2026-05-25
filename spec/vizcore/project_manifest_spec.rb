@@ -61,4 +61,40 @@ RSpec.describe Vizcore::ProjectManifest do
       expect(manifest.plugins(profile: "show")).to eq(["vizcore-laser-grid", "./lib/local_plugin", "./lib/show_plugin"])
     end
   end
+
+  it "rejects plugin assets outside the manifest root" do
+    Dir.mktmpdir("vizcore-project-manifest") do |dir|
+      manifest_path = File.join(dir, "vizcore.yml")
+      File.write(
+        manifest_path,
+        <<~YAML
+          scene: scenes/show.rb
+          plugin_assets:
+            - ../outside.js
+        YAML
+      )
+
+      expect do
+        described_class.load(manifest_path).plugin_assets
+      end.to raise_error(ArgumentError, /Plugin asset must stay inside/)
+    end
+  end
+
+  it "rejects unsupported plugin asset extensions" do
+    Dir.mktmpdir("vizcore-project-manifest") do |dir|
+      manifest_path = File.join(dir, "vizcore.yml")
+      File.write(
+        manifest_path,
+        <<~YAML
+          scene: scenes/show.rb
+          plugin_assets:
+            - frontend/plugin.txt
+        YAML
+      )
+
+      expect do
+        described_class.load(manifest_path).plugin_assets
+      end.to raise_error(ArgumentError, /Unsupported plugin asset extension/)
+    end
+  end
 end

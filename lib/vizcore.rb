@@ -3,6 +3,8 @@
 require_relative "vizcore/version"
 require_relative "vizcore/errors"
 require_relative "vizcore/layer_catalog"
+require_relative "vizcore/plugin_asset_policy"
+require_relative "vizcore/scene_trust"
 require_relative "vizcore/shape"
 require_relative "vizcore/dsl"
 require_relative "vizcore/analysis"

@@ -4,6 +4,7 @@ require "json"
 require "pathname"
 require "rack"
 require_relative "../control_preset"
+require_relative "../plugin_asset_policy"
 require_relative "websocket_handler"
 
 module Vizcore
@@ -348,7 +349,8 @@ module Vizcore
           raw_value = value.to_s.strip
           next if raw_value.empty?
 
-          path = value.is_a?(Pathname) ? value.expand_path : Pathname.new(raw_value).expand_path
+          raw_path = value.is_a?(Pathname) ? value.expand_path : Pathname.new(raw_value).expand_path
+          path = Vizcore::PluginAssetPolicy.validate!(raw_path)
           {
             path: path,
             url: "#{PLUGIN_ASSET_PREFIX}#{index}/#{rack_escape_path(path.basename.to_s)}"
