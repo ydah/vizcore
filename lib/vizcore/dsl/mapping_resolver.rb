@@ -32,7 +32,7 @@ module Vizcore
       def resolve_layer(layer, audio, time:, frame:, resolution:, globals:, custom_shape_overrides:, layer_param_overrides:)
         params = deep_dup(layer[:params] || {})
         apply_custom_shape_overrides!(params, layer_name: layer[:name], custom_shape_overrides: custom_shape_overrides)
-        merge_resolved_mappings!(params, resolve_mappings(layer[:mappings], audio, globals: globals, layer_name: layer[:name], frame: frame))
+        merge_resolved_mappings!(params, resolve_mappings(layer[:mappings], audio, globals: globals, layer_name: layer[:name], time: time, frame: frame))
         apply_layer_param_overrides!(params, layer_name: layer[:name], layer_param_overrides: layer_param_overrides)
         expand_dynamic_custom_shapes!(params, layer: layer, audio: audio, time: time, frame: frame, resolution: resolution, globals: globals)
 
@@ -48,13 +48,13 @@ module Vizcore
         output
       end
 
-      def resolve_mappings(mappings, audio, globals:, layer_name:, frame:)
+      def resolve_mappings(mappings, audio, globals:, layer_name:, time:, frame:)
         Array(mappings).each_with_object({}) do |mapping, resolved|
           source = mapping[:source]
           target = mapping[:target]
           next unless source && target
 
-          value = resolve_source_value(source, audio, globals: globals)
+          value = resolve_source_value(source, audio, globals: globals, time: time)
           value = apply_transform(value, mapping[:transform], state_key: [layer_name, target, source], frame: frame)
           resolved[target.to_s] = value unless value.nil?
         end
@@ -251,7 +251,7 @@ module Vizcore
         raise ArgumentError, "param #{name} must be numeric"
       end
 
-      def resolve_source_value(source, audio, globals: {})
+      def resolve_source_value(source, audio, globals: {}, time: 0.0)
         case source[:kind]&.to_sym
         when :amplitude
           audio[:amplitude]
@@ -307,9 +307,29 @@ module Vizcore
           audio[:zero_crossing_rate]
         when :global
           resolve_global(source, globals)
+        when :lfo
+          resolve_lfo(source, time)
         else
           nil
         end
+      end
+
+      def resolve_lfo(source, time)
+        rate = Float(source[:rate] || 1.0)
+        phase = Float(source[:phase] || 0.0)
+        position = (Float(time) * rate + phase) % 1.0
+        case source[:wave]&.to_sym
+        when :triangle
+          1.0 - ((position * 2.0) - 1.0).abs
+        when :saw
+          position
+        when :square
+          position < 0.5 ? 1.0 : 0.0
+        else
+          (Math.sin(position * Math::PI * 2.0) + 1.0) * 0.5
+        end
+      rescue ArgumentError, TypeError
+        0.0
       end
 
       def resolve_global(source, globals)

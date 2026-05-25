@@ -24,13 +24,24 @@ try {
     await page.waitForTimeout(options.wait);
   }
 
-  const element = page.locator(options.selector).first();
+  const element = await resolveCaptureLocator(page, options.selector);
   await element.waitFor({ state: "visible", timeout: 10000 });
   await fs.mkdir(path.dirname(options.out), { recursive: true });
   await element.screenshot({ path: options.out });
   console.log(`Browser capture written: ${options.out}`);
 } finally {
   await browser.close();
+}
+
+async function resolveCaptureLocator(page, selector) {
+  const candidates = [...new Set([selector, "#vizcore-canvas", "canvas"].filter(Boolean))];
+  for (const candidate of candidates) {
+    const locator = page.locator(candidate).first();
+    if (await locator.count().catch(() => 0) > 0) {
+      return locator;
+    }
+  }
+  return page.locator(selector).first();
 }
 
 function parseArgs(args) {

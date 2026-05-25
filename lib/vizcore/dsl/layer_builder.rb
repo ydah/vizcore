@@ -15,7 +15,7 @@ module Vizcore
       MAPPING_SOURCE_KINDS = %i[
         amplitude peak frequency_band frequency_band_peak fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
         beat_phase beat_2 beat_4 beat_8 beat_triplet triplet bar_phase bar_count phrase_count bpm_confidence
-        spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate global
+        spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate global lfo
       ].freeze
       PATH_DEFAULT_DETAIL = 32
       PATH_MIN_DETAIL = 4
@@ -892,6 +892,16 @@ module Vizcore
       # @return [Hash] source descriptor for mutable runtime globals
       def global(name)
         mapping_source(:global, name: name.to_sym)
+      end
+
+      # @param wave [Symbol, String] one of `sine`, `triangle`, `saw`, `square`
+      # @param rate [Numeric] cycles per second
+      # @param phase [Numeric] phase offset in cycles
+      # @return [Hash] source descriptor for a time-based low-frequency oscillator
+      def lfo(wave = :sine, rate: 1.0, phase: 0.0)
+        mapping_source(:lfo, wave: wave.to_sym, rate: Float(rate), phase: Float(phase))
+      rescue ArgumentError, TypeError
+        raise ArgumentError, "lfo rate and phase must be numeric"
       end
 
       # @return [Hash] serialized layer payload

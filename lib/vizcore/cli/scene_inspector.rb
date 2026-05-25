@@ -114,8 +114,19 @@ module Vizcore
         return "unknown" unless values[:kind]
         return "frequency_band(#{values[:band]})" if values[:kind].to_sym == :frequency_band
         return "onset(#{values[:band]})" if values[:kind].to_sym == :onset && values[:band]
+        return "global(#{values[:name]})" if values[:kind].to_sym == :global && values[:name]
+        return format_lfo_source(values) if values[:kind].to_sym == :lfo
 
         values[:kind].to_s
+      end
+
+      def format_lfo_source(values)
+        wave = values[:wave] || :sine
+        parts = []
+        parts << "rate=#{values[:rate]}" if values.key?(:rate)
+        parts << "phase=#{values[:phase]}" if values.key?(:phase)
+        suffix = parts.empty? ? "" : ", #{parts.join(', ')}"
+        "lfo(#{wave}#{suffix})"
       end
 
       def format_transform(transform)

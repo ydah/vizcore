@@ -34,6 +34,7 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
             map spectral_flux => :glitch
             map zero_crossing_rate => :noise
             map global(:intensity) => :opacity
+            map lfo(:sine, rate: 0.5) => :drift
           end
         end
 
@@ -64,6 +65,7 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
             map frequency_band(:ultra) => :size
             map onset(:ultra) => :spark
             map({ kind: :global }, to: :opacity)
+            map({ kind: :lfo, wave: :random, rate: :fast }, to: :drift)
           end
         end
 
@@ -85,6 +87,8 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
         "E_UNKNOWN_FREQUENCY_BAND",
         "E_UNKNOWN_ONSET_BAND",
         "E_GLOBAL_SOURCE_NAME",
+        "E_LFO_WAVE",
+        "E_LFO_RATE",
         "E_UNKNOWN_TRANSITION_TARGET",
         "E_UNKNOWN_KEY_SCENE"
       )
@@ -93,6 +97,8 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
       expect(messages).to include("unsupported mapping source: mystery")
       expect(messages).to include("unsupported frequency band: :ultra")
       expect(messages).to include("unsupported onset band: :ultra")
+      expect(messages).to include("unsupported LFO wave: random")
+      expect(messages).to include("non-numeric LFO rate: fast")
       expect(messages).to include("unknown target scene: missing")
       expect(messages).to include("switches to unknown scene: missing")
       expect(result.warnings.map(&:message).join("\n")).to include("has no trigger block")
@@ -317,6 +323,8 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
           layer :background do
             shader :neon_grid
             map amplitude, to: :intensity, gain: 2.0
+            map global(:intensity) => :opacity
+            map lfo(:triangle, rate: 0.5, phase: 0.25) => :drift
           end
         end
 
@@ -332,6 +340,8 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
       expect(lines).to include("  inspectable")
       expect(lines).to include("    layer background (shader, shader=neon_grid)")
       expect(lines).to include("      amplitude -> intensity [gain=2.0]")
+      expect(lines).to include("      global(intensity) -> opacity")
+      expect(lines).to include("      lfo(triangle, rate=0.5, phase=0.25) -> drift")
       expect(lines).to include("Keyboard:")
       expect(lines).to include("  i -> switch_scene inspectable")
     end

@@ -14,9 +14,10 @@ module Vizcore
       MAPPING_SOURCE_KINDS = %i[
         amplitude peak frequency_band frequency_band_peak fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
         beat_phase beat_2 beat_4 beat_8 beat_triplet triplet bar_phase bar_count phrase_count bpm_confidence
-        spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate global
+        spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate global lfo
       ].freeze
 
+      LFO_WAVES = %i[sine triangle saw square].freeze
       FREQUENCY_BANDS = %i[sub low mid high].freeze
       SUPPORTED_BLEND_MODES = Vizcore::LayerCatalog::BLEND_MODES
       SUPPORTED_POST_EFFECTS = Vizcore::LayerCatalog::POST_EFFECTS
@@ -275,6 +276,7 @@ module Vizcore
         validate_frequency_band(source, scene_name, layer_name, issues) if kind == :frequency_band_peak
         validate_onset_band(source, scene_name, layer_name, issues) if kind == :onset
         validate_global_source(source, scene_name, layer_name, issues) if kind == :global
+        validate_lfo_source(source, scene_name, layer_name, issues) if kind == :lfo
       end
 
       def validate_frequency_band(source, scene_name, layer_name, issues)
@@ -298,6 +300,23 @@ module Vizcore
         return unless name.to_s.strip.empty?
 
         issues << error("scene #{scene_name} layer #{layer_name} uses global mapping source without name", code: "E_GLOBAL_SOURCE_NAME")
+      end
+
+      def validate_lfo_source(source, scene_name, layer_name, issues)
+        wave = source[:wave] || source["wave"] || :sine
+        wave_name = wave.respond_to?(:to_sym) ? wave.to_sym : nil
+        unless LFO_WAVES.include?(wave_name)
+          issues << error("scene #{scene_name} layer #{layer_name} uses unsupported LFO wave: #{wave}", code: "E_LFO_WAVE")
+        end
+
+        %i[rate phase].each do |key|
+          value = source[key] || source[key.to_s]
+          next if value.nil?
+
+          Float(value)
+        rescue ArgumentError, TypeError
+          issues << error("scene #{scene_name} layer #{layer_name} has non-numeric LFO #{key}: #{value}", code: "E_LFO_#{key.to_s.upcase}")
+        end
       end
 
       def validate_transform(transform, scene_name, layer_name, target, issues)

@@ -166,6 +166,7 @@ RSpec.describe Vizcore::DSL::Engine do
             map spectral_flatness => :noise
             map zero_crossing_rate => :crossings
             map global(:intensity) => :opacity
+            map lfo(:triangle, rate: 0.25, phase: 0.5) => :drift
           end
         end
       end
@@ -188,7 +189,8 @@ RSpec.describe Vizcore::DSL::Engine do
         { source: { kind: :spectral_rolloff }, target: :rolloff },
         { source: { kind: :spectral_flatness }, target: :noise },
         { source: { kind: :zero_crossing_rate }, target: :crossings },
-        { source: { kind: :global, name: :intensity }, target: :opacity }
+        { source: { kind: :global, name: :intensity }, target: :opacity },
+        { source: { kind: :lfo, wave: :triangle, rate: 0.25, phase: 0.5 }, target: :drift }
       )
     end
 
