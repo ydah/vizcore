@@ -364,17 +364,34 @@ module Vizcore
         duplicate_values(mappings.filter_map { |mapping| midi_trigger_key(mapping[:trigger] || mapping["trigger"]) }).each do |trigger|
           issues << error("duplicate MIDI mapping: #{trigger}", code: "E_DUPLICATE_MIDI_MAPPING")
         end
+        mappings.each do |mapping|
+          validate_midi_trigger(Hash(mapping[:trigger] || mapping["trigger"] || {}), issues)
+        end
       end
 
       def midi_trigger_key(trigger)
         values = Hash(trigger || {})
+        channel = values[:channel] || values["channel"]
+        channel_part = channel.nil? ? "" : ":ch#{channel}"
         %i[note cc pc].each do |key|
           value = values[key] || values[key.to_s]
-          return "#{key}:#{value}" unless value.nil?
+          return "#{key}:#{value}#{channel_part}" unless value.nil?
         end
         nil
       rescue StandardError
         nil
+      end
+
+      def validate_midi_trigger(trigger, issues)
+        channel = trigger[:channel] || trigger["channel"]
+        return if channel.nil?
+
+        value = Integer(channel)
+        return if value.between?(0, 15)
+
+        issues << error("MIDI mapping has unsupported channel: #{channel}", code: "E_MIDI_CHANNEL")
+      rescue ArgumentError, TypeError
+        issues << error("MIDI mapping has non-numeric channel: #{channel}", code: "E_MIDI_CHANNEL")
       end
 
       def validate_unknown_layer_params(layer, scene_name, layer_name, type, issues)

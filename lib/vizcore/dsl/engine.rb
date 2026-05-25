@@ -264,15 +264,23 @@ module Vizcore
       # @param note [Integer, nil] note number trigger
       # @param cc [Integer, nil] control-change trigger
       # @param pc [Integer, nil] program-change trigger
+      # @param channel [Integer, nil] optional MIDI channel condition (1..16; 0 aliases channel 1)
+      # @param relative [Boolean] true when CC values should be treated as relative encoder deltas
+      # @param deadband [Numeric, nil] minimum CC value change required to emit an action
+      # @param smooth [Numeric, Boolean, nil] optional CC smoothing alpha
       # @yield Action block executed by midi runtime
       # @raise [ArgumentError] when no trigger is supplied
       # @return [void]
-      def midi_map(note: nil, cc: nil, pc: nil, &block)
+      def midi_map(note: nil, cc: nil, pc: nil, channel: nil, relative: false, deadband: nil, smooth: nil, &block)
         trigger = {}
         trigger[:note] = Integer(note) unless note.nil?
         trigger[:cc] = Integer(cc) unless cc.nil?
         trigger[:pc] = Integer(pc) unless pc.nil?
         raise ArgumentError, "midi_map requires note, cc or pc" if trigger.empty?
+        trigger[:channel] = normalize_midi_channel(channel) unless channel.nil?
+        trigger[:relative] = true if relative && trigger.key?(:cc)
+        trigger[:deadband] = non_negative_float(deadband, "midi deadband") unless deadband.nil?
+        trigger[:smooth] = normalize_midi_smooth(smooth) unless smooth.nil? || smooth == false
 
         @midi_mappings << {
           trigger: trigger,
@@ -370,6 +378,32 @@ module Vizcore
         raise ArgumentError, "#{name} must be between #{min} and #{max}" unless numeric.between?(min, max)
 
         numeric
+      end
+
+      def normalize_midi_channel(value)
+        channel = Integer(value)
+        return 0 if channel.zero?
+        return channel - 1 if channel.between?(1, 16)
+
+        raise ArgumentError, "midi channel must be between 1 and 16"
+      end
+
+      def non_negative_float(value, name)
+        numeric = Float(value)
+        raise ArgumentError, "#{name} must be non-negative" if numeric.negative?
+
+        numeric
+      end
+
+      def normalize_midi_smooth(value)
+        return 0.25 if value == true
+
+        numeric = Float(value)
+        raise ArgumentError, "midi smooth must be between 0.0 and 1.0" unless numeric.between?(0.0, 1.0)
+
+        numeric
+      rescue ArgumentError, TypeError
+        raise ArgumentError, "midi smooth must be true or between 0.0 and 1.0"
       end
 
       def positive_float(value, name)

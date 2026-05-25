@@ -474,7 +474,23 @@ module Vizcore
               globals: executor.globals
             }
           )
+        when :live_control
+          apply_midi_live_control(action[:control], action[:value])
         end
+      end
+
+      def apply_midi_live_control(control, value)
+        control_name = control.to_s
+        return unless @live_controls.key?(control_name)
+
+        @live_controls[control_name] = !!value
+        WebSocketHandler.broadcast(
+          type: "config_update",
+          payload: {
+            live_controls: @live_controls.dup,
+            source: "midi"
+          }
+        )
       end
 
       def apply_midi_scene_change(target_scene, effect, broadcaster)

@@ -19,6 +19,7 @@ module Vizcore
         @midi_maps = normalize_midi_maps(midi_maps)
         @scenes = normalize_scenes(scenes)
         @globals = normalize_globals(globals) unless globals.nil?
+        @cc_state = {}
       end
 
       # @return [Hash] mutable global parameter snapshot
@@ -32,8 +33,11 @@ module Vizcore
         @midi_maps.each_with_object([]) do |mapping, actions|
           next unless mapping_match?(mapping[:trigger], event)
 
+          value = event_value(event, mapping[:trigger])
+          next if value.nil?
+
           context = ActionContext.new(scenes: @scenes, globals: @globals)
-          invoke_action_block(context, mapping[:action], event, mapping[:trigger])
+          invoke_action_block(context, mapping[:action], value)
           actions.concat(context.actions)
         end
       end
@@ -73,6 +77,8 @@ module Vizcore
       end
 
       def mapping_match?(trigger, event)
+        return false unless channel_match?(trigger, event)
+
         if trigger.key?(:note)
           event.type == :note_on && event.data1 == trigger[:note].to_i
         elsif trigger.key?(:cc)
@@ -84,8 +90,13 @@ module Vizcore
         end
       end
 
-      def invoke_action_block(context, action, event, trigger)
-        value = event_value(event, trigger)
+      def channel_match?(trigger, event)
+        return true unless trigger.key?(:channel)
+
+        event.channel.to_i == trigger[:channel].to_i
+      end
+
+      def invoke_action_block(context, action, value)
         if action.arity.zero?
           context.instance_exec(&action)
         else
@@ -94,13 +105,63 @@ module Vizcore
       end
 
       def event_value(event, trigger)
-        if trigger.key?(:note) || trigger.key?(:cc)
+        if trigger.key?(:note)
           event.data2.to_i.clamp(0, 127)
+        elsif trigger.key?(:cc)
+          cc_event_value(event, trigger)
         elsif trigger.key?(:pc)
           event.data1.to_i.clamp(0, 127)
         else
           0
         end
+      end
+
+      def cc_event_value(event, trigger)
+        raw = event.data2.to_i.clamp(0, 127)
+        state = (@cc_state[state_key(trigger)] ||= {})
+        value = trigger[:relative] ? relative_cc_delta(raw) : raw
+        return nil if within_deadband?(value, state, trigger)
+
+        value = smooth_value(value, state, trigger)
+        state[:last_raw] = raw unless trigger[:relative]
+        state[:last_value] = value
+        value
+      end
+
+      def relative_cc_delta(raw)
+        return raw if raw.between?(1, 63)
+        return raw - 128 if raw.between?(65, 127)
+
+        0
+      end
+
+      def within_deadband?(value, state, trigger)
+        return false unless trigger.key?(:deadband)
+
+        deadband = Float(trigger[:deadband])
+        if trigger[:relative]
+          value.abs <= deadband
+        elsif state.key?(:last_raw)
+          (value - state[:last_raw].to_f).abs <= deadband
+        else
+          false
+        end
+      rescue ArgumentError, TypeError
+        false
+      end
+
+      def smooth_value(value, state, trigger)
+        return value unless trigger.key?(:smooth)
+        return value unless state.key?(:last_value)
+
+        alpha = Float(trigger[:smooth]).clamp(0.0, 1.0)
+        state[:last_value].to_f + ((value - state[:last_value].to_f) * alpha)
+      rescue ArgumentError, TypeError
+        value
+      end
+
+      def state_key(trigger)
+        [trigger[:channel], trigger[:cc]]
       end
 
       def symbolize_hash(value)
@@ -182,6 +243,29 @@ module Vizcore
             key: symbol_key,
             value: value
           }
+        end
+
+        # @param control [Symbol, String]
+        # @param value [Boolean]
+        # @return [void]
+        def live_control(control, value = true)
+          @actions << {
+            type: :live_control,
+            control: control.to_s,
+            value: !!value
+          }
+        end
+
+        # @param value [Boolean]
+        # @return [void]
+        def blackout(value = true)
+          live_control(:blackout, value)
+        end
+
+        # @param value [Boolean]
+        # @return [void]
+        def freeze(value = true)
+          live_control(:freeze, value)
         end
 
         private

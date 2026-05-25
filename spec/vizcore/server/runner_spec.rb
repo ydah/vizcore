@@ -449,6 +449,20 @@ RSpec.describe Vizcore::Server::Runner do
       )
     end
 
+    it "applies MIDI live control actions" do
+      runner = described_class.new(config, output: output)
+      executor = instance_double(Vizcore::DSL::MidiMapExecutor, globals: {})
+      broadcaster = instance_double(Vizcore::Server::FrameBroadcaster)
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+
+      runner.send(:apply_midi_action, { type: :live_control, control: "blackout", value: true }, executor, broadcaster)
+
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "config_update",
+        payload: hash_including(live_controls: { "blackout" => true, "freeze" => false }, source: "midi")
+      )
+    end
+
     it "switches scene from OSC message" do
       runner = described_class.new(config, output: output)
       broadcaster = instance_double(

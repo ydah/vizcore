@@ -4,10 +4,10 @@ require "vizcore/audio/midi_input"
 require "vizcore/dsl/midi_map_executor"
 
 RSpec.describe Vizcore::DSL::MidiMapExecutor do
-  def midi_event(type:, data1:, data2: 0)
+  def midi_event(type:, data1:, data2: 0, channel: 0)
     Vizcore::Audio::MidiInput::Event.new(
       type: type,
-      channel: 0,
+      channel: channel,
       data1: data1,
       data2: data2,
       raw: [0x90, data1, data2],
@@ -69,6 +69,60 @@ RSpec.describe Vizcore::DSL::MidiMapExecutor do
 
     expect(next_actions).to eq([{ type: :next_scene, effect: nil }])
     expect(previous_actions).to eq([{ type: :previous_scene, effect: { name: :crossfade } }])
+  end
+
+  it "filters mappings by MIDI channel" do
+    executor = described_class.new(
+      midi_maps: [
+        { trigger: { note: 36, channel: 1 }, action: proc { switch_scene :drop } }
+      ],
+      scenes: [{ name: :drop, layers: [] }],
+      globals: {}
+    )
+
+    expect(executor.handle_event(midi_event(type: :note_on, data1: 36, data2: 100, channel: 0))).to eq([])
+    expect(executor.handle_event(midi_event(type: :note_on, data1: 36, data2: 100, channel: 1))).to include(
+      hash_including(type: :switch_scene)
+    )
+  end
+
+  it "applies CC deadband, smoothing, and relative encoder deltas" do
+    values = []
+    executor = described_class.new(
+      midi_maps: [
+        { trigger: { cc: 1, deadband: 2, smooth: 0.5 }, action: proc { |value| values << value } },
+        { trigger: { cc: 2, relative: true, deadband: 1 }, action: proc { |value| values << value } }
+      ],
+      scenes: [],
+      globals: {}
+    )
+
+    executor.handle_event(midi_event(type: :control_change, data1: 1, data2: 10))
+    executor.handle_event(midi_event(type: :control_change, data1: 1, data2: 11))
+    executor.handle_event(midi_event(type: :control_change, data1: 1, data2: 20))
+    executor.handle_event(midi_event(type: :control_change, data1: 2, data2: 1))
+    executor.handle_event(midi_event(type: :control_change, data1: 2, data2: 64))
+    executor.handle_event(midi_event(type: :control_change, data1: 2, data2: 68))
+
+    expect(values).to eq([10, 15.0, -60])
+  end
+
+  it "emits live control actions" do
+    executor = described_class.new(
+      midi_maps: [
+        { trigger: { note: 40 }, action: proc { blackout } },
+        { trigger: { note: 41 }, action: proc { freeze(false) } }
+      ],
+      scenes: [],
+      globals: {}
+    )
+
+    expect(executor.handle_event(midi_event(type: :note_on, data1: 40, data2: 100))).to eq(
+      [{ type: :live_control, control: "blackout", value: true }]
+    )
+    expect(executor.handle_event(midi_event(type: :note_on, data1: 41, data2: 100))).to eq(
+      [{ type: :live_control, control: "freeze", value: false }]
+    )
   end
 
   it "ignores unmatched mappings" do

@@ -93,6 +93,19 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "stores MIDI trigger options" do
+      definition = described_class.define do
+        midi_map cc: 1, channel: 1, relative: true, deadband: 2, smooth: 0.25 do |value|
+          set :global_intensity, value
+        end
+      end
+
+      expect(definition[:midi_maps].first).to include(
+        trigger: { cc: 1, channel: 0, relative: true, deadband: 2.0, smooth: 0.25 },
+        action: an_instance_of(Proc)
+      )
+    end
+
     it "builds mapping transforms from keyword and target hash syntax" do
       definition = described_class.define do
         scene :reactive do
