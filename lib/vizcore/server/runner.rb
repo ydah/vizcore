@@ -25,7 +25,10 @@ module Vizcore
         @scene_catalog = []
         @runtime_globals_mutex = Mutex.new
         @runtime_globals = {}
-        @live_controls = { "blackout" => false, "freeze" => false }
+        @live_controls = {
+          "blackout" => default_live_control_state,
+          "freeze" => default_live_control_state
+        }
       end
 
       # Run server lifecycle until interrupted.
@@ -389,7 +392,7 @@ module Vizcore
         when %r{\A/vizcore/layer/([^/]+)/(.+)\z}
           apply_osc_layer_param(broadcaster, Regexp.last_match(1), Regexp.last_match(2), message.arguments)
         when %r{\A/vizcore/live/(blackout|freeze)\z}
-          apply_osc_live_control(Regexp.last_match(1), message.arguments.first)
+          apply_osc_live_control(Regexp.last_match(1), message.arguments)
         when "/vizcore/transport/play", "/vizcore/transport/position"
           apply_osc_transport(broadcaster, playing: true, position_seconds: message.arguments.first)
         when "/vizcore/transport/stop"
@@ -478,15 +481,15 @@ module Vizcore
             }
           )
         when :live_control
-          apply_midi_live_control(action[:control], action[:value])
+          apply_midi_live_control(action[:control], action)
         end
       end
 
-      def apply_midi_live_control(control, value)
+      def apply_midi_live_control(control, action)
         control_name = control.to_s
         return unless @live_controls.key?(control_name)
 
-        @live_controls[control_name] = !!value
+        @live_controls[control_name] = normalize_live_control_state(action)
         WebSocketHandler.broadcast(
           type: "config_update",
           payload: {
@@ -724,7 +727,12 @@ module Vizcore
       end
 
       def apply_osc_live_control(control, value)
-        @live_controls[control] = osc_truthy?(value)
+        values = Array(value)
+        @live_controls[control] = default_live_control_state(
+          enabled: osc_truthy?(values.first),
+          fade: values[1],
+          release: values[2]
+        )
         WebSocketHandler.broadcast(
           type: "config_update",
           payload: {
@@ -774,6 +782,27 @@ module Vizcore
         return numeric.positive? unless numeric.nil?
 
         %w[true on yes 1].include?(value.to_s.strip.downcase)
+      end
+
+      def default_live_control_state(enabled: false, fade: nil, release: nil)
+        {
+          "enabled" => !!enabled,
+          "fade" => finite_float(fade),
+          "release" => finite_float(release)
+        }.compact
+      end
+
+      def normalize_live_control_state(value)
+        return default_live_control_state(enabled: !!value) unless value.is_a?(Hash)
+
+        values = value.each_with_object({}) do |(entry_key, entry_value), output|
+          output[entry_key.to_s] = entry_value
+        end
+        default_live_control_state(
+          enabled: values.fetch("value", values.fetch("enabled", false)),
+          fade: values["fade"],
+          release: values["release"]
+        )
       end
 
       def switch_scene_from_client(target_name, broadcaster, source: "ui", effect: nil)

@@ -537,26 +537,36 @@ module Vizcore
         # Toggle browser blackout output.
         #
         # @return [void]
-        def blackout
-          live_control(:blackout)
+        def blackout(value = nil, fade: nil, release: nil)
+          live_control(:blackout, value, fade: fade, release: release)
         end
 
         # Toggle browser freeze output.
         #
         # @return [void]
-        def freeze
-          live_control(:freeze)
+        def freeze(value = nil, fade: nil, release: nil)
+          live_control(:freeze, value, fade: fade, release: release)
         end
 
         # Toggle a browser live control.
         #
         # @param control [Symbol, String]
+        # @param value [Object, nil] target value; nil means UI-side toggle for keyboard/live mapping
         # @return [void]
-        def live_control(control)
+        def live_control(control, value = nil, fade: nil, release: nil)
           normalized = control.to_s.strip.downcase.to_sym
           raise ArgumentError, "unsupported live control: #{control}" unless %i[blackout freeze].include?(normalized)
 
           assign_action(type: :live_control, control: normalized)
+
+          # Preserve explicit value and transition timings when provided by DSL authors.
+          # `nil` is kept for UI-side toggles to avoid changing existing keyboard ergonomics.
+          action = @action
+          action[:value] = value unless value.nil?
+          action[:fade] = normalize_control_transition(fade)
+          action[:release] = normalize_control_transition(release)
+          action.delete(:fade) if action[:fade].nil?
+          action.delete(:release) if action[:release].nil?
         end
 
         # @return [Hash] serialized key action
@@ -570,6 +580,17 @@ module Vizcore
           raise ArgumentError, "key mapping already has an action" if @action
 
           @action = action
+        end
+
+        def normalize_control_transition(value)
+          return nil if value.nil?
+
+          numeric = Float(value)
+          return nil if numeric.negative? || !numeric.finite?
+
+          numeric
+        rescue ArgumentError, TypeError
+          nil
         end
       end
     end

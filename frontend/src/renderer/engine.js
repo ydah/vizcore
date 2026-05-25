@@ -37,8 +37,23 @@ export class Engine {
     };
     this.visualAudioState = null;
     this.liveControls = {
-      blackout: false,
-      freeze: false,
+      blackout: { enabled: false },
+      freeze: { enabled: false },
+    };
+    this.liveControlRuntime = {
+      blackout: {
+        opacity: 0,
+        targetOpacity: 0,
+        transitionFrom: 0,
+        transitionStartedAt: 0,
+        transitionDuration: 0,
+      },
+      freeze: {
+        enabled: false,
+        targetEnabled: false,
+        transitionStartedAt: 0,
+        transitionDuration: 0,
+      },
     };
     this.runtimeGlobals = {};
     this.shaderParamOverrides = {};
@@ -118,10 +133,97 @@ export class Engine {
   }
 
   setLiveControls(controls = {}) {
+    const now = performance.now();
     this.liveControls = {
-      blackout: !!controls?.blackout,
-      freeze: !!controls?.freeze,
+      blackout: normalizeLiveControlState(controls?.blackout),
+      freeze: normalizeLiveControlState(controls?.freeze),
     };
+    this.applyBlackoutRuntime(this.liveControls.blackout, now);
+    this.applyFreezeRuntime(this.liveControls.freeze, now);
+  }
+
+  applyBlackoutRuntime(control, now) {
+    const targetOpacity = control.enabled ? 1 : 0;
+    if (targetOpacity === this.liveControlRuntime.blackout.targetOpacity) {
+      this.liveControlRuntime.blackout.transitionDuration = 0;
+      this.liveControlRuntime.blackout.opacity = targetOpacity;
+      return;
+    }
+
+    const transitionDuration = control.enabled
+      ? finiteFloat(control.fade)
+      : finiteFloat(control.release);
+    if (!transitionDuration) {
+      this.liveControlRuntime.blackout.opacity = targetOpacity;
+      this.liveControlRuntime.blackout.targetOpacity = targetOpacity;
+      this.liveControlRuntime.blackout.transitionDuration = 0;
+      return;
+    }
+
+    this.liveControlRuntime.blackout.targetOpacity = targetOpacity;
+    this.liveControlRuntime.blackout.transitionFrom = this.liveControlRuntime.blackout.opacity;
+    this.liveControlRuntime.blackout.transitionStartedAt = now;
+    this.liveControlRuntime.blackout.transitionDuration = transitionDuration;
+  }
+
+  applyFreezeRuntime(control, now) {
+    const targetEnabled = !!control.enabled;
+    if (targetEnabled === this.liveControlRuntime.freeze.targetEnabled) {
+      return;
+    }
+
+    const transitionDuration = targetEnabled
+      ? finiteFloat(control.fade)
+      : finiteFloat(control.release);
+    if (!transitionDuration) {
+      this.liveControlRuntime.freeze.enabled = targetEnabled;
+      this.liveControlRuntime.freeze.targetEnabled = targetEnabled;
+      this.liveControlRuntime.freeze.transitionDuration = 0;
+      return;
+    }
+
+    this.liveControlRuntime.freeze.targetEnabled = targetEnabled;
+    this.liveControlRuntime.freeze.transitionStartedAt = now;
+    this.liveControlRuntime.freeze.transitionDuration = transitionDuration;
+  }
+
+  updateLiveControlRuntime(time) {
+    this.updateBlackoutRuntime(time);
+    this.updateFreezeRuntime(time);
+  }
+
+  updateBlackoutRuntime(time) {
+    const blackout = this.liveControlRuntime.blackout;
+    const duration = blackout.transitionDuration;
+    if (!duration || duration <= 0) {
+      return;
+    }
+
+    const elapsed = time - blackout.transitionStartedAt;
+    if (elapsed >= duration) {
+      blackout.opacity = blackout.targetOpacity;
+      blackout.transitionDuration = 0;
+      return;
+    }
+
+    const progress = clamp(elapsed / duration, 0, 1);
+    blackout.opacity = blackout.transitionFrom + (blackout.targetOpacity - blackout.transitionFrom) * progress;
+  }
+
+  updateFreezeRuntime(time) {
+    const freeze = this.liveControlRuntime.freeze;
+    const duration = freeze.transitionDuration;
+    if (!duration || duration <= 0) {
+      return;
+    }
+
+    const elapsed = time - freeze.transitionStartedAt;
+    if (elapsed < duration) {
+      return;
+    }
+
+    freeze.enabled = freeze.targetEnabled;
+    freeze.transitionDuration = 0;
   }
 
   setRuntimeGlobals(globals = {}) {
@@ -185,15 +287,16 @@ export class Engine {
     }
 
     this.updateSafeMode(deltaSeconds * 1000);
+    this.updateLiveControlRuntime(time);
 
-    if (this.liveControls.blackout) {
+    if (this.liveControlRuntime.blackout.opacity >= 1) {
       this.gl.clearColor(0, 0, 0, 1);
       this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
       requestAnimationFrame((nextTime) => this.render(nextTime));
       return;
     }
 
-    if (this.liveControls.freeze) {
+    if (this.liveControlRuntime.freeze.enabled) {
       requestAnimationFrame((nextTime) => this.render(nextTime));
       return;
     }
@@ -222,6 +325,17 @@ export class Engine {
       1.0
     );
     this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+
+    if (this.liveControlRuntime.blackout.opacity > 0) {
+      const blackout = this.liveControlRuntime.blackout.opacity;
+      this.gl.clearColor(
+        0,
+        0,
+        0,
+        clamp(blackout, 0, 1) * 0.999 + 0.001
+      );
+      this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+    }
 
     this.layerManager.renderScene({
       layers,
@@ -265,6 +379,23 @@ export class Engine {
     this.shaderManager?.dispose?.();
   }
 }
+
+const normalizeLiveControlState = (state) => {
+  if (state === null || state === undefined || typeof state === "boolean") {
+    return { enabled: !!state };
+  }
+
+  return {
+    enabled: state.value !== undefined ? !!state.value : !!state.enabled,
+    fade: finiteFloat(state.fade),
+    release: finiteFloat(state.release),
+  };
+};
+
+const finiteFloat = (value) => {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : null;
+};
 
 const resolveRotationSpeed = (layers, amplitude) => {
   const layerWithSpeed = Array.isArray(layers)

@@ -317,7 +317,20 @@ module Vizcore
           control = (action[:control] || action["control"]).to_s.strip
           return nil unless %w[blackout freeze].include?(control)
 
-          { type: "live_control", control: control }
+          live_control = { type: "live_control", control: control }
+          if action.key?(:value) || action.key?("value")
+            live_control[:value] = action[:value]
+            live_control[:value] = action["value"] if action.key?("value")
+          end
+          fade = action.key?(:fade) ? action[:fade] : action["fade"]
+          release = action.key?(:release) ? action[:release] : action["release"]
+          normalized_fade = finite_float(fade)
+          normalized_release = finite_float(release)
+          return live_control if normalized_fade.nil? && normalized_release.nil? && !live_control.key?(:value)
+
+          live_control[:fade] = normalized_fade if normalized_fade
+          live_control[:release] = normalized_release if normalized_release
+          live_control
         end
       end
 
@@ -343,6 +356,15 @@ module Vizcore
         end
       rescue StandardError
         {}
+      end
+
+      def finite_float(value)
+        numeric = Float(value)
+        return numeric if numeric.finite?
+
+        nil
+      rescue ArgumentError, TypeError
+        nil
       end
 
       def normalize_plugin_assets(values)

@@ -1,7 +1,74 @@
+const finiteFloat = (value) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
+const createLiveControlEntry = (enabled = false, fade = undefined, release = undefined) => {
+  return compactLiveControlEntry({
+    enabled: !!enabled,
+    fade: finiteFloat(fade),
+    release: finiteFloat(release),
+  });
+};
+
+const compactLiveControlEntry = (entry) => {
+  const output = { ...entry };
+  if (!Object.prototype.hasOwnProperty.call(output, "fade")) {
+    return output;
+  }
+  if (output.fade === null || output.fade === undefined) {
+    delete output.fade;
+  }
+  if (output.release === null || output.release === undefined) {
+    delete output.release;
+  }
+  return output;
+};
+
+const normalizeLiveControlState = (value) => {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    if (Object.prototype.hasOwnProperty.call(value, "value")) {
+      return compactLiveControlEntry(createLiveControlEntry(
+        !!value.value,
+        value.fade,
+        value.release
+      ));
+    }
+
+    return compactLiveControlEntry(createLiveControlEntry(
+      Object.prototype.hasOwnProperty.call(value, "enabled") ? !!value.enabled : false,
+      value.fade,
+      value.release
+    ));
+  }
+
+  return compactLiveControlEntry(createLiveControlEntry(!!value));
+};
+
 export const createLiveControlState = () => ({
-  blackout: false,
-  freeze: false,
+  blackout: createLiveControlEntry(false),
+  freeze: createLiveControlEntry(false),
 });
+
+export const isLiveControlEnabled = (state) => {
+  if (!state) {
+    return false;
+  }
+
+  if (typeof state === "object") {
+    return !!state.enabled;
+  }
+
+  return !!state;
+};
+
+export const isLiveControlActive = (state) => {
+  if (!state || typeof state !== "object" || Array.isArray(state)) {
+    return isLiveControlEnabled(state);
+  }
+
+  return !!state.enabled;
+};
 
 export const toggleLiveControl = (state, key) => {
   const control = String(key || "");
@@ -9,16 +76,22 @@ export const toggleLiveControl = (state, key) => {
     return { ...state };
   }
 
+  const current = normalizeLiveControlState(state?.[control]);
   return {
     ...state,
-    [control]: !state?.[control],
+    [control]: {
+      ...current,
+      enabled: !current.enabled,
+    },
   };
 };
 
+export const normalizeLiveControlPayload = (state) => normalizeLiveControlState(state);
+
 export const liveControlStatusText = (state) => {
   const values = [];
-  if (state?.blackout) values.push("Blackout");
-  if (state?.freeze) values.push("Freeze");
+  if (isLiveControlActive(state?.blackout)) values.push("Blackout");
+  if (isLiveControlActive(state?.freeze)) values.push("Freeze");
   return values.length ? `Live: ${values.join(" + ")}` : "Live: output";
 };
 
@@ -116,7 +189,26 @@ const normalizeKeyboardAction = (action) => {
 
   if (type === "live_control") {
     const control = String(action?.control || "").trim();
-    return control === "blackout" || control === "freeze" ? { type, control } : null;
+    if (control !== "blackout" && control !== "freeze") {
+      return null;
+    }
+
+    const payload = { type, control };
+    if (Object.prototype.hasOwnProperty.call(action, "value")) {
+      payload.value = action.value;
+    }
+
+    const fade = finiteFloat(action?.fade);
+    if (fade !== null) {
+      payload.fade = fade;
+    }
+
+    const release = finiteFloat(action?.release);
+    if (release !== null) {
+      payload.release = release;
+    }
+
+    return payload;
   }
 
   return null;

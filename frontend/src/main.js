@@ -1,10 +1,12 @@
 import { BAND_KEYS, DEFAULT_FFT_BINS, buildAudioInspectorState, formatMeterValue } from "./audio-inspector.js";
 import {
   createLiveControlState,
+  isLiveControlEnabled,
   isTapTempoShortcut,
   keyboardActionForKey,
   liveControlStatusText,
   normalizeKeyboardMappings,
+  normalizeLiveControlPayload,
   shortcutActionForKey,
   shortcutSceneIndexForKey,
   toggleLiveControl,
@@ -266,7 +268,6 @@ const client = new WebSocketClient(websocketUrl, {
     }
     if (Object.prototype.hasOwnProperty.call(payload || {}, "live_controls")) {
       applyLiveControls({
-        ...liveControls,
         ...normalizeLiveControls(payload?.live_controls),
       });
     }
@@ -816,7 +817,14 @@ function applyKeyboardAction(action) {
   }
 
   if (action?.type === "live_control") {
-    applyLiveControls(toggleLiveControl(liveControls, action.control));
+    if (Object.prototype.hasOwnProperty.call(action, "value")) {
+      applyLiveControls({
+        [action?.control]: normalizeLiveControlPayload(action),
+      });
+      return;
+    }
+
+    applyLiveControls(toggleLiveControl(liveControls, action?.control));
   }
 }
 
@@ -904,7 +912,7 @@ function bindLiveControls() {
     const action = shortcutActionForKey(event);
     if (action) {
       event.preventDefault();
-      applyLiveControls(toggleLiveControl(liveControls, action));
+      applyKeyboardAction({ type: "live_control", control: action });
       return;
     }
 
@@ -938,16 +946,52 @@ function bindLiveControlButton(button, control) {
 }
 
 function applyLiveControls(nextState) {
-  Object.assign(liveControls, nextState);
+  if (!nextState || typeof nextState !== "object") {
+    return;
+  }
+
+  const nextBlackout = mergeLiveControlState(
+    liveControls.blackout,
+    nextState.blackout
+  );
+  const nextFreeze = mergeLiveControlState(
+    liveControls.freeze,
+    nextState.freeze
+  );
+  Object.assign(liveControls, {
+    blackout: nextBlackout,
+    freeze: nextFreeze,
+  });
   engine.setLiveControls(liveControls);
   renderLiveControlStatus();
+}
+
+function mergeLiveControlState(currentState, nextState) {
+  const current = normalizeLiveControlPayload(currentState);
+  if (nextState === undefined) {
+    return current;
+  }
+  if (!nextState || typeof nextState !== "object" || Array.isArray(nextState)) {
+    return normalizeLiveControlPayload(nextState);
+  }
+
+  const normalized = normalizeLiveControlPayload(nextState);
+  const nextHasFade = Object.prototype.hasOwnProperty.call(nextState, "fade");
+  const nextHasRelease = Object.prototype.hasOwnProperty.call(nextState, "release");
+
+  return {
+    ...current,
+    ...normalized,
+    ...(nextHasFade ? { fade: normalized.fade } : {}),
+    ...(nextHasRelease ? { release: normalized.release } : {}),
+  };
 }
 
 function normalizeLiveControls(value) {
   const input = value && typeof value === "object" ? value : {};
   return {
-    blackout: !!input.blackout,
-    freeze: !!input.freeze,
+    blackout: normalizeLiveControlPayload(input.blackout),
+    freeze: normalizeLiveControlPayload(input.freeze),
   };
 }
 
@@ -957,13 +1001,15 @@ function renderLiveControlStatus() {
   }
 
   if (blackoutButton) {
-    blackoutButton.classList.toggle("is-active", liveControls.blackout);
-    blackoutButton.setAttribute("aria-pressed", String(liveControls.blackout));
+    const isActive = isLiveControlEnabled(liveControls.blackout);
+    blackoutButton.classList.toggle("is-active", isActive);
+    blackoutButton.setAttribute("aria-pressed", String(isActive));
   }
 
   if (freezeButton) {
-    freezeButton.classList.toggle("is-active", liveControls.freeze);
-    freezeButton.setAttribute("aria-pressed", String(liveControls.freeze));
+    const isActive = isLiveControlEnabled(liveControls.freeze);
+    freezeButton.classList.toggle("is-active", isActive);
+    freezeButton.setAttribute("aria-pressed", String(isActive));
   }
 }
 
@@ -1262,7 +1308,13 @@ function applyMidiLearnAction(action, unitValue, active) {
   }
 
   if (action.type === "live_control") {
-    applyLiveControls(toggleLiveControl(liveControls, action.control));
+    if (Object.prototype.hasOwnProperty.call(action, "value")) {
+      applyLiveControls({
+        [action.control]: normalizeLiveControlPayload(action),
+      });
+    } else {
+      applyLiveControls(toggleLiveControl(liveControls, action.control));
+    }
     renderMidiLearnStatus(`MIDI: ${midiLearnActionLabel(action)}`);
   }
 }

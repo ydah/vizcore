@@ -252,29 +252,47 @@ module Vizcore
         end
 
         # @param control [Symbol, String]
-        # @param value [Boolean]
+        # @param value [Boolean, nil] target value; nil defaults to true for direct calls
+        # @param fade [Numeric, nil] optional seconds for transition to `value == true`
+        # @param release [Numeric, nil] optional seconds for transition to `value == false`
         # @return [void]
-        def live_control(control, value = true)
+        def live_control(control, value = nil, fade: nil, release: nil)
+          state = normalize_live_control_state(value)
+          state[:fade] = normalize_control_transition(fade)
+          state[:release] = normalize_control_transition(release)
+          state.delete(:fade) if state[:fade].nil?
+          state.delete(:release) if state[:release].nil?
+
           @actions << {
             type: :live_control,
             control: control.to_s,
-            value: !!value
+            **state
           }
         end
 
-        # @param value [Boolean]
+        # @param value [Boolean, nil]
         # @return [void]
-        def blackout(value = true)
-          live_control(:blackout, value)
+        def blackout(value = nil, fade: nil, release: nil)
+          live_control(:blackout, value, fade: fade, release: release)
         end
 
-        # @param value [Boolean]
+        # @param value [Boolean, nil]
         # @return [void]
-        def freeze(value = true)
-          live_control(:freeze, value)
+        def freeze(value = nil, fade: nil, release: nil)
+          live_control(:freeze, value, fade: fade, release: release)
         end
 
         private
+
+        def normalize_live_control_state(value)
+          if value.is_a?(Hash)
+            state = value.transform_keys(&:to_sym)
+            enabled = state.key?(:value) ? state[:value] : true
+            return { value: !!enabled, fade: normalize_control_transition(state[:fade]), release: normalize_control_transition(state[:release]) }
+          end
+
+          { value: !!(value.nil? || value) }
+        end
 
         def deep_dup(value)
           case value
@@ -287,6 +305,17 @@ module Vizcore
           else
             value
           end
+        end
+
+        def normalize_control_transition(value)
+          return nil if value.nil?
+
+          numeric = Float(value)
+          return nil if numeric.negative? || !numeric.finite?
+
+          numeric
+        rescue ArgumentError, TypeError
+          nil
         end
       end
     end

@@ -500,11 +500,22 @@ RSpec.describe Vizcore::Server::Runner do
       broadcaster = instance_double(Vizcore::Server::FrameBroadcaster)
       allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
 
-      runner.send(:apply_midi_action, { type: :live_control, control: "blackout", value: true }, executor, broadcaster)
+      runner.send(
+        :apply_midi_action,
+        { type: :live_control, control: "blackout", value: true, fade: 0.25, release: 0.8 },
+        executor,
+        broadcaster
+      )
 
       expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
         type: "config_update",
-        payload: hash_including(live_controls: { "blackout" => true, "freeze" => false }, source: "midi")
+        payload: hash_including(
+          live_controls: {
+            "blackout" => { "enabled" => true, "fade" => 0.25, "release" => 0.8 },
+            "freeze" => { "enabled" => false }
+          },
+          source: "midi"
+        )
       )
     end
 
@@ -601,7 +612,10 @@ RSpec.describe Vizcore::Server::Runner do
       )
       expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
         type: "config_update",
-        payload: hash_including(live_controls: { "blackout" => true, "freeze" => false }, source: "osc")
+        payload: hash_including(
+          live_controls: { "blackout" => { "enabled" => true }, "freeze" => { "enabled" => false } },
+          source: "osc"
+        )
       )
     end
 

@@ -14,16 +14,25 @@ import {
 } from "../src/live-controls.js";
 
 test("createLiveControlState starts with live output enabled", () => {
-  assert.deepEqual(createLiveControlState(), { blackout: false, freeze: false });
+  assert.deepEqual(createLiveControlState(), {
+    blackout: { enabled: false },
+    freeze: { enabled: false },
+  });
 });
 
 test("toggleLiveControl toggles known controls without mutating input", () => {
   const state = createLiveControlState();
   const next = toggleLiveControl(state, "blackout");
 
-  assert.deepEqual(state, { blackout: false, freeze: false });
-  assert.deepEqual(next, { blackout: true, freeze: false });
-  assert.deepEqual(toggleLiveControl(next, "freeze"), { blackout: true, freeze: true });
+  assert.deepEqual(state, {
+    blackout: { enabled: false },
+    freeze: { enabled: false },
+  });
+  assert.deepEqual(next, { blackout: { enabled: true }, freeze: { enabled: false } });
+  assert.deepEqual(toggleLiveControl(next, "freeze"), {
+    blackout: { enabled: true },
+    freeze: { enabled: true },
+  });
 });
 
 test("toggleLiveControl ignores unknown controls", () => {
@@ -35,9 +44,9 @@ test("toggleLiveControl ignores unknown controls", () => {
 });
 
 test("liveControlStatusText summarizes active emergency controls", () => {
-  assert.equal(liveControlStatusText({ blackout: false, freeze: false }), "Live: output");
-  assert.equal(liveControlStatusText({ blackout: true, freeze: false }), "Live: Blackout");
-  assert.equal(liveControlStatusText({ blackout: true, freeze: true }), "Live: Blackout + Freeze");
+  assert.equal(liveControlStatusText({ blackout: { enabled: false }, freeze: { enabled: false } }), "Live: output");
+  assert.equal(liveControlStatusText({ blackout: { enabled: true }, freeze: { enabled: false } }), "Live: Blackout");
+  assert.equal(liveControlStatusText({ blackout: { enabled: true }, freeze: { enabled: true } }), "Live: Blackout + Freeze");
 });
 
 test("shortcutActionForKey maps live shortcuts outside editable fields", () => {

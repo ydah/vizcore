@@ -151,7 +151,11 @@ module Vizcore
         when :switch_scene
           "switch_scene #{values[:scene]}"
         when :live_control
-          values[:control].to_s
+          options = values.slice(:value, :fade, :release)
+          control = values[:control].to_s
+          return control if options.empty?
+
+          "#{control}#{format_options(options)}"
         else
           "unknown"
         end
