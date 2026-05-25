@@ -384,6 +384,46 @@ RSpec.describe Vizcore::Server::Runner do
       )
     end
 
+    it "applies configured manual scene switch effect when websocket message omits one" do
+      configured_config = Vizcore::Config.new(
+        scene_file: scene_file,
+        host: "127.0.0.1",
+        port: 4567,
+        scene_switch_effect: "crossfade",
+        scene_switch_effect_duration: 0.5
+      )
+      runner = described_class.new(configured_config, output: output)
+      broadcaster = instance_double(
+        Vizcore::Server::FrameBroadcaster,
+        current_scene_snapshot: { name: "build", layers: [] },
+        update_scene: nil
+      )
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+      runner.send(
+        :replace_scene_catalog,
+        [
+          { name: :build, layers: [{ name: :a }] },
+          { name: :drop, layers: [{ name: :b }] }
+        ]
+      )
+
+      runner.send(
+        :handle_client_message,
+        { "type" => "switch_scene", "payload" => { "scene" => "drop" } },
+        broadcaster
+      )
+
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "scene_change",
+        payload: hash_including(
+          from: "build",
+          to: "drop",
+          source: "ui",
+          effect: { name: :crossfade, options: { duration: 0.5 } }
+        )
+      )
+    end
+
     it "switches scene from client websocket message with transition effect" do
       runner = described_class.new(config, output: output)
       broadcaster = instance_double(
@@ -551,6 +591,39 @@ RSpec.describe Vizcore::Server::Runner do
       )
     end
 
+    it "switches scene from OSC message with transition effect" do
+      runner = described_class.new(config, output: output)
+      broadcaster = instance_double(
+        Vizcore::Server::FrameBroadcaster,
+        current_scene_snapshot: { name: "build", layers: [] },
+        update_scene: nil
+      )
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+      runner.send(
+        :replace_scene_catalog,
+        [
+          { name: :build, layers: [{ name: :a }] },
+          { name: :drop, layers: [{ name: :b }] }
+        ]
+      )
+
+      runner.send(
+        :handle_osc_message,
+        Vizcore::Sync::OscMessage.new(address: "/vizcore/scene", arguments: ["drop", "crossfade", 0.45]),
+        broadcaster
+      )
+
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "scene_change",
+        payload: hash_including(
+          source: "osc",
+          from: "build",
+          to: "drop",
+          effect: { name: :crossfade, options: { duration: 0.45 } }
+        )
+      )
+    end
+
     it "applies OSC tap tempo messages" do
       runner = described_class.new(config, output: output)
       broadcaster = instance_double(Vizcore::Server::FrameBroadcaster)
@@ -644,6 +717,48 @@ RSpec.describe Vizcore::Server::Runner do
       expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
         type: "config_update",
         payload: hash_including(layer_params: { "rings" => { "opacity" => 0.5 } }, source: "osc")
+      )
+    end
+
+    it "normalizes OSC value with 0..127 preset" do
+      runner = described_class.new(config, output: output)
+      broadcaster = instance_double(
+        Vizcore::Server::FrameBroadcaster,
+        set_layer_param: { "rings" => { "opacity" => 0.5 } }
+      )
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+
+      runner.send(
+        :handle_osc_message,
+        Vizcore::Sync::OscMessage.new(address: "/vizcore/layer/rings/opacity", arguments: [64, "midi"]),
+        broadcaster
+      )
+
+      expect(broadcaster).to have_received(:set_layer_param).with(
+        layer_name: "rings",
+        param: "opacity",
+        value: (64.0 / 127.0)
+      )
+    end
+
+    it "normalizes OSC value with range expression" do
+      runner = described_class.new(config, output: output)
+      broadcaster = instance_double(
+        Vizcore::Server::FrameBroadcaster,
+        set_layer_param: { "rings" => { "x" => 0.5 } }
+      )
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+
+      runner.send(
+        :handle_osc_message,
+        Vizcore::Sync::OscMessage.new(address: "/vizcore/layer/rings/x", arguments: [0, "-1..1"]),
+        broadcaster
+      )
+
+      expect(broadcaster).to have_received(:set_layer_param).with(
+        layer_name: "rings",
+        param: "x",
+        value: 0.5
       )
     end
 

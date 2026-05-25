@@ -380,7 +380,10 @@ module Vizcore
       def handle_osc_message(message, broadcaster)
         case message.address
         when "/vizcore/scene"
-          switch_scene_from_client(message.arguments.first, broadcaster, source: "osc")
+          arguments = Array(message.arguments)
+          target_name = arguments.first
+          effect = parse_osc_scene_effect(arguments.drop(1))
+          switch_scene_from_client(target_name, broadcaster, source: "osc", effect: effect)
         when "/vizcore/tap"
           apply_tap_tempo({ "client_tapped_at_ms" => wall_clock_ms }, broadcaster)
         when "/vizcore/bpm"
@@ -759,10 +762,54 @@ module Vizcore
 
       def normalize_osc_value(value, input_min: nil, input_max: nil)
         numeric = finite_float(value)
-        normalized = normalize_osc_range(numeric, input_min: input_min, input_max: input_max) unless numeric.nil?
+        normalized_range = parse_osc_range(input_min, input_max)
+        normalized = normalize_osc_range(numeric, input_min: normalized_range[:min], input_max: normalized_range[:max]) unless numeric.nil? || normalized_range.nil?
         return normalized unless normalized.nil?
 
         numeric.nil? ? value : numeric
+      end
+
+      def parse_osc_range(input_min, input_max)
+        if input_max.nil?
+          return parse_osc_range_preset(input_min) if input_min
+          return nil
+        end
+
+        {
+          min: input_min,
+          max: input_max
+        }
+      end
+
+      def parse_osc_range_preset(value)
+        return nil unless value
+
+        symbol = value.to_s.strip.downcase
+        case symbol
+        when "0..1", "01", "unit", "unit01", "unit_01", "unit_0_1", "normalized"
+          { min: 0.0, max: 1.0 }
+        when "-1..1", "bipolar", "bip", "minus1..1", "minus1_1", "-1_1", "-1,1", "-1 to 1"
+          { min: -1.0, max: 1.0 }
+        when "midi", "midicc", "cc", "midi_cc", "0..127", "0..128", "127"
+          { min: 0.0, max: 127.0 }
+        else
+          parse_range_expression(value)
+        end
+      end
+
+      def parse_range_expression(value)
+        text = value.to_s.strip
+        from, to = text.split("..", 2)
+        return nil if to.nil?
+
+        min = finite_float(from)
+        max = finite_float(to)
+        return nil if min.nil? || max.nil?
+
+        {
+          min: min,
+          max: max
+        }
       end
 
       def normalize_osc_range(value, input_min:, input_max:)
@@ -818,15 +865,26 @@ module Vizcore
         current = broadcaster.current_scene_snapshot
         from_scene = current[:name]
         broadcaster.update_scene(scene_name: target_scene[:name], scene_layers: target_scene[:layers])
+        resolved_effect = resolve_manual_scene_effect(effect)
         WebSocketHandler.broadcast(
           type: "scene_change",
           payload: {
             from: from_scene.to_s,
             to: target_scene[:name].to_s,
-            effect: normalize_transition_effect(effect),
+            effect: resolved_effect,
             source: source
           }
         )
+      end
+
+      def resolve_manual_scene_effect(effect)
+        normalized = normalize_transition_effect(effect)
+        return normalized unless normalized.nil?
+        return nil unless @config.respond_to?(:scene_switch_effect)
+
+        deep_dup(@config.scene_switch_effect)
+      rescue StandardError
+        nil
       end
 
       def normalize_transition_effect(value)
@@ -844,6 +902,34 @@ module Vizcore
         end
       rescue StandardError
         nil
+      end
+
+      def parse_osc_scene_effect(arguments)
+        return nil if arguments.empty?
+
+        name = arguments[0]
+        return nil unless name
+
+        effect_name = name.to_s.strip
+        return nil if effect_name.empty?
+
+        duration = finite_float(arguments[1])
+        return { name: effect_name.to_sym } if duration.nil?
+
+        { name: effect_name.to_sym, options: { duration: duration } }
+      rescue StandardError
+        nil
+      end
+
+      def deep_dup(value)
+        case value
+        when Hash
+          value.each_with_object({}) { |(entry_key, entry_value), output| output[entry_key] = deep_dup(entry_value) }
+        when Array
+          value.map { |entry| deep_dup(entry) }
+        else
+          value
+        end
       end
 
       def find_scene_catalog_scene(name)

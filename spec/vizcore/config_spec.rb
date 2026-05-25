@@ -75,6 +75,28 @@ RSpec.describe Vizcore::Config do
     expect(config.allow_public_control?).to eq(true)
   end
 
+  it "parses optional scene switch effect and duration" do
+    config = described_class.new(
+      scene_file: scene_file,
+      scene_switch_effect: "crossfade",
+      scene_switch_effect_duration: "0.45"
+    )
+
+    expect(config.scene_switch_effect).to eq({ name: :crossfade, options: { duration: 0.45 } })
+  end
+
+  it "accepts scene switch effect without duration" do
+    config = described_class.new(scene_file: scene_file, scene_switch_effect: "crossfade")
+
+    expect(config.scene_switch_effect).to eq({ name: :crossfade })
+  end
+
+  it "raises for non-numeric scene switch duration" do
+    expect do
+      described_class.new(scene_file: scene_file, scene_switch_effect: "crossfade", scene_switch_effect_duration: "bad")
+    end.to raise_error(ArgumentError, /scene_switch_duration/)
+  end
+
   it "enables scene hot reload by default and can disable it" do
     default_config = described_class.new(scene_file: scene_file)
     disabled_config = described_class.new(scene_file: scene_file, reload: false)

@@ -123,6 +123,8 @@ module Vizcore
     option :bpm, type: :numeric, desc: "Fixed BPM value used with --bpm-lock"
     option :bpm_lock, type: :boolean, default: false, desc: "Lock analysis BPM output to --bpm"
     option :osc_port, type: :numeric, desc: "UDP port for OSC sync (/vizcore/scene, /vizcore/tap)"
+    option :scene_switch_effect, type: :string, desc: "Transition effect name for manual scene switch actions"
+    option :scene_switch_duration, type: :numeric, desc: "Duration in seconds for manual scene switch effects"
     option :reload, type: :boolean, default: Config::DEFAULT_RELOAD, desc: "Reload the scene file when it changes"
     option :projector, type: :boolean, default: false, desc: "Hide browser operator UI for projection output"
     option :allow_public_control, type: :boolean, default: false, desc: "Allow control panel/WebSocket when binding to a public host"
@@ -151,6 +153,8 @@ module Vizcore
         bpm: options[:bpm],
         bpm_lock: options.fetch(:bpm_lock),
         osc_port: options[:osc_port] || defaults[:osc_port],
+        scene_switch_effect: options[:scene_switch_effect] || defaults[:scene_switch_effect],
+        scene_switch_effect_duration: options[:scene_switch_duration] || defaults[:scene_switch_effect_duration],
         reload: options.fetch(:reload),
         projector_mode: options.fetch(:projector),
         allow_public_control: options.fetch(:allow_public_control)
@@ -169,6 +173,8 @@ module Vizcore
     option :bpm_lock, type: :boolean, default: false, desc: "Lock analysis BPM output to --bpm"
     option :control_preset, type: :string, desc: "Control preset JSON for browser HUD and MIDI learn"
     option :osc_port, type: :numeric, desc: "UDP port for OSC sync (/vizcore/scene, /vizcore/tap)"
+    option :scene_switch_effect, type: :string, desc: "Transition effect name for manual scene switch actions"
+    option :scene_switch_duration, type: :numeric, desc: "Duration in seconds for manual scene switch effects"
     option :projector, type: :boolean, default: false, desc: "Hide browser operator UI for projection output"
     option :allow_public_control, type: :boolean, default: false, desc: "Allow control panel/WebSocket when binding to a public host"
     # Start a bundled scene with bundled audio for first-run verification.
@@ -186,6 +192,8 @@ module Vizcore
         bpm_lock: options.fetch(:bpm_lock),
         control_preset: options[:control_preset],
         osc_port: options[:osc_port],
+        scene_switch_effect: options[:scene_switch_effect],
+        scene_switch_effect_duration: options[:scene_switch_duration],
         projector_mode: options.fetch(:projector),
         allow_public_control: options.fetch(:allow_public_control)
       )

@@ -19,7 +19,8 @@ module Vizcore
     # Supported CLI audio source values.
     SUPPORTED_AUDIO_SOURCES = %i[mic file dummy].freeze
 
-    attr_reader :host, :port, :scene_file, :audio_source, :audio_file, :audio_device, :feature_file, :control_preset, :plugin_assets, :noise_gate, :bpm, :osc_port, :projector_mode
+    attr_reader :host, :port, :scene_file, :audio_source, :audio_file, :audio_device, :feature_file, :control_preset, :plugin_assets,
+      :noise_gate, :bpm, :osc_port, :projector_mode, :scene_switch_effect
 
     # @param scene_file [String, Pathname] scene DSL file path
     # @param host [String] bind host
@@ -36,6 +37,7 @@ module Vizcore
     # @param osc_port [Integer, nil] UDP port for OSC control sync
     # @param reload [Boolean] true when scene file changes should be reloaded while running
     # @param projector_mode [Boolean] true when the browser should hide operator UI by default
+    # @param scene_switch_effect [Hash, nil] transition metadata applied to manual scene switches
     # @param allow_public_control [Boolean] true when binding operator control routes on a public host is intentional
     def initialize(
       scene_file:,
@@ -53,6 +55,8 @@ module Vizcore
       osc_port: nil,
       reload: DEFAULT_RELOAD,
       projector_mode: false,
+      scene_switch_effect: nil,
+      scene_switch_effect_duration: nil,
       allow_public_control: false
     )
       @scene_file = Pathname.new(scene_file).expand_path if scene_file
@@ -70,6 +74,7 @@ module Vizcore
       @osc_port = normalize_optional_port(osc_port)
       @reload = !!reload
       @projector_mode = !!projector_mode
+      @scene_switch_effect = normalize_scene_switch_effect(scene_switch_effect, scene_switch_effect_duration)
       @allow_public_control = !!allow_public_control
     end
 
@@ -152,6 +157,28 @@ module Vizcore
         path = value.is_a?(Pathname) ? value.expand_path : Pathname.new(raw_value).expand_path
         Vizcore::PluginAssetPolicy.validate!(path)
       end
+    end
+
+    def normalize_scene_switch_effect(effect_name, duration)
+      return nil if effect_name.nil?
+
+      raw_name = effect_name.to_s.strip
+      return nil if raw_name.empty?
+
+      options = {}
+      unless duration.nil?
+        normalized_duration = Float(duration)
+        options[:duration] = normalized_duration if normalized_duration.positive? || normalized_duration.zero?
+      end
+
+      {
+        name: raw_name.to_sym,
+        options: options
+      }.tap do |effect|
+        effect.delete(:options) if options.empty?
+      end
+    rescue ArgumentError, TypeError
+      raise ArgumentError, "scene_switch_duration must be numeric"
     end
   end
 end

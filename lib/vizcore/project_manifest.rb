@@ -37,6 +37,8 @@ module Vizcore
         feature_file: expand_path(value_at(data, "feature_file") || value_at(data, "features")),
         control_preset: expand_path(value_at(data, "control_preset") || value_at(data, "controlPreset")),
         osc_port: value_at(data, "osc_port") || value_at(data, "sync", "osc_port") || value_at(data, "sync", "osc", "port"),
+        scene_switch_effect: value_at(data, "scene_switch_effect"),
+        scene_switch_effect_duration: value_at(data, "scene_switch_effect_duration"),
         plugin_assets: plugin_assets(profile: profile)
       }.compact
     end
