@@ -464,7 +464,8 @@ RSpec.describe Vizcore::CLI do
           "--osc-port",
           "9000",
           "--no-reload",
-          "--projector"
+          "--projector",
+          "--allow-public-control"
         ]
       )
 
@@ -480,6 +481,7 @@ RSpec.describe Vizcore::CLI do
         expect(config.osc_port).to eq(9000)
         expect(config.reload?).to eq(false)
         expect(config.projector_mode).to eq(true)
+        expect(config.allow_public_control?).to eq(true)
       end
       expect(runner).to have_received(:run)
     end

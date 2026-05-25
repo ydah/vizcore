@@ -35,6 +35,7 @@ module Vizcore
     # @param osc_port [Integer, nil] UDP port for OSC control sync
     # @param reload [Boolean] true when scene file changes should be reloaded while running
     # @param projector_mode [Boolean] true when the browser should hide operator UI by default
+    # @param allow_public_control [Boolean] true when binding operator control routes on a public host is intentional
     def initialize(
       scene_file:,
       host: DEFAULT_HOST,
@@ -50,7 +51,8 @@ module Vizcore
       bpm_lock: false,
       osc_port: nil,
       reload: DEFAULT_RELOAD,
-      projector_mode: false
+      projector_mode: false,
+      allow_public_control: false
     )
       @scene_file = Pathname.new(scene_file).expand_path if scene_file
       @host = host
@@ -67,6 +69,7 @@ module Vizcore
       @osc_port = normalize_optional_port(osc_port)
       @reload = !!reload
       @projector_mode = !!projector_mode
+      @allow_public_control = !!allow_public_control
     end
 
     # @return [Boolean] true when the configured scene file exists.
@@ -87,6 +90,11 @@ module Vizcore
     # @return [Boolean] true when BPM output should use the fixed BPM value.
     def bpm_lock?
       @bpm_lock
+    end
+
+    # @return [Boolean] true when public host binding is allowed.
+    def allow_public_control?
+      @allow_public_control
     end
 
     private

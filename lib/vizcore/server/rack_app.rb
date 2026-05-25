@@ -29,6 +29,7 @@ module Vizcore
       # @param control_preset_path [String, Pathname, nil]
       # @param plugin_assets [Array<String, Pathname>, nil]
       # @param projector_mode [Boolean]
+      # @param runtime_status_provider [#call, nil]
       def initialize(
         frontend_root:,
         websocket_path: "/ws",
@@ -41,7 +42,8 @@ module Vizcore
         control_preset: nil,
         control_preset_path: nil,
         plugin_assets: nil,
-        projector_mode: false
+        projector_mode: false,
+        runtime_status_provider: nil
       )
         @frontend_root = frontend_root.expand_path
         @websocket_path = websocket_path
@@ -55,6 +57,7 @@ module Vizcore
         @control_preset_path = control_preset_path ? Pathname.new(control_preset_path).expand_path : nil
         @plugin_assets = normalize_plugin_assets(plugin_assets)
         @projector_mode = !!projector_mode
+        @runtime_status_provider = runtime_status_provider
       end
 
       # @param env [Hash]
@@ -96,7 +99,10 @@ module Vizcore
           control_preset_writable: !!@control_preset_path,
           control_preset_url: @control_preset_path ? CONTROL_PRESET_PATH : nil,
           plugin_assets: @plugin_assets.map { |asset| asset.fetch(:url) },
-          projector_mode: @projector_mode
+          projector_mode: @projector_mode,
+          websocket_clients: WebSocketHandler.connection_count,
+          dropped_frames: WebSocketHandler.dropped_frame_count,
+          runtime: runtime_status
         }
 
         if audio_file_available?
@@ -185,6 +191,35 @@ module Vizcore
 
       def root_display_mode
         @projector_mode ? "projector" : "auto"
+      end
+
+      def runtime_status
+        return {} unless @runtime_status_provider.respond_to?(:call)
+
+        normalize_runtime_status(@runtime_status_provider.call)
+      rescue StandardError => e
+        { "last_error" => e.message }
+      end
+
+      def normalize_runtime_status(values)
+        Hash(values || {}).each_with_object({}) do |(key, value), output|
+          output[key.to_s] = normalize_runtime_status_value(value)
+        end
+      rescue StandardError
+        {}
+      end
+
+      def normalize_runtime_status_value(value)
+        case value
+        when Hash
+          normalize_runtime_status(value)
+        when Array
+          value.map { |entry| normalize_runtime_status_value(entry) }
+        when Symbol
+          value.to_s
+        else
+          value
+        end
       end
 
       def static_response(body, content_type:)

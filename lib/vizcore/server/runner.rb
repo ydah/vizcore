@@ -35,6 +35,7 @@ module Vizcore
       # @return [void]
       def run
         validate_scene_file!
+        validate_public_bind_settings!
         validate_feature_settings!
         validate_control_preset_settings!
         validate_plugin_asset_settings!
@@ -45,6 +46,7 @@ module Vizcore
         @tap_tempo_key = tap_tempo_key(definition)
         scene = first_scene(definition) || fallback_scene
 
+        broadcaster = nil
         app = RackApp.new(
           frontend_root: Vizcore.frontend_root,
           audio_source: runtime_audio_source,
@@ -56,7 +58,8 @@ module Vizcore
           control_preset: control_preset,
           control_preset_path: @config.control_preset,
           plugin_assets: @config.plugin_assets,
-          projector_mode: @config.projector_mode
+          projector_mode: @config.projector_mode,
+          runtime_status_provider: -> { broadcaster&.runtime_status || {} }
         )
         server = Puma::Server.new(app, nil, min_threads: 0, max_threads: 4)
         server.add_tcp_listener(@config.host, @config.port)
@@ -140,6 +143,19 @@ module Vizcore
         return if @config.audio_file && @config.audio_file.file?
 
         raise Vizcore::ConfigurationError, "Audio file not found: #{@config.audio_file || '(nil)'}"
+      end
+
+      def validate_public_bind_settings!
+        return if @config.allow_public_control?
+        return unless public_bind_host?(@config.host)
+
+        raise Vizcore::ConfigurationError,
+              "Refusing to expose Vizcore control routes on #{@config.host}; pass --allow-public-control when this is intentional"
+      end
+
+      def public_bind_host?(host)
+        value = host.to_s.strip
+        value.empty? || value == "0.0.0.0" || value == "::" || value == "[::]"
       end
 
       def validate_feature_settings!

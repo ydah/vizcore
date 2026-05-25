@@ -122,6 +122,7 @@ module Vizcore
     option :osc_port, type: :numeric, desc: "UDP port for OSC sync (/vizcore/scene, /vizcore/tap)"
     option :reload, type: :boolean, default: Config::DEFAULT_RELOAD, desc: "Reload the scene file when it changes"
     option :projector, type: :boolean, default: false, desc: "Hide browser operator UI for projection output"
+    option :allow_public_control, type: :boolean, default: false, desc: "Allow control panel/WebSocket when binding to a public host"
     # Start the Vizcore server with the given scene file.
     #
     # @param scene_file [String] path to a Ruby scene DSL file
@@ -147,7 +148,8 @@ module Vizcore
         bpm_lock: options.fetch(:bpm_lock),
         osc_port: options[:osc_port] || defaults[:osc_port],
         reload: options.fetch(:reload),
-        projector_mode: options.fetch(:projector)
+        projector_mode: options.fetch(:projector),
+        allow_public_control: options.fetch(:allow_public_control)
       )
       Server::Runner.new(config).run
     rescue ArgumentError => e
@@ -163,6 +165,7 @@ module Vizcore
     option :control_preset, type: :string, desc: "Control preset JSON for browser HUD and MIDI learn"
     option :osc_port, type: :numeric, desc: "UDP port for OSC sync (/vizcore/scene, /vizcore/tap)"
     option :projector, type: :boolean, default: false, desc: "Hide browser operator UI for projection output"
+    option :allow_public_control, type: :boolean, default: false, desc: "Allow control panel/WebSocket when binding to a public host"
     # Start a bundled scene with bundled audio for first-run verification.
     #
     # @return [void]
@@ -178,7 +181,8 @@ module Vizcore
         bpm_lock: options.fetch(:bpm_lock),
         control_preset: options[:control_preset],
         osc_port: options[:osc_port],
-        projector_mode: options.fetch(:projector)
+        projector_mode: options.fetch(:projector),
+        allow_public_control: options.fetch(:allow_public_control)
       )
       Server::Runner.new(config).run
     rescue ArgumentError => e
@@ -400,6 +404,7 @@ module Vizcore
     option :timeout, type: :numeric, default: 10, desc: "Seconds to wait for the temporary server"
     option :width, type: :numeric, default: 1280, desc: "Browser viewport width"
     option :height, type: :numeric, default: 720, desc: "Browser viewport height"
+    option :allow_public_control, type: :boolean, default: false, desc: "Allow control panel/WebSocket when binding to a public host"
     # Start Vizcore and capture a browser-rendered canvas from the projector route.
     #
     # @param scene_file [String]
@@ -415,7 +420,8 @@ module Vizcore
         feature_file: options[:feature_file],
         control_preset: options[:control_preset],
         reload: false,
-        projector_mode: true
+        projector_mode: true,
+        allow_public_control: options.fetch(:allow_public_control)
       )
       validate_snapshot_config!(config)
 
@@ -680,6 +686,7 @@ module Vizcore
       command.concat(["--audio-file", config.audio_file.to_s]) if config.audio_file
       command.concat(["--feature-file", config.feature_file.to_s]) if config.feature_file
       command.concat(["--control-preset", config.control_preset.to_s]) if config.control_preset
+      command << "--allow-public-control" if config.allow_public_control?
       command
     end
 

@@ -49,6 +49,26 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
       expect(frame[:audio][:fft].length).to eq(32)
     end
 
+    it "exposes runtime status after frame builds" do
+      frame = described_class.new(scene_name: "basic").build_frame(1.25)
+      broadcaster = described_class.new(scene_name: "status")
+
+      broadcaster.build_frame(1.25)
+      status = broadcaster.runtime_status
+
+      expect(frame[:metrics]).to include(:server_frame_ms)
+      expect(status).to include(
+        current_scene: "status",
+        fps: described_class::FRAME_RATE,
+        frame_id: 0,
+        websocket_clients: an_instance_of(Integer),
+        dropped_frames: an_instance_of(Integer)
+      )
+      expect(status[:sample_rate]).to be_a(Integer)
+      expect(status[:frame_size]).to be_a(Integer)
+      expect(status[:metrics]).to include(:server_frame_ms)
+    end
+
     it "builds scene layers from DSL definitions and mapping sources" do
       input_manager = instance_double(
         Vizcore::Audio::InputManager,

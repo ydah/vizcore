@@ -111,6 +111,23 @@ module Vizcore
         current_scene
       end
 
+      # @return [Hash] runtime health details for control/status endpoints
+      def runtime_status
+        scene = current_scene
+        {
+          current_scene: scene[:name].to_s,
+          fps: FRAME_RATE,
+          frame_id: @frame_count,
+          sample_rate: input_manager_value(:sample_rate),
+          frame_size: input_manager_value(:frame_size),
+          transport_playing: @scene_mutex.synchronize { @transport_playing },
+          websocket_clients: WebSocketHandler.connection_count,
+          dropped_frames: WebSocketHandler.dropped_frame_count,
+          last_error: formatted_last_error,
+          metrics: deep_dup(@last_frame_metrics)
+        }.compact
+      end
+
       # Synchronize external playback transport (e.g. browser audio element) with the input source.
       #
       # @param playing [Boolean]
@@ -271,6 +288,23 @@ module Vizcore
         return [samples, 0.0] if samples
 
         measure_ms { capture_samples }
+      end
+
+      def input_manager_value(name)
+        return nil unless @input_manager.respond_to?(name)
+
+        @input_manager.public_send(name)
+      rescue StandardError
+        nil
+      end
+
+      def formatted_last_error
+        error = @last_error
+        return nil unless error
+
+        Vizcore::ErrorFormatting.summarize(error, context: "last runtime error")
+      rescue StandardError
+        error.to_s
       end
 
       def measure_ms

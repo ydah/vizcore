@@ -53,7 +53,8 @@ RSpec.describe Vizcore::Server::Runner do
         control_preset: nil,
         control_preset_path: nil,
         plugin_assets: [],
-        projector_mode: false
+        projector_mode: false,
+        runtime_status_provider: an_instance_of(Proc)
       )
       expect(Puma::Server).to have_received(:new).with(rack_app, nil, min_threads: 0, max_threads: 4)
       expect(Vizcore::Audio::InputManager).to have_received(:new).with(source: :mic, file_path: nil, audio_device: nil)
@@ -97,6 +98,34 @@ RSpec.describe Vizcore::Server::Runner do
       expect(output.string).to include("Hot reload: disabled")
     end
 
+    it "rejects public host binding unless explicitly allowed" do
+      public_config = Vizcore::Config.new(scene_file: scene_file.to_s, host: "0.0.0.0", port: 4567)
+
+      expect do
+        described_class.new(public_config, output: output).run
+      end.to raise_error(Vizcore::ConfigurationError, /allow-public-control/)
+    end
+
+    it "allows public host binding when explicitly opted in" do
+      public_config = Vizcore::Config.new(
+        scene_file: scene_file.to_s,
+        host: "0.0.0.0",
+        port: 4567,
+        allow_public_control: true
+      )
+      allow(Vizcore::Server::RackApp).to receive(:new).and_return(rack_app)
+      allow(Puma::Server).to receive(:new).and_return(puma_server)
+      allow(Vizcore::Audio::InputManager).to receive(:new).and_return(input_manager)
+      allow(Vizcore::Server::FrameBroadcaster).to receive(:new).and_return(broadcaster)
+
+      runner = described_class.new(public_config, output: output)
+      allow(runner).to receive(:wait_for_interrupt)
+
+      runner.run
+
+      expect(puma_server).to have_received(:add_tcp_listener).with("0.0.0.0", 4567)
+    end
+
     it "passes file source metadata to RackApp when file input is enabled" do
       fixture = Vizcore.root.join("spec", "fixtures", "audio", "pulse16_mono.wav")
       file_config = Vizcore::Config.new(
@@ -127,7 +156,8 @@ RSpec.describe Vizcore::Server::Runner do
         control_preset: nil,
         control_preset_path: nil,
         plugin_assets: [],
-        projector_mode: false
+        projector_mode: false,
+        runtime_status_provider: an_instance_of(Proc)
       )
       expect(broadcaster).to have_received(:sync_transport).with(playing: false, position_seconds: 0.0)
     end

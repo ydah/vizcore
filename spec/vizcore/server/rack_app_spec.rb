@@ -41,6 +41,31 @@ RSpec.describe Vizcore::Server::RackApp do
     expect(response.body).to include("\"control_preset\":{}")
     expect(response.body).to include("\"control_preset_writable\":false")
     expect(response.body).to include("\"projector_mode\":false")
+    expect(response.body).to include("\"websocket_clients\":")
+    expect(response.body).to include("\"dropped_frames\":")
+    expect(response.body).to include("\"runtime\":{}")
+  end
+
+  it "includes live runtime status when provided" do
+    runtime_app = described_class.new(
+      frontend_root: Vizcore.frontend_root,
+      runtime_status_provider: lambda do
+        {
+          current_scene: :drop,
+          fps: 60.0,
+          frame_id: 42,
+          metrics: { server_frame_ms: 1.25 }
+        }
+      end
+    )
+
+    response = Rack::MockRequest.new(runtime_app).get("/runtime")
+    payload = JSON.parse(response.body)
+
+    expect(payload.dig("runtime", "current_scene")).to eq("drop")
+    expect(payload.dig("runtime", "fps")).to eq(60.0)
+    expect(payload.dig("runtime", "frame_id")).to eq(42)
+    expect(payload.dig("runtime", "metrics", "server_frame_ms")).to eq(1.25)
   end
 
   it "serves projector output without operator UI by default" do

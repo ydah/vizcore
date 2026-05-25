@@ -69,6 +69,12 @@ RSpec.describe Vizcore::Config do
     expect(config.projector?).to eq(true)
   end
 
+  it "parses public control opt-in" do
+    config = described_class.new(scene_file: scene_file, allow_public_control: true)
+
+    expect(config.allow_public_control?).to eq(true)
+  end
+
   it "enables scene hot reload by default and can disable it" do
     default_config = described_class.new(scene_file: scene_file)
     disabled_config = described_class.new(scene_file: scene_file, reload: false)
