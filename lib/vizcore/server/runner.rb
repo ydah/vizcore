@@ -385,7 +385,9 @@ module Vizcore
         when "/vizcore/bpm_unlock"
           apply_osc_bpm_unlock(broadcaster)
         when %r{\A/vizcore/global/([^/]+)\z}
-          apply_osc_global(Regexp.last_match(1), message.arguments.first)
+          apply_osc_global(Regexp.last_match(1), message.arguments)
+        when %r{\A/vizcore/layer/([^/]+)/(.+)\z}
+          apply_osc_layer_param(broadcaster, Regexp.last_match(1), Regexp.last_match(2), message.arguments)
         when %r{\A/vizcore/live/(blackout|freeze)\z}
           apply_osc_live_control(Regexp.last_match(1), message.arguments.first)
         when "/vizcore/transport/play", "/vizcore/transport/position"
@@ -673,12 +675,29 @@ module Vizcore
         )
       end
 
-      def apply_osc_global(name, value)
-        globals = set_runtime_global(name, normalize_osc_value(value))
+      def apply_osc_global(name, arguments)
+        globals = set_runtime_global(name, normalize_osc_argument(arguments))
         WebSocketHandler.broadcast(
           type: "config_update",
           payload: {
             globals: globals,
+            source: "osc"
+          }
+        )
+      end
+
+      def apply_osc_layer_param(broadcaster, layer_name, param, arguments)
+        return unless broadcaster.respond_to?(:set_layer_param)
+
+        overrides = broadcaster.set_layer_param(
+          layer_name: layer_name,
+          param: param.to_s.tr("/", "."),
+          value: normalize_osc_argument(arguments)
+        )
+        WebSocketHandler.broadcast(
+          type: "config_update",
+          payload: {
+            layer_params: overrides,
             source: "osc"
           }
         )
@@ -723,9 +742,27 @@ module Vizcore
         )
       end
 
-      def normalize_osc_value(value)
+      def normalize_osc_argument(arguments)
+        values = Array(arguments)
+        normalize_osc_value(values.first, input_min: values[1], input_max: values[2])
+      end
+
+      def normalize_osc_value(value, input_min: nil, input_max: nil)
         numeric = finite_float(value)
+        normalized = normalize_osc_range(numeric, input_min: input_min, input_max: input_max) unless numeric.nil?
+        return normalized unless normalized.nil?
+
         numeric.nil? ? value : numeric
+      end
+
+      def normalize_osc_range(value, input_min:, input_max:)
+        return nil if input_min.nil? || input_max.nil?
+
+        min = finite_float(input_min)
+        max = finite_float(input_max)
+        return nil if min.nil? || max.nil? || min == max
+
+        ((value - min) / (max - min)).clamp(0.0, 1.0)
       end
 
       def osc_truthy?(value)

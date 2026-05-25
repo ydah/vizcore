@@ -560,6 +560,31 @@ RSpec.describe Vizcore::Server::Runner do
       )
     end
 
+    it "applies OSC layer params and normalizes ranged values" do
+      runner = described_class.new(config, output: output)
+      broadcaster = instance_double(
+        Vizcore::Server::FrameBroadcaster,
+        set_layer_param: { "rings" => { "opacity" => 0.5 } }
+      )
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+
+      runner.send(
+        :handle_osc_message,
+        Vizcore::Sync::OscMessage.new(address: "/vizcore/layer/rings/opacity", arguments: [64, 0, 128]),
+        broadcaster
+      )
+
+      expect(broadcaster).to have_received(:set_layer_param).with(
+        layer_name: "rings",
+        param: "opacity",
+        value: 0.5
+      )
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "config_update",
+        payload: hash_including(layer_params: { "rings" => { "opacity" => 0.5 } }, source: "osc")
+      )
+    end
+
     it "applies OSC transport messages for file input" do
       fixture = Vizcore.root.join("spec", "fixtures", "audio", "pulse16_mono.wav")
       file_config = Vizcore::Config.new(

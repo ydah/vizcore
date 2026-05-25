@@ -20,18 +20,19 @@ module Vizcore
       # @param scene_layers [Array<Hash>]
       # @param audio [Hash]
       # @return [Array<Hash>] normalized layer payloads with resolved params
-      def resolve_layers(scene_layers:, audio:, time: 0.0, frame: 0, resolution: [1280, 720], globals: {}, custom_shape_overrides: {})
+      def resolve_layers(scene_layers:, audio:, time: 0.0, frame: 0, resolution: [1280, 720], globals: {}, custom_shape_overrides: {}, layer_param_overrides: {})
         normalize_scene_layers(scene_layers).map do |layer|
-          resolve_layer(layer, audio, time: time, frame: frame, resolution: resolution, globals: globals, custom_shape_overrides: custom_shape_overrides)
+          resolve_layer(layer, audio, time: time, frame: frame, resolution: resolution, globals: globals, custom_shape_overrides: custom_shape_overrides, layer_param_overrides: layer_param_overrides)
         end
       end
 
       private
 
-      def resolve_layer(layer, audio, time:, frame:, resolution:, globals:, custom_shape_overrides:)
+      def resolve_layer(layer, audio, time:, frame:, resolution:, globals:, custom_shape_overrides:, layer_param_overrides:)
         params = deep_dup(layer[:params] || {})
         apply_custom_shape_overrides!(params, layer_name: layer[:name], custom_shape_overrides: custom_shape_overrides)
         merge_resolved_mappings!(params, resolve_mappings(layer[:mappings], audio, globals: globals, layer_name: layer[:name], frame: frame))
+        apply_layer_param_overrides!(params, layer_name: layer[:name], layer_param_overrides: layer_param_overrides)
         expand_dynamic_custom_shapes!(params, layer: layer, audio: audio, time: time, frame: frame, resolution: resolution, globals: globals)
 
         output = {
@@ -139,6 +140,18 @@ module Vizcore
         Hash(values[name] || values[layer_name.to_sym] || {})
       rescue TypeError
         {}
+      end
+
+      def apply_layer_param_overrides!(params, layer_name:, layer_param_overrides:)
+        layer_overrides = custom_shape_layer_overrides(layer_param_overrides, layer_name)
+        layer_overrides.each do |target, value|
+          target_name = target.to_s
+          if target_name.include?(".")
+            assign_nested_param(params, target_name.split("."), value)
+          else
+            params[target_name.to_sym] = value
+          end
+        end
       end
 
       def apply_custom_shape_attributes!(primitive, descriptor)

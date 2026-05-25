@@ -215,6 +215,42 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
       )
     end
 
+    it "applies live layer parameter overrides" do
+      input_manager = instance_double(
+        Vizcore::Audio::InputManager,
+        frame_size: 1024,
+        sample_rate: 44_100,
+        capture_frame: Array.new(1024, 0.0),
+        latest_samples: Array.new(1024, 0.0),
+        realtime_capture_size: 735,
+        start: nil,
+        stop: nil
+      )
+      pipeline = instance_double(
+        Vizcore::Analysis::Pipeline,
+        call: { amplitude: 0.9, bands: {}, fft: [], beat: false, beat_count: 0, bpm: 0.0 }
+      )
+      broadcaster = described_class.new(
+        scene_name: "intro",
+        scene_layers: [
+          {
+            name: :rings,
+            type: :shape,
+            params: { opacity: 0.3 },
+            mappings: [{ source: { kind: :amplitude }, target: :opacity }]
+          }
+        ],
+        input_manager: input_manager,
+        analysis_pipeline: pipeline
+      )
+
+      overrides = broadcaster.set_layer_param(layer_name: :rings, param: :opacity, value: 0.5)
+      frame = broadcaster.build_frame(0.5, Array.new(1024, 0.0))
+
+      expect(overrides).to eq("rings" => { "opacity" => 0.5 })
+      expect(frame.dig(:scene, :layers, 0, :params, :opacity)).to eq(0.5)
+    end
+
     it "reports audio capture errors and falls back to silence frame" do
       input_manager = instance_double(
         Vizcore::Audio::InputManager,

@@ -405,6 +405,26 @@ RSpec.describe Vizcore::DSL::MappingResolver do
       expect(resolved[0][:params][:shapes][0][:transform]).to eq(translate: { x: 25.0 })
     end
 
+    it "applies layer parameter overrides after audio mappings" do
+      resolver = described_class.new
+      scene_layers = [
+        {
+          name: :rings,
+          params: { opacity: 0.3, transform: { scale: { x: 1.0 } } },
+          mappings: [{ source: { kind: :amplitude }, target: :opacity }]
+        }
+      ]
+
+      resolved = resolver.resolve_layers(
+        scene_layers: scene_layers,
+        audio: { amplitude: 0.8, bands: {} },
+        layer_param_overrides: { "rings" => { "opacity" => 0.5, "transform.scale.x" => 1.5 } }
+      )
+
+      expect(resolved[0][:params]).to include(opacity: 0.5)
+      expect(resolved[0][:params].dig(:transform, :scale, :x)).to eq(1.5)
+    end
+
     it "expands dynamic custom shapes after custom params are mapped" do
       shape_class = Class.new do
         include Vizcore::Shape

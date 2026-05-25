@@ -85,6 +85,7 @@ module Vizcore
         @frame_count = 0
         @last_frame_metrics = {}
         @custom_shape_param_overrides = {}
+        @layer_param_overrides = {}
         @custom_shape_param_mutex = Mutex.new
         @transport_playing = initial_transport_playing_state
         reset_transition_trigger_counters!
@@ -268,6 +269,18 @@ module Vizcore
         custom_shape_param_overrides_snapshot
       end
 
+      def set_layer_param(layer_name:, param:, value:)
+        layer_key = layer_name.to_s
+        param_key = param.to_s.tr("/", ".").strip
+        return layer_param_overrides_snapshot if layer_key.empty? || param_key.empty?
+
+        @custom_shape_param_mutex.synchronize do
+          @layer_param_overrides[layer_key] ||= {}
+          @layer_param_overrides[layer_key][param_key] = value
+          deep_dup(@layer_param_overrides)
+        end
+      end
+
       # Build one frame payload for transport to frontend.
       #
       # @param _elapsed_seconds [Float]
@@ -378,12 +391,17 @@ module Vizcore
           audio: analyzed,
           time: time,
           frame: frame,
-          custom_shape_overrides: custom_shape_param_overrides_snapshot
+          custom_shape_overrides: custom_shape_param_overrides_snapshot,
+          layer_param_overrides: layer_param_overrides_snapshot
         )
       end
 
       def custom_shape_param_overrides_snapshot
         @custom_shape_param_mutex.synchronize { deep_dup(@custom_shape_param_overrides) }
+      end
+
+      def layer_param_overrides_snapshot
+        @custom_shape_param_mutex.synchronize { deep_dup(@layer_param_overrides) }
       end
 
       def finite_float(value)

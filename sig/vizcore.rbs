@@ -492,7 +492,9 @@ module Vizcore::DSL
       ?time: Numeric time,
       ?frame: Integer frame,
       ?resolution: Array[untyped] resolution,
-      ?globals: Hash[untyped, untyped] globals
+      ?globals: Hash[untyped, untyped] globals,
+      ?custom_shape_overrides: Hash[untyped, untyped] custom_shape_overrides,
+      ?layer_param_overrides: Hash[untyped, untyped] layer_param_overrides
     ) -> Array[Hash[Symbol, untyped]]
   end
 end
