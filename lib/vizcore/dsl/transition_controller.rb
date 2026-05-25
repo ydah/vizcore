@@ -8,7 +8,9 @@ module Vizcore
 
       # @param scenes [Array<Hash>]
       # @param transitions [Array<Hash>]
-      def initialize(scenes:, transitions:)
+      # @param error_reporter [#call, nil]
+      def initialize(scenes:, transitions:, error_reporter: nil)
+        @error_reporter = error_reporter || ->(_message) {}
         update(scenes: scenes, transitions: transitions)
       end
 
@@ -23,11 +25,12 @@ module Vizcore
       # @param scene_name [String, Symbol]
       # @param audio [Hash]
       # @param frame_count [Integer]
+      # @param elapsed_seconds [Numeric, nil]
       # @return [Hash, nil] transition payload when condition matches
-      def next_transition(scene_name:, audio:, frame_count: 0)
+      def next_transition(scene_name:, audio:, frame_count: 0, elapsed_seconds: nil)
         current = scene_name.to_sym
         transition = @transitions.find do |entry|
-          entry[:from] == current && trigger_match?(entry[:trigger], audio, frame_count)
+          entry[:from] == current && trigger_match?(entry, audio, frame_count, elapsed_seconds)
         end
         return nil unless transition
 
@@ -73,12 +76,22 @@ module Vizcore
         end
       end
 
-      def trigger_match?(trigger, audio, frame_count)
+      def trigger_match?(transition, audio, frame_count, elapsed_seconds)
+        trigger = transition[:trigger]
         return false unless trigger.respond_to?(:call)
 
-        TriggerContext.new(audio, frame_count: frame_count).instance_exec(&trigger)
-      rescue StandardError
+        TriggerContext.new(audio, frame_count: frame_count, elapsed_seconds: elapsed_seconds).instance_exec(&trigger)
+      rescue StandardError => e
+        report_trigger_error(transition, e)
         false
+      end
+
+      def report_trigger_error(transition, error)
+        @error_reporter.call(
+          "transition trigger failed: #{transition[:from]} -> #{transition[:to]} (#{error.class}: #{error.message})"
+        )
+      rescue StandardError
+        nil
       end
 
       def symbolize_hash(value)
@@ -107,14 +120,17 @@ module Vizcore
       class TriggerContext
         # @param audio [Hash]
         # @param frame_count [Integer]
-        def initialize(audio, frame_count:)
+        # @param elapsed_seconds [Numeric, nil]
+        def initialize(audio, frame_count:, elapsed_seconds: nil)
           @audio = symbolize_hash(audio)
           @bands = symbolize_hash(@audio[:bands])
           @onsets = symbolize_hash(@audio[:onsets])
           @drums = symbolize_hash(@audio[:drums])
           @frame_count = Integer(frame_count)
+          @elapsed_seconds = normalize_elapsed_seconds(elapsed_seconds)
         rescue StandardError
           @frame_count = 0
+          @elapsed_seconds = nil
         end
 
         # @return [Float]
@@ -223,12 +239,23 @@ module Vizcore
           @frame_count
         end
 
-        # @return [Float] scene-local elapsed seconds at the default runtime frame rate
+        # @return [Float] scene-local elapsed seconds
         def seconds
+          return @elapsed_seconds if @elapsed_seconds
+
           @frame_count / DEFAULT_FRAME_RATE
         end
 
         private
+
+        def normalize_elapsed_seconds(value)
+          return nil if value.nil?
+
+          numeric = Float(value)
+          numeric.finite? ? numeric : nil
+        rescue StandardError
+          nil
+        end
 
         def symbolize_hash(value)
           Hash(value).each_with_object({}) do |(key, entry), output|

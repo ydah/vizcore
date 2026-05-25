@@ -18,11 +18,19 @@ module Vizcore
       def start
         @definition = resolve_shader_sources(Vizcore::DSL::Engine.load_file(@config.scene_file.to_s))
         @scene = first_scene(@definition)
+        @transition_controller = Vizcore::DSL::TransitionController.new(
+          scenes: Array(@definition[:scenes]),
+          transitions: Array(@definition[:transitions])
+        )
+        @mapping_resolver = Vizcore::DSL::MappingResolver.new
         @input_manager = build_input_manager
         @input_manager.start
         @capture_size = capture_size
         @pipeline = build_pipeline
         @frame_count = 0
+        @scene_frame_base = 0
+        @scene_elapsed_base = 0.0
+        @scene_beat_base = 0
         self
       end
 
@@ -32,17 +40,23 @@ module Vizcore
 
         audio = @pipeline.call(@input_manager.capture_frame(@capture_size))
         @frame_count += 1
-        layers = Vizcore::DSL::MappingResolver.new.resolve_layers(
-          scene_layers: @scene[:layers],
+        scene = @scene
+        layers = @mapping_resolver.resolve_layers(
+          scene_layers: scene[:layers],
           audio: audio,
           time: frame_time,
           frame: @frame_count
         )
+        evaluate_transition(audio)
 
         {
-          scene: { name: @scene[:name], layers: layers },
+          scene: {
+            schema_version: Vizcore::Renderer::SceneSerializer::SCENE_SCHEMA_VERSION,
+            name: scene[:name],
+            layers: layers
+          },
           audio: audio,
-          scene_name: @scene[:name].to_s
+          scene_name: scene[:name].to_s
         }
       end
 
@@ -62,6 +76,51 @@ module Vizcore
         return scene if scene
 
         { name: @config.scene_file.basename(".rb").to_sym, layers: [] }
+      end
+
+      def evaluate_transition(audio)
+        transition = @transition_controller.next_transition(
+          scene_name: @scene[:name],
+          audio: transition_audio(audio),
+          frame_count: scene_frame_count,
+          elapsed_seconds: scene_elapsed_seconds
+        )
+        return unless transition
+
+        @scene = transition.fetch(:scene)
+        reset_scene_counters(audio)
+      end
+
+      def transition_audio(audio)
+        Hash(audio).merge(beat_count: scene_beat_count(audio))
+      rescue StandardError
+        { beat_count: 0 }
+      end
+
+      def scene_frame_count
+        [@frame_count - @scene_frame_base, 0].max
+      end
+
+      def scene_elapsed_seconds
+        [frame_time - @scene_elapsed_base, 0.0].max
+      end
+
+      def scene_beat_count(audio)
+        global_beat_count = Integer(Hash(audio)[:beat_count] || 0)
+        [global_beat_count - @scene_beat_base, 0].max
+      rescue StandardError
+        0
+      end
+
+      def reset_scene_counters(audio)
+        audio_hash = Hash(audio)
+        @scene_frame_base = @frame_count
+        @scene_elapsed_base = frame_time
+        @scene_beat_base = Integer(audio_hash[:beat_count] || 0) - (audio_hash[:beat] ? 1 : 0)
+      rescue StandardError
+        @scene_frame_base = @frame_count
+        @scene_elapsed_base = frame_time
+        @scene_beat_base = 0
       end
 
       def build_input_manager

@@ -42,6 +42,7 @@ RSpec.describe Vizcore::Renderer::SceneSerializer do
       )
 
       expect(frame[:timestamp]).to eq(1.23456)
+      expect(frame[:schema_version]).to eq("vizcore.frame.v1")
       expect(frame[:audio]).to eq(
         amplitude: 0.1235,
         bands: { low: 0.9877, high: 0.3333 },
@@ -57,6 +58,7 @@ RSpec.describe Vizcore::Renderer::SceneSerializer do
         peak_frequency: 440.1235
       )
       expect(frame[:scene]).to eq(
+        schema_version: "vizcore.scene.v1",
         name: "intro",
         layers: [
           {

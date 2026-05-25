@@ -91,6 +91,51 @@ RSpec.describe Vizcore::DSL::TransitionController do
       )
     end
 
+    it "uses explicit elapsed seconds when supplied" do
+      controller = described_class.new(
+        scenes: [
+          { name: :intro, layers: [] },
+          { name: :drop, layers: [] }
+        ],
+        transitions: [
+          {
+            from: :intro,
+            to: :drop,
+            trigger: proc { seconds >= 2.5 }
+          }
+        ]
+      )
+
+      expect(
+        controller.next_transition(scene_name: :intro, audio: {}, frame_count: 999, elapsed_seconds: 2.4)
+      ).to be_nil
+      expect(
+        controller.next_transition(scene_name: :intro, audio: {}, frame_count: 1, elapsed_seconds: 2.5)
+      ).to include(from: :intro, to: :drop)
+    end
+
+    it "reports trigger errors without raising" do
+      reports = []
+      controller = described_class.new(
+        scenes: [
+          { name: :intro, layers: [] },
+          { name: :drop, layers: [] }
+        ],
+        transitions: [
+          {
+            from: :intro,
+            to: :drop,
+            trigger: proc { raise "bad trigger" }
+          }
+        ],
+        error_reporter: ->(message) { reports << message }
+      )
+
+      expect(controller.next_transition(scene_name: :intro, audio: {})).to be_nil
+      expect(reports.join("\n")).to include("transition trigger failed: intro -> drop")
+      expect(reports.join("\n")).to include("bad trigger")
+    end
+
     it "exposes beat_pulse to transition trigger context" do
       controller = described_class.new(
         scenes: [

@@ -60,13 +60,15 @@ module Vizcore
         )
         @mapping_resolver = mapping_resolver || Vizcore::DSL::MappingResolver.new
         @scene_serializer = scene_serializer || Vizcore::Renderer::SceneSerializer.new
+        @error_reporter = error_reporter || ->(_message) {}
         @transition_controller = transition_controller || Vizcore::DSL::TransitionController.new(
           scenes: scene_catalog || [],
-          transitions: transitions || []
+          transitions: transitions || [],
+          error_reporter: @error_reporter
         )
-        @error_reporter = error_reporter || ->(_message) {}
         @last_error = nil
         @frame_count = 0
+        @last_frame_metrics = {}
         @custom_shape_param_overrides = {}
         @custom_shape_param_mutex = Mutex.new
         @transport_playing = initial_transport_playing_state
@@ -135,7 +137,7 @@ module Vizcore
         @frame_count += 1
         frame = build_frame(elapsed_seconds, samples)
         WebSocketHandler.broadcast(type: "audio_frame", payload: frame)
-        evaluate_transition(frame[:audio], frame_count: @frame_count)
+        evaluate_transition(frame[:audio], frame_count: @frame_count, elapsed_seconds: elapsed_seconds)
         frame
       end
 
@@ -242,7 +244,7 @@ module Vizcore
         scene = current_scene
         layers, scene_build_ms = measure_ms { build_scene_layers(scene[:layers], analyzed, time: elapsed_seconds, frame: @frame_count) }
 
-        @scene_serializer.audio_frame(
+        frame = @scene_serializer.audio_frame(
           timestamp: Time.now.to_f,
           audio: analyzed,
           scene_name: scene[:name],
@@ -256,6 +258,8 @@ module Vizcore
             server_frame_ms: monotonic_ms - started_at_ms
           }
         )
+        @last_frame_metrics = frame[:metrics] || {}
+        frame
       rescue StandardError => e
         report_error(e, context: "frame build failed")
         raise Vizcore::FrameBuildError, Vizcore::ErrorFormatting.summarize(e, context: "Frame build failed")
@@ -373,7 +377,7 @@ module Vizcore
         end
       end
 
-      def evaluate_transition(audio, frame_count:)
+      def evaluate_transition(audio, frame_count:, elapsed_seconds:)
         return if transition_evaluation_paused?
 
         transition = @scene_mutex.synchronize do
@@ -386,10 +390,15 @@ module Vizcore
             audio: audio,
             frame_count: frame_count
           )
+          trigger_elapsed_seconds = transition_trigger_elapsed_seconds(
+            scene_name: scene[:name],
+            elapsed_seconds: elapsed_seconds
+          )
           @transition_controller.next_transition(
             scene_name: scene[:name],
             audio: trigger_audio,
-            frame_count: trigger_frame_count
+            frame_count: trigger_frame_count,
+            elapsed_seconds: trigger_elapsed_seconds
           )
         end
         return unless transition
@@ -407,8 +416,10 @@ module Vizcore
 
       def reset_transition_trigger_counters!
         @transition_counter_scene_name = nil
+        @transition_counter_elapsed_scene_name = nil
         @transition_counter_frame_base = 0
         @transition_counter_beat_base = 0
+        @transition_counter_elapsed_base = 0.0
       end
 
       def transition_evaluation_paused?
@@ -448,6 +459,15 @@ module Vizcore
         [0, { beat_count: 0 }]
       end
 
+      def transition_trigger_elapsed_seconds(scene_name:, elapsed_seconds:)
+        sync_transition_elapsed_counter(scene_name: scene_name, elapsed_seconds: elapsed_seconds)
+
+        current_elapsed = Float(elapsed_seconds)
+        [current_elapsed - @transition_counter_elapsed_base, 0.0].max
+      rescue StandardError
+        0.0
+      end
+
       def sync_transition_trigger_counters(scene_name:, audio:, frame_count:)
         normalized_scene_name = scene_name.to_s
         return if @transition_counter_scene_name == normalized_scene_name
@@ -462,6 +482,16 @@ module Vizcore
         @transition_counter_beat_base = global_beat_count - (truthy_audio_beat?(audio_hash) ? 1 : 0)
       rescue StandardError
         reset_transition_trigger_counters!
+      end
+
+      def sync_transition_elapsed_counter(scene_name:, elapsed_seconds:)
+        normalized_scene_name = scene_name.to_s
+        return if @transition_counter_elapsed_scene_name == normalized_scene_name
+
+        @transition_counter_elapsed_scene_name = normalized_scene_name
+        @transition_counter_elapsed_base = Float(elapsed_seconds)
+      rescue StandardError
+        @transition_counter_elapsed_base = 0.0
       end
 
       def extract_beat_count(audio)

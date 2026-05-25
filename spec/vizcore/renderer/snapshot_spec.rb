@@ -129,6 +129,40 @@ RSpec.describe Vizcore::Renderer::Snapshot do
     frame_source&.stop
   end
 
+  it "advances offline frame source through transition rules" do
+    Dir.mktmpdir("vizcore-frame-source") do |dir|
+      scene_path = File.join(dir, "scene.rb")
+      File.write(scene_path, <<~RUBY)
+        Vizcore.define do
+          scene :intro do
+            layer(:intro_layer) { type :geometry }
+          end
+
+          scene :drop do
+            layer(:drop_layer) { type :shader }
+          end
+
+          transition from: :intro, to: :drop do
+            trigger { frame_count >= 1 }
+          end
+        end
+      RUBY
+      config = Vizcore::Config.new(scene_file: scene_path, audio_source: :dummy)
+      frame_source = Vizcore::Renderer::SceneFrameSource.new(config: config, frame_rate: 30)
+      frame_source.start
+
+      first = frame_source.capture
+      second = frame_source.capture
+
+      expect(first[:scene_name]).to eq("intro")
+      expect(first.dig(:scene, :schema_version)).to eq("vizcore.scene.v1")
+      expect(second[:scene_name]).to eq("drop")
+      expect(second.dig(:scene, :layers, 0, :name)).to eq("drop_layer")
+    ensure
+      frame_source&.stop
+    end
+  end
+
   def png_scanlines(png)
     offset = Vizcore::Renderer::PngWriter::SIGNATURE.bytesize
     idat = +"".b

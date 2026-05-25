@@ -4,6 +4,9 @@ module Vizcore
   module Renderer
     # Serializes analysis and scene state into transport payloads.
     class SceneSerializer
+      SCENE_SCHEMA_VERSION = "vizcore.scene.v1"
+      FRAME_SCHEMA_VERSION = "vizcore.frame.v1"
+
       # @param timestamp [Numeric]
       # @param audio [Hash]
       # @param scene_name [String, Symbol]
@@ -13,6 +16,7 @@ module Vizcore
       # @return [Hash]
       def audio_frame(timestamp:, audio:, scene_name:, scene_layers:, transition: nil, metrics: nil)
         frame = {
+          schema_version: FRAME_SCHEMA_VERSION,
           timestamp: Float(timestamp),
           audio: serialize_audio(audio),
           scene: serialize_scene(scene_name, scene_layers),
@@ -47,6 +51,7 @@ module Vizcore
 
       def serialize_scene(scene_name, scene_layers)
         {
+          schema_version: SCENE_SCHEMA_VERSION,
           name: scene_name.to_s,
           layers: Array(scene_layers).map { |layer| serialize_layer(layer) }
         }
