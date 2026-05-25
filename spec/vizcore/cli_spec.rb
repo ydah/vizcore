@@ -3,6 +3,7 @@
 require "json"
 require "fileutils"
 require "pathname"
+require "stringio"
 require "tmpdir"
 require "vizcore/cli"
 
@@ -108,6 +109,19 @@ RSpec.describe Vizcore::CLI do
       end
     end
 
+    it "prints issue codes for strict validation" do
+      Dir.mktmpdir("vizcore-cli-validate-strict") do |dir|
+        scene_path = File.join(dir, "scene.rb")
+        File.write(scene_path, "Vizcore.define { scene(:main) { layer(:cube) { type :wireframe_cube; opactiy 0.5 } } }")
+
+        expect do
+          expect do
+            described_class.start(["validate", scene_path, "--strict"])
+          end.to raise_error(SystemExit)
+        end.to output(/E_UNKNOWN_LAYER_PARAM .*opactiy/).to_stdout
+      end
+    end
+
     it "inspects a scene file" do
       Dir.mktmpdir("vizcore-cli-inspect") do |dir|
         scene_path = File.join(dir, "scene.rb")
@@ -130,6 +144,27 @@ RSpec.describe Vizcore::CLI do
         end.to output(
           /Scenes:\n  main\n    layer cube \(wireframe_cube\).*Timeline 1:\n  0\.0 beats -> main\n  8\.0 beats -> drop/m
         ).to_stdout
+      end
+    end
+
+    it "inspects a scene file as json" do
+      Dir.mktmpdir("vizcore-cli-inspect-json") do |dir|
+        scene_path = File.join(dir, "scene.rb")
+        File.write(scene_path, "Vizcore.define { scene(:main) { layer(:cube) { type :wireframe_cube } } }")
+
+        original_stdout = $stdout
+        stdout = StringIO.new
+        $stdout = stdout
+        described_class.start(["inspect", scene_path, "--format", "json"])
+        output = stdout.string
+        $stdout = original_stdout
+        payload = JSON.parse(output)
+
+        expect(payload.fetch("issues")).to eq([])
+        expect(payload.dig("definition", "scenes", 0, "name")).to eq("main")
+        expect(payload.dig("definition", "scenes", 0, "layers", 0, "name")).to eq("cube")
+      ensure
+        $stdout = original_stdout if original_stdout
       end
     end
 

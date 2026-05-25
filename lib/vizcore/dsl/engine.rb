@@ -82,6 +82,7 @@ module Vizcore
         @styles = {}
         @themes = {}
         @scene_registry = {}
+        @strict = false
       end
 
       # Evaluate DSL methods on this engine instance.
@@ -133,6 +134,13 @@ module Vizcore
         @midi_inputs << { name: name.to_sym, options: symbolize_keys(options) }
       end
 
+      # Enable strict DSL validation while the file is evaluated.
+      #
+      # @return [Boolean]
+      def strict!
+        @strict = true
+      end
+
       # Configure analysis-level audio feature normalization.
       #
       # @param mode [Symbol, String] `:off` or `:adaptive`
@@ -177,7 +185,7 @@ module Vizcore
       # @yield Scene definition block
       # @return [void]
       def scene(name, extends: nil, &block)
-        builder = SceneBuilder.new(name: name, styles: @styles, themes: @themes, layers: inherited_layers(extends))
+        builder = SceneBuilder.new(name: name, styles: @styles, themes: @themes, layers: inherited_layers(extends), strict: @strict)
         builder.evaluate(&block)
         scene_definition = builder.to_h
         @scenes << scene_definition
@@ -294,6 +302,7 @@ module Vizcore
           styles: @styles.map { |name, params| { name: name, params: deep_dup(params) } },
           themes: @themes.map { |name, params| { name: name, params: deep_dup(params) } }
         }
+        definition[:strict] = true if @strict
         definition[:timelines] = @timelines.map { |timeline| deep_dup(timeline) } unless @timelines.empty?
         definition
       end

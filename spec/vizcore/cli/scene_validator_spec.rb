@@ -76,6 +76,15 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
       messages = result.issues.map(&:message).join("\n")
 
       expect(result).not_to be_valid
+      expect(result.errors.map(&:code)).to include(
+        "E_UNKNOWN_LAYER_TYPE",
+        "E_UNKNOWN_SHADER",
+        "E_UNKNOWN_MAPPING_SOURCE",
+        "E_UNKNOWN_FREQUENCY_BAND",
+        "E_UNKNOWN_ONSET_BAND",
+        "E_UNKNOWN_TRANSITION_TARGET",
+        "E_UNKNOWN_KEY_SCENE"
+      )
       expect(messages).to include("unsupported type: unknown_visual")
       expect(messages).to include("unknown shader: missing_shader")
       expect(messages).to include("unsupported mapping source: mystery")
@@ -84,6 +93,56 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
       expect(messages).to include("unknown target scene: missing")
       expect(messages).to include("switches to unknown scene: missing")
       expect(result.warnings.map(&:message).join("\n")).to include("has no trigger block")
+      expect(result.warnings.map(&:code)).to include("W_TRANSITION_WITHOUT_TRIGGER")
+    end
+  end
+
+  it "reports strict unknown params and duplicate control bindings" do
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :broken do
+          layer :shape_layer do
+            type :shape
+            opactiy 0.7
+            shapes [
+              { kind: :circle, id: :dot },
+              { kind: :circle, id: :dot }
+            ]
+            map amplitude => :opacity
+            map peak => :opacity
+            map beat_pulse => :"shapes.3.radius"
+          end
+        end
+
+        key "x" do
+          freeze
+        end
+
+        key "x" do
+          blackout
+        end
+
+        midi_map note: 36 do
+          switch_scene :broken
+        end
+
+        midi_map note: 36 do
+          switch_scene :broken
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path, strict: true).call
+      codes = result.issues.map(&:code)
+
+      expect(result).not_to be_valid
+      expect(codes).to include(
+        "E_UNKNOWN_LAYER_PARAM",
+        "E_DUPLICATE_SHAPE",
+        "W_DUPLICATE_MAPPING_TARGET",
+        "E_MAPPING_TARGET",
+        "E_DUPLICATE_KEY_MAPPING",
+        "E_DUPLICATE_MIDI_MAPPING"
+      )
     end
   end
 

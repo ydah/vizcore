@@ -11,10 +11,12 @@ module Vizcore
       # @param styles [Hash] reusable layer parameter styles
       # @param themes [Hash] reusable scene-wide layer parameter themes
       # @param layers [Array<Hash>] initial layer definitions
-      def initialize(name:, styles: {}, themes: {}, layers: [])
+      # @param strict [Boolean] true when unknown layer params should fail
+      def initialize(name:, styles: {}, themes: {}, layers: [], strict: false)
         @name = name.to_sym
         @styles = styles
         @themes = themes
+        @strict = !!strict
         @theme_name = nil
         @theme_params = {}
         @layers = layers.map { |layer| deep_dup(layer) }
@@ -35,7 +37,7 @@ module Vizcore
       # @yield Layer definition block
       # @return [void]
       def layer(name, &block)
-        builder = LayerBuilder.new(name: name, styles: @styles, defaults: @theme_params)
+        builder = LayerBuilder.new(name: name, styles: @styles, defaults: @theme_params, strict: @strict)
         builder.evaluate(&block)
         @layers << builder.to_h
       end
@@ -46,7 +48,7 @@ module Vizcore
       # @yield Layer group definition block
       # @return [void]
       def group(name, &block)
-        builder = LayerGroupBuilder.new(name: name, styles: @styles, defaults: @theme_params)
+        builder = LayerGroupBuilder.new(name: name, styles: @styles, defaults: @theme_params, strict: @strict)
         builder.evaluate(&block)
         @layers.concat(builder.to_a)
       end

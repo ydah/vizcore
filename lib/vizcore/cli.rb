@@ -258,14 +258,27 @@ module Vizcore
 
     map "inspect" => :inspect_scene
     desc "inspect SCENE_FILE", "Print scenes, layers, mappings, and transitions"
+    option :format, type: :string, default: "text", desc: "Output format: text or json"
     # Load a scene DSL file and print its runtime structure.
     #
     # @param scene_file [String] path to a Ruby scene DSL file
     # @raise [Thor::Error] when scene loading fails
     # @return [void]
     def inspect_scene(scene_file)
+      format = options.fetch(:format).to_s
       diagnostics = Vizcore::CLISupport::SceneDiagnostics.new(scene_file: scene_file)
       result = diagnostics.validate
+      if format == "json"
+        payload = {
+          issues: result.issues.map(&:to_h),
+          definition: result.definition ? Vizcore::CLISupport::SceneInspector.new(definition: result.definition).to_h : nil
+        }
+        say(JSON.pretty_generate(payload))
+        raise Thor::Error, "scene inspection failed" unless result.definition
+        return
+      end
+      raise Thor::Error, "unsupported inspect format: #{format}" unless format == "text"
+
       print_issues(result.issues)
       raise Thor::Error, "scene inspection failed" unless result.definition
 
@@ -273,13 +286,14 @@ module Vizcore
     end
 
     desc "validate SCENE_FILE", "Validate a scene DSL file"
+    option :strict, type: :boolean, default: false, desc: "Error on unknown layer params and stricter duplicate mappings"
     # Load and validate a scene DSL file without starting the server.
     #
     # @param scene_file [String] path to a Ruby scene DSL file
     # @raise [Thor::Error] when validation fails
     # @return [void]
     def validate(scene_file)
-      result = Vizcore::CLISupport::SceneDiagnostics.new(scene_file: scene_file).validate
+      result = Vizcore::CLISupport::SceneDiagnostics.new(scene_file: scene_file, strict: options.fetch(:strict)).validate
       print_issues(result.issues)
       raise Thor::Error, "scene validation failed" unless result.valid?
 
@@ -554,7 +568,8 @@ module Vizcore
     def print_issues(issues)
       issues.each do |issue|
         label = issue.error? ? "[error]" : "[warn]"
-        say("#{label} #{issue.message}")
+        code = issue.respond_to?(:code) && issue.code ? " #{issue.code}" : ""
+        say("#{label}#{code} #{issue.message}")
       end
     end
 

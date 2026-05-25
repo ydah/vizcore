@@ -19,7 +19,26 @@ module Vizcore
         output
       end
 
+      def to_h
+        sanitize(@definition)
+      end
+
       private
+
+      def sanitize(value)
+        case value
+        when Hash
+          value.each_with_object({}) do |(key, entry), output|
+            output[key.to_s] = sanitize(entry)
+          end
+        when Array
+          value.map { |entry| sanitize(entry) }
+        when Symbol
+          value.to_s
+        else
+          value.respond_to?(:call) ? true : value
+        end
+      end
 
       def append_inputs(output, label, values)
         return if values.empty?

@@ -7,8 +7,8 @@ module Vizcore
   module CLISupport
     # Facade used by Thor commands for scene validation and inspection.
     class SceneDiagnostics
-      def initialize(scene_file:)
-        @validator = SceneValidator.new(scene_file: scene_file)
+      def initialize(scene_file:, strict: false)
+        @validator = SceneValidator.new(scene_file: scene_file, strict: strict)
       end
 
       def validate

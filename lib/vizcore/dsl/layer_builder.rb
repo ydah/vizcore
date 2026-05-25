@@ -2,6 +2,7 @@
 
 require_relative "mapping_transform_builder"
 require_relative "reaction_builder"
+require_relative "../layer_catalog"
 require_relative "../shape"
 
 module Vizcore
@@ -31,6 +32,9 @@ module Vizcore
       }.freeze
       SHAPE_STYLE_KEYS = Vizcore::Shape::STYLE_KEYS
       SHAPE_TRANSFORM_KEYS = %i[translate rotate rotation scale origin].freeze
+      STRICT_PARAM_ALLOWLIST = %i[
+        custom_shape_controls custom_shapes glsl_source group origin rotate scale translate
+      ].freeze
 
       # Reference to an already declared shape, used by `map ... to: shape(:id).radius`.
       class ShapeReference
@@ -53,9 +57,11 @@ module Vizcore
       # @param name [Symbol, String] layer identifier
       # @param styles [Hash] reusable layer parameter styles
       # @param defaults [Hash] default params applied before layer-specific values
-      def initialize(name:, styles: {}, defaults: {})
+      # @param strict [Boolean] true when unknown layer params should fail
+      def initialize(name:, styles: {}, defaults: {}, strict: false)
         @name = name.to_sym
         @styles = styles
+        @strict = !!strict
         @type = nil
         @shader = nil
         @glsl = nil
@@ -800,6 +806,7 @@ module Vizcore
 
       # @return [Hash] serialized layer payload
       def to_h
+        validate_strict_params! if @strict
         layer = {
           name: @name,
           type: resolved_type,
@@ -1462,6 +1469,18 @@ module Vizcore
         return curve if %i[linear sqrt square ease_out ease_in ease_in_out smoothstep exp log step].include?(curve)
 
         raise ArgumentError, "unsupported mapping curve: #{value.inspect}"
+      end
+
+      def validate_strict_params!
+        unknown = @params.keys.map(&:to_sym) - strict_allowed_params
+        return if unknown.empty?
+
+        raise ArgumentError, "layer #{@name} has unknown params in strict mode: #{unknown.sort.join(', ')}"
+      end
+
+      def strict_allowed_params
+        catalog_params = Vizcore::LayerCatalog.params_for(resolved_type).keys
+        (catalog_params + @param_schema.keys + STRICT_PARAM_ALLOWLIST).map(&:to_sym).uniq
       end
 
       def clamp(value, min, max)

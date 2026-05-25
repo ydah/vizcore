@@ -154,6 +154,21 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "rejects unknown layer params in strict mode" do
+      expect do
+        described_class.define do
+          strict!
+
+          scene :strict_scene do
+            layer :typo do
+              type :geometry
+              opactiy 0.5
+            end
+          end
+        end
+      end.to raise_error(ArgumentError, /unknown params in strict mode: opactiy/)
+    end
+
     it "applies named styles to layer params" do
       definition = described_class.define do
         style :neon do
