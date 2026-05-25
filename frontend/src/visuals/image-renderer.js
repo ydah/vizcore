@@ -198,6 +198,25 @@ export class ImageRenderer {
     gl.uniform1f(this.invertLocation, normalizeInvert(invert));
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
+
+  dispose() {
+    for (const media of this.media.values()) {
+      if (isVideoElement(media)) {
+        media.pause?.();
+        media.removeAttribute?.("src");
+        media.load?.();
+      }
+    }
+    this.media.clear();
+    if (this.texture) {
+      this.gl.deleteTexture(this.texture);
+      this.texture = null;
+    }
+    if (this.buffer) {
+      this.gl.deleteBuffer(this.buffer);
+      this.buffer = null;
+    }
+  }
 }
 
 export const resolveMediaSource = (value) => {

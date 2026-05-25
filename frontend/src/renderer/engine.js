@@ -3,6 +3,9 @@ import { ShaderManager } from "./shader-manager.js";
 import { applyShaderParamOverrides } from "../shader-param-controls.js";
 import { applyShapeEditorOverrides } from "../shape-editor-controls.js";
 
+export const RENDERER_CAPABILITIES_EVENT = "vizcore:renderer-capabilities";
+export const RENDERER_SAFE_MODE_EVENT = "vizcore:renderer-safe-mode";
+
 export class Engine {
   constructor(canvas) {
     this.canvas = canvas;
@@ -14,12 +17,23 @@ export class Engine {
     this.currentRotationSpeed = 0.5;
     this.mediaElement = null;
     this.lastMediaTime = null;
+    this.resizeHandler = null;
+    this.rendererCapabilities = null;
+    this.safeModeState = {
+      active: false,
+      slowFrames: 0,
+      fastFrames: 0,
+    };
     this.visualSettings = {
       visualGain: 1,
       bassBoost: 1,
       smoothing: 0,
       beatHoldMs: 180,
       wobbleAmount: 1,
+      maxDevicePixelRatio: 2,
+      safeMode: true,
+      safeModeFrameMs: 34,
+      safeModeScale: 0.75,
     };
     this.visualAudioState = null;
     this.liveControls = {
@@ -67,12 +81,18 @@ export class Engine {
 
     this.shaderManager = new ShaderManager(this.gl);
     this.layerManager = new LayerManager(this.gl, this.shaderManager);
+    this.rendererCapabilities = collectRendererCapabilities(this.gl, {
+      devicePixelRatio: currentDevicePixelRatio(),
+      effectiveDevicePixelRatio: this.effectiveDevicePixelRatio(),
+    });
+    dispatchRendererEvent(RENDERER_CAPABILITIES_EVENT, this.rendererCapabilities);
 
     this.gl.enable(this.gl.DEPTH_TEST);
     this.gl.enable(this.gl.BLEND);
     this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
     this.resize();
-    window.addEventListener("resize", () => this.resize());
+    this.resizeHandler = () => this.resize();
+    window.addEventListener("resize", this.resizeHandler);
   }
 
   setAudioFrame(frame) {
@@ -92,6 +112,9 @@ export class Engine {
       ...this.visualSettings,
       ...settings,
     };
+    if (this.gl) {
+      this.resize();
+    }
   }
 
   setLiveControls(controls = {}) {
@@ -119,14 +142,24 @@ export class Engine {
   }
 
   resize() {
-    const width = Math.floor(this.canvas.clientWidth * window.devicePixelRatio);
-    const height = Math.floor(this.canvas.clientHeight * window.devicePixelRatio);
+    const dpr = this.effectiveDevicePixelRatio();
+    const width = Math.max(1, Math.floor(this.canvas.clientWidth * dpr));
+    const height = Math.max(1, Math.floor(this.canvas.clientHeight * dpr));
     if (this.canvas.width === width && this.canvas.height === height) {
       return;
     }
     this.canvas.width = width;
     this.canvas.height = height;
     this.gl.viewport(0, 0, width, height);
+  }
+
+  effectiveDevicePixelRatio() {
+    return resolveEffectiveDevicePixelRatio({
+      devicePixelRatio: currentDevicePixelRatio(),
+      maxDevicePixelRatio: this.visualSettings.maxDevicePixelRatio,
+      safeModeActive: this.safeModeState.active,
+      safeModeScale: this.visualSettings.safeModeScale,
+    });
   }
 
   render(time) {
@@ -150,6 +183,8 @@ export class Engine {
     } else {
       this.lastMediaTime = null;
     }
+
+    this.updateSafeMode(deltaSeconds * 1000);
 
     if (this.liveControls.blackout) {
       this.gl.clearColor(0, 0, 0, 1);
@@ -199,6 +234,35 @@ export class Engine {
     });
 
     requestAnimationFrame((nextTime) => this.render(nextTime));
+  }
+
+  updateSafeMode(frameMs) {
+    const nextState = nextSafeModeState({
+      state: this.safeModeState,
+      frameMs,
+      enabled: this.visualSettings.safeMode,
+      thresholdMs: this.visualSettings.safeModeFrameMs,
+    });
+    if (nextState.active === this.safeModeState.active) {
+      this.safeModeState = nextState;
+      return;
+    }
+
+    this.safeModeState = nextState;
+    this.resize();
+    dispatchRendererEvent(RENDERER_SAFE_MODE_EVENT, {
+      active: nextState.active,
+      effectiveDevicePixelRatio: this.effectiveDevicePixelRatio(),
+    });
+  }
+
+  dispose() {
+    if (this.resizeHandler && typeof window !== "undefined") {
+      window.removeEventListener("resize", this.resizeHandler);
+      this.resizeHandler = null;
+    }
+    this.layerManager?.dispose?.();
+    this.shaderManager?.dispose?.();
   }
 }
 
@@ -294,5 +358,111 @@ const isSilentAudio = (audio) => {
     && Number(drums.snare || 0) <= 0
     && Number(drums.hihat || 0) <= 0;
 };
+
+export const resolveEffectiveDevicePixelRatio = ({
+  devicePixelRatio,
+  maxDevicePixelRatio = 2,
+  safeModeActive = false,
+  safeModeScale = 0.75,
+} = {}) => {
+  const rawDpr = Number(devicePixelRatio);
+  const maxDpr = clamp(Number(maxDevicePixelRatio || 2), 0.5, 4);
+  const base = clamp(Number.isFinite(rawDpr) ? rawDpr : 1, 0.5, maxDpr);
+  if (!safeModeActive) {
+    return roundDpr(base);
+  }
+
+  const scale = clamp(Number(safeModeScale || 0.75), 0.25, 1);
+  return roundDpr(clamp(base * scale, 0.5, maxDpr));
+};
+
+export const nextSafeModeState = ({
+  state,
+  frameMs,
+  enabled = true,
+  thresholdMs = 34,
+} = {}) => {
+  const current = state || {};
+  if (!enabled) {
+    return { active: false, slowFrames: 0, fastFrames: 0 };
+  }
+
+  const value = Number(frameMs);
+  const threshold = clamp(Number(thresholdMs || 34), 16, 250);
+  if (!Number.isFinite(value) || value <= 0) {
+    return { ...current };
+  }
+
+  const slowFrames = value > threshold ? Number(current.slowFrames || 0) + 1 : 0;
+  const fastFrames = value < threshold * 0.75 ? Number(current.fastFrames || 0) + 1 : 0;
+  const active = current.active ? fastFrames < 120 : slowFrames >= 12;
+  return {
+    active,
+    slowFrames: active ? 0 : slowFrames,
+    fastFrames: active ? fastFrames : 0,
+  };
+};
+
+export const collectRendererCapabilities = (gl, {
+  devicePixelRatio = currentDevicePixelRatio(),
+  effectiveDevicePixelRatio = devicePixelRatio,
+} = {}) => {
+  const maxViewportDims = safeGetParameter(gl, gl?.MAX_VIEWPORT_DIMS) || [];
+  return {
+    webgl2: true,
+    devicePixelRatio: roundDpr(devicePixelRatio),
+    effectiveDevicePixelRatio: roundDpr(effectiveDevicePixelRatio),
+    maxTextureSize: Number(safeGetParameter(gl, gl?.MAX_TEXTURE_SIZE) || 0),
+    maxRenderbufferSize: Number(safeGetParameter(gl, gl?.MAX_RENDERBUFFER_SIZE) || 0),
+    maxViewportDims: Array.from(maxViewportDims).map((value) => Number(value || 0)),
+    floatColorBuffer: !!safeGetExtension(gl, "EXT_color_buffer_float"),
+    textureFloat: !!safeGetExtension(gl, "OES_texture_float"),
+  };
+};
+
+const currentDevicePixelRatio = () => {
+  if (typeof window === "undefined") {
+    return 1;
+  }
+  return Number(window.devicePixelRatio || 1);
+};
+
+const safeGetParameter = (gl, parameter) => {
+  if (!gl || parameter === undefined || typeof gl.getParameter !== "function") {
+    return null;
+  }
+
+  try {
+    return gl.getParameter(parameter);
+  } catch {
+    return null;
+  }
+};
+
+const safeGetExtension = (gl, name) => {
+  if (!gl || typeof gl.getExtension !== "function") {
+    return null;
+  }
+
+  try {
+    return gl.getExtension(name);
+  } catch {
+    return null;
+  }
+};
+
+const dispatchRendererEvent = (type, detail) => {
+  if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") {
+    return;
+  }
+
+  if (typeof CustomEvent !== "function") {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent(type, { detail }));
+};
+
+const roundDpr = (value) => Math.round(Number(value || 1) * 100) / 100;
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);

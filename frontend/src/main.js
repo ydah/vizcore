@@ -15,6 +15,8 @@ import {
   recordConnectionStatus,
   recordLatencyProbe,
   recordRenderFrame,
+  recordRendererCapabilities,
+  recordRendererSafeMode,
   recordShaderCompile,
   recordSocketFrame,
 } from "./performance-monitor.js";
@@ -29,7 +31,7 @@ import {
   upsertMidiLearnBinding,
 } from "./midi-learn.js";
 import { applyProjectorMode, resolveProjectorMode } from "./projector-mode.js";
-import { Engine } from "./renderer/engine.js";
+import { Engine, RENDERER_CAPABILITIES_EVENT, RENDERER_SAFE_MODE_EVENT } from "./renderer/engine.js";
 import { SHADER_COMPILE_EVENT } from "./renderer/shader-manager.js";
 import {
   customShapeParamControlEntries,
@@ -148,6 +150,7 @@ applyProjectorMode(document.body, projectorMode);
 const engine = new Engine(canvas);
 let rendererReady = false;
 bindShaderCompileMetrics();
+bindRendererMetrics();
 try {
   engine.init();
   rendererReady = true;
@@ -830,6 +833,15 @@ function renderPerformanceMonitor() {
 function bindShaderCompileMetrics() {
   window.addEventListener(SHADER_COMPILE_EVENT, (event) => {
     updatePerformanceMonitor(recordShaderCompile(performanceMonitor, event.detail));
+  });
+}
+
+function bindRendererMetrics() {
+  window.addEventListener(RENDERER_CAPABILITIES_EVENT, (event) => {
+    updatePerformanceMonitor(recordRendererCapabilities(performanceMonitor, event.detail));
+  });
+  window.addEventListener(RENDERER_SAFE_MODE_EVENT, (event) => {
+    updatePerformanceMonitor(recordRendererSafeMode(performanceMonitor, event.detail));
   });
 }
 

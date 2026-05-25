@@ -163,6 +163,19 @@ export class TextRenderer {
     gl.uniform1f(this.intensityLocation, clamp(Number(intensity || 1), 0, 1));
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
+
+  dispose() {
+    if (this.texture) {
+      this.gl.deleteTexture(this.texture);
+      this.texture = null;
+    }
+    if (this.buffer) {
+      this.gl.deleteBuffer(this.buffer);
+      this.buffer = null;
+    }
+    this.canvas = null;
+    this.ctx = null;
+  }
 }
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);

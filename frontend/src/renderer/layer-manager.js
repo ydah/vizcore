@@ -58,6 +58,8 @@ const FULLSCREEN_VERTICES = new Float32Array([
   1.0, 1.0
 ]);
 const MAX_LAYER_TARGET_PIXELS = 4_194_304;
+const MIN_LAYER_RESOLUTION_SCALE = 0.1;
+const SHADER_CACHE_VERSION = "v2";
 
 export const coerceUniformNumber = (value) => {
   if (typeof value === "boolean") {
@@ -128,6 +130,36 @@ export const normalizeBlendMode = (mode) => {
   if (value === "screen") return "screen";
   if (value === "difference") return "difference";
   return "alpha";
+};
+
+export const resolveLayerResolutionScale = (params = {}, visualSettings = {}) => {
+  const rawValue = params?.resolution_scale
+    ?? params?.resolutionScale
+    ?? params?.target_resolution_scale
+    ?? params?.targetResolutionScale
+    ?? 1;
+  const layerScale = clamp(Number(rawValue), MIN_LAYER_RESOLUTION_SCALE, 1);
+  const safeScale = visualSettings?.safeModeActive
+    ? clamp(Number(visualSettings?.safeModeScale || 0.75), MIN_LAYER_RESOLUTION_SCALE, 1)
+    : 1;
+  const scale = layerScale * safeScale;
+  return Number.isFinite(scale) ? clamp(scale, MIN_LAYER_RESOLUTION_SCALE, 1) : 1;
+};
+
+export const shaderCacheKeyForLayer = (layer, shaderName, fragmentShader) => {
+  const customSource = typeof layer?.glsl_source === "string" ? layer.glsl_source : null;
+  const schemaSignature = stableHash(layer?.param_schema || layer?.params?.param_schema || []);
+  if (customSource) {
+    return [
+      "custom",
+      SHADER_CACHE_VERSION,
+      String(layer?.glsl || shaderName),
+      stableHash(fragmentShader),
+      schemaSignature,
+    ].join(":");
+  }
+
+  return ["builtin", SHADER_CACHE_VERSION, String(shaderName), schemaSignature].join(":");
 };
 
 export const normalizePaletteColors = (value) => {
@@ -217,24 +249,17 @@ export class LayerManager {
     const layerList = Array.isArray(layers) && layers.length > 0 ? layers : [defaultLayer(audio)];
     const width = Math.max(1, Math.floor(Number(resolution?.[0] || 1)));
     const height = Math.max(1, Math.floor(Number(resolution?.[1] || 1)));
-    this.ensureLayerTarget(width, height);
-
-    if (!this.layerTargetAvailable || !this.layerFramebuffer || !this.layerTexture) {
-      layerList.forEach((layer, index) => {
-        try {
-          const blend = String(layer?.params?.blend || "alpha").toLowerCase();
-          this.setBlendMode(blend);
-          this.renderLayer(layer, audio, time, rotation, [width, height], globals, visualSettings, index);
-        } catch (error) {
-          this.reportLayerError(layer, error, "direct-render");
-        }
-      });
-      this.setBlendMode("alpha");
-      return;
-    }
 
     layerList.forEach((layer, index) => {
       try {
+        this.ensureLayerTarget(width, height, layer, visualSettings);
+        if (!this.layerTargetAvailable || !this.layerFramebuffer || !this.layerTexture) {
+          const blend = String(layer?.params?.blend || "alpha").toLowerCase();
+          this.setBlendMode(blend);
+          this.renderLayer(layer, audio, time, rotation, [width, height], globals, visualSettings, index);
+          return;
+        }
+
         this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.layerFramebuffer);
         this.gl.viewport(0, 0, this.layerTargetWidth, this.layerTargetHeight);
         this.gl.clearColor(0.0, 0.0, 0.0, 0.0);
@@ -340,9 +365,7 @@ export class LayerManager {
     const shaderName = String(layer?.shader || "gradient_pulse");
     const customSource = typeof layer?.glsl_source === "string" ? layer.glsl_source : null;
     const fragmentShader = customSource || getBuiltinShader(shaderName);
-    const cacheKey = customSource
-      ? `custom:${String(layer?.glsl || shaderName)}:${hashString(customSource)}`
-      : `builtin:${shaderName}`;
+    const cacheKey = shaderCacheKeyForLayer(layer, shaderName, fragmentShader);
     let program = null;
     try {
       program = this.shaderManager.getProgram(cacheKey, FULLSCREEN_VERTEX_SHADER, fragmentShader);
@@ -352,7 +375,7 @@ export class LayerManager {
         console.warn("Failed to compile custom GLSL, falling back to builtin shader", error);
         try {
           program = this.shaderManager.getProgram(
-            `builtin:${shaderName}`,
+            shaderCacheKeyForLayer({ ...layer, glsl_source: null }, shaderName, getBuiltinShader(shaderName)),
             FULLSCREEN_VERTEX_SHADER,
             getBuiltinShader(shaderName)
           );
@@ -367,7 +390,7 @@ export class LayerManager {
 
       if (!program) {
         program = this.shaderManager.getProgram(
-          "builtin:default",
+          shaderCacheKeyForLayer({ shader: "default" }, "default", getBuiltinShader("default")),
           FULLSCREEN_VERTEX_SHADER,
           getBuiltinShader("default")
         );
@@ -652,12 +675,12 @@ export class LayerManager {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
-  ensureLayerTarget(width, height) {
+  ensureLayerTarget(width, height, layer = null, visualSettings = null) {
     if (!this.layerTargetAvailable) {
       return;
     }
 
-    const [targetWidth, targetHeight] = this.resolveLayerTargetSize(width, height);
+    const [targetWidth, targetHeight] = this.resolveLayerTargetSize(width, height, layer, visualSettings);
     if (this.layerFramebuffer && this.layerTargetWidth === targetWidth && this.layerTargetHeight === targetHeight) {
       return;
     }
@@ -714,11 +737,12 @@ export class LayerManager {
     }
   }
 
-  resolveLayerTargetSize(width, height) {
+  resolveLayerTargetSize(width, height, layer = null, visualSettings = null) {
     const gl = this.gl;
     const maxTextureSize = Number(gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096);
-    let targetWidth = clamp(Math.floor(width), 1, maxTextureSize);
-    let targetHeight = clamp(Math.floor(height), 1, maxTextureSize);
+    const scale = resolveLayerResolutionScale(layer?.params || {}, visualSettings || {});
+    let targetWidth = clamp(Math.floor(width * scale), 1, maxTextureSize);
+    let targetHeight = clamp(Math.floor(height * scale), 1, maxTextureSize);
 
     const pixels = targetWidth * targetHeight;
     if (pixels > MAX_LAYER_TARGET_PIXELS) {
@@ -728,6 +752,23 @@ export class LayerManager {
     }
 
     return [targetWidth, targetHeight];
+  }
+
+  dispose() {
+    this.disposeLayerTarget();
+    this.particleSystem?.dispose?.();
+    this.textRenderer?.dispose?.();
+    this.imageRenderer?.dispose?.();
+    this.shapeRenderer?.dispose?.();
+    this.spectrogramRenderer?.dispose?.();
+    if (this.fullscreenBuffer) {
+      this.gl.deleteBuffer(this.fullscreenBuffer);
+      this.fullscreenBuffer = null;
+    }
+    if (this.geometryBuffer) {
+      this.gl.deleteBuffer(this.geometryBuffer);
+      this.geometryBuffer = null;
+    }
   }
 
   setBlendMode(mode) {
@@ -871,10 +912,25 @@ const defaultLayer = (audio) => ({
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
+const stableHash = (value) => hashString(stableStringify(value));
+
+const stableStringify = (value) => {
+  if (value === null || typeof value !== "object") {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return `[${value.map((entry) => stableStringify(entry)).join(",")}]`;
+  }
+
+  return `{${Object.keys(value).sort().map((key) => `${key}:${stableStringify(value[key])}`).join(",")}}`;
+};
+
 const hashString = (value) => {
+  const text = String(value || "");
   let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash * 31 + text.charCodeAt(index)) >>> 0;
   }
   return hash.toString(16);
 };

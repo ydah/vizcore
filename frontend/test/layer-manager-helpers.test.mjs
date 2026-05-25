@@ -7,8 +7,10 @@ import {
   normalizePaletteColors,
   normalizeSpectrum,
   parseHexColor,
+  resolveLayerResolutionScale,
   resolveLayerCssColor,
   resolveLayerRgbColor,
+  shaderCacheKeyForLayer,
   shaderGlobalUniformNames,
   shaderParamUniformNames,
 } from "../src/renderer/layer-manager.js";
@@ -83,4 +85,32 @@ test("resolveLayerCssColor prefers explicit color then palette", () => {
 test("resolveLayerRgbColor parses palette colors and falls back for non-hex colors", () => {
   assert.deepEqual(resolveLayerRgbColor({ palette: ["#000", "#ffffff"] }, null, 1), [1, 1, 1]);
   assert.deepEqual(resolveLayerRgbColor({ color: "red" }, [0.1, 0.2, 0.3]), [0.1, 0.2, 0.3]);
+});
+
+test("resolveLayerResolutionScale clamps layer and safe-mode scales", () => {
+  assert.equal(resolveLayerResolutionScale({ resolution_scale: 0.5 }), 0.5);
+  assert.equal(resolveLayerResolutionScale({ resolutionScale: 3 }), 1);
+  assert.equal(resolveLayerResolutionScale({ target_resolution_scale: 0.01 }), 0.1);
+  assert.equal(resolveLayerResolutionScale({ resolution_scale: 0.5 }, { safeModeActive: true, safeModeScale: 0.5 }), 0.25);
+});
+
+test("shaderCacheKeyForLayer includes source and param schema changes", () => {
+  const base = shaderCacheKeyForLayer(
+    { glsl: "wave.frag", glsl_source: "void main() {}", param_schema: [{ name: "gain", default: 1 }] },
+    "gradient_pulse",
+    "void main() {}",
+  );
+  const changedSchema = shaderCacheKeyForLayer(
+    { glsl: "wave.frag", glsl_source: "void main() {}", param_schema: [{ name: "gain", default: 2 }] },
+    "gradient_pulse",
+    "void main() {}",
+  );
+  const changedSource = shaderCacheKeyForLayer(
+    { glsl: "wave.frag", glsl_source: "void main() { }", param_schema: [{ name: "gain", default: 1 }] },
+    "gradient_pulse",
+    "void main() { }",
+  );
+
+  assert.notEqual(base, changedSchema);
+  assert.notEqual(base, changedSource);
 });

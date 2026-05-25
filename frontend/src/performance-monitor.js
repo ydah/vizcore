@@ -10,6 +10,9 @@ export const createPerformanceMonitorState = () => ({
   lastRenderAtMs: null,
   lastSocketTimestampMs: null,
   reconnects: 0,
+  rendererDpr: null,
+  rendererMaxTextureSize: null,
+  rendererSafeMode: false,
   renderWindowFrames: 0,
   renderWindowStartedAtMs: null,
   rttMs: null,
@@ -132,6 +135,25 @@ export const recordShaderCompile = (state, detail) => {
   };
 };
 
+export const recordRendererCapabilities = (state, detail) => {
+  const effectiveDpr = coerceMetric(detail?.effectiveDevicePixelRatio);
+  const maxTextureSize = coerceMetric(detail?.maxTextureSize);
+
+  return {
+    ...state,
+    rendererDpr: effectiveDpr ?? state?.rendererDpr ?? null,
+    rendererMaxTextureSize: maxTextureSize ?? state?.rendererMaxTextureSize ?? null,
+  };
+};
+
+export const recordRendererSafeMode = (state, detail) => {
+  return {
+    ...state,
+    rendererSafeMode: !!detail?.active,
+    rendererDpr: coerceMetric(detail?.effectiveDevicePixelRatio) ?? state?.rendererDpr ?? null,
+  };
+};
+
 export const formatPerformanceMonitorText = (state) => {
   const fps = Number(state?.fps || 0) > 0 ? Number(state.fps).toFixed(1) : "--";
   const frameMs = Number(state?.frameMs || 0) > 0 ? `${Number(state.frameMs).toFixed(1)}ms` : "--";
@@ -140,10 +162,13 @@ export const formatPerformanceMonitorText = (state) => {
   const clockOffset = Number.isFinite(state?.clockOffsetMs) ? `${formatSignedInteger(state.clockOffsetMs)}ms` : "--";
   const audioLatency = Number.isFinite(state?.audioLatencyMs) ? `${Number(state.audioLatencyMs).toFixed(1)}ms` : "--";
   const shaderCompile = Number.isFinite(state?.shaderCompileMs) ? `${Number(state.shaderCompileMs).toFixed(1)}ms` : "--";
+  const rendererDpr = Number.isFinite(state?.rendererDpr) ? `${Number(state.rendererDpr).toFixed(2)}x` : "--";
+  const maxTexture = Number.isFinite(state?.rendererMaxTextureSize) ? Math.round(state.rendererMaxTextureSize) : "--";
+  const safeMode = state?.rendererSafeMode ? "on" : "off";
   const droppedFrames = Math.max(0, Number(state?.droppedFrames || 0));
   const reconnects = Math.max(0, Number(state?.reconnects || 0));
 
-  return `Perf: ${fps} FPS | Frame ${frameMs} | WS ${wsLatency} | RTT ${rtt} | Clock ${clockOffset} | Drop ${droppedFrames} | Audio ${audioLatency} | Shader ${shaderCompile} | Reconnect ${reconnects}`;
+  return `Perf: ${fps} FPS | Frame ${frameMs} | WS ${wsLatency} | RTT ${rtt} | Clock ${clockOffset} | Drop ${droppedFrames} | Audio ${audioLatency} | Shader ${shaderCompile} | DPR ${rendererDpr} | MaxTex ${maxTexture} | Safe ${safeMode} | Reconnect ${reconnects}`;
 };
 
 export const estimateDroppedFrames = (frameGapMs, expectedFrameMs = DEFAULT_EXPECTED_FRAME_MS) => {

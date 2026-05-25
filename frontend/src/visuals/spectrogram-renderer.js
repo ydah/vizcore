@@ -124,6 +124,20 @@ export class SpectrogramRenderer {
     gl.uniform1f(this.opacityLocation, clamp(Number(opacity || 1), 0, 1));
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
+
+  dispose() {
+    this.histories.clear();
+    if (this.texture) {
+      this.gl.deleteTexture(this.texture);
+      this.texture = null;
+    }
+    if (this.buffer) {
+      this.gl.deleteBuffer(this.buffer);
+      this.buffer = null;
+    }
+    this.canvas = null;
+    this.ctx = null;
+  }
 }
 
 export const normalizeSpectrogramScroll = (value) => {

@@ -170,6 +170,16 @@ export class ParticleSystem {
     );
     gl.drawArrays(gl.POINTS, 0, this.count);
   }
+
+  dispose() {
+    if (this.buffer) {
+      this.gl.deleteBuffer(this.buffer);
+      this.buffer = null;
+    }
+    this.positions = new Float32Array(0);
+    this.velocities = new Float32Array(0);
+    this.count = 0;
+  }
 }
 
 const clampInt = (value, min, max) => {

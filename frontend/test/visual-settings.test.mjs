@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { applyVisualSettings } from "../src/renderer/engine.js";
+import {
+  applyVisualSettings,
+  collectRendererCapabilities,
+  nextSafeModeState,
+  resolveEffectiveDevicePixelRatio,
+} from "../src/renderer/engine.js";
 
 test("applyVisualSettings boosts and clamps audio values", () => {
   const audio = {
@@ -58,4 +63,58 @@ test("applyVisualSettings does not smooth silent frames", () => {
   assert.equal(result.amplitude, 0);
   assert.equal(result.bands.low, 0);
   assert.equal(result.beat_pulse, 0);
+});
+
+test("resolveEffectiveDevicePixelRatio applies caps and safe-mode scale", () => {
+  assert.equal(resolveEffectiveDevicePixelRatio({ devicePixelRatio: 3, maxDevicePixelRatio: 2 }), 2);
+  assert.equal(resolveEffectiveDevicePixelRatio({
+    devicePixelRatio: 2,
+    maxDevicePixelRatio: 2,
+    safeModeActive: true,
+    safeModeScale: 0.5,
+  }), 1);
+});
+
+test("nextSafeModeState enters after repeated slow frames and exits after sustained fast frames", () => {
+  let state = { active: false, slowFrames: 0, fastFrames: 0 };
+  for (let index = 0; index < 12; index += 1) {
+    state = nextSafeModeState({ state, frameMs: 40, thresholdMs: 34 });
+  }
+  assert.equal(state.active, true);
+
+  for (let index = 0; index < 120; index += 1) {
+    state = nextSafeModeState({ state, frameMs: 10, thresholdMs: 34 });
+  }
+  assert.equal(state.active, false);
+});
+
+test("collectRendererCapabilities returns WebGL limits without throwing", () => {
+  const gl = {
+    MAX_TEXTURE_SIZE: 1,
+    MAX_RENDERBUFFER_SIZE: 2,
+    MAX_VIEWPORT_DIMS: 3,
+    getParameter(parameter) {
+      if (parameter === 1) return 8192;
+      if (parameter === 2) return 4096;
+      if (parameter === 3) return new Int32Array([8192, 4096]);
+      return null;
+    },
+    getExtension(name) {
+      return name === "EXT_color_buffer_float" ? {} : null;
+    },
+  };
+
+  assert.deepEqual(collectRendererCapabilities(gl, {
+    devicePixelRatio: 2,
+    effectiveDevicePixelRatio: 1.5,
+  }), {
+    webgl2: true,
+    devicePixelRatio: 2,
+    effectiveDevicePixelRatio: 1.5,
+    maxTextureSize: 8192,
+    maxRenderbufferSize: 4096,
+    maxViewportDims: [8192, 4096],
+    floatColorBuffer: true,
+    textureFloat: false,
+  });
 });

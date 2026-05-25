@@ -8,6 +8,8 @@ import {
   recordConnectionStatus,
   recordLatencyProbe,
   recordRenderFrame,
+  recordRendererCapabilities,
+  recordRendererSafeMode,
   recordShaderCompile,
   recordSocketFrame,
 } from "../src/performance-monitor.js";
@@ -93,6 +95,17 @@ test("recordShaderCompile tracks the latest shader compile duration", () => {
   assert.equal(state.shaderCompileMs, 3.45);
 });
 
+test("renderer capability and safe mode metrics are tracked", () => {
+  let state = createPerformanceMonitorState();
+
+  state = recordRendererCapabilities(state, { effectiveDevicePixelRatio: 1.5, maxTextureSize: 8192 });
+  state = recordRendererSafeMode(state, { active: true, effectiveDevicePixelRatio: 1 });
+
+  assert.equal(state.rendererDpr, 1);
+  assert.equal(state.rendererMaxTextureSize, 8192);
+  assert.equal(state.rendererSafeMode, true);
+});
+
 test("formatPerformanceMonitorText produces stable HUD copy", () => {
   const state = {
     audioLatencyMs: 1.2,
@@ -103,12 +116,15 @@ test("formatPerformanceMonitorText produces stable HUD copy", () => {
     shaderCompileMs: 3.4,
     rttMs: 8,
     clockOffsetMs: -2,
+    rendererDpr: 1.5,
+    rendererMaxTextureSize: 8192,
+    rendererSafeMode: true,
     wsLatencyMs: 12.4,
   };
 
   assert.equal(
     formatPerformanceMonitorText(state),
-    "Perf: 59.9 FPS | Frame 16.7ms | WS 12ms | RTT 8ms | Clock -2ms | Drop 3 | Audio 1.2ms | Shader 3.4ms | Reconnect 1",
+    "Perf: 59.9 FPS | Frame 16.7ms | WS 12ms | RTT 8ms | Clock -2ms | Drop 3 | Audio 1.2ms | Shader 3.4ms | DPR 1.50x | MaxTex 8192 | Safe on | Reconnect 1",
   );
 });
 
