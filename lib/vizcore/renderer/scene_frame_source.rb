@@ -19,9 +19,11 @@ module Vizcore
       def start
         @definition = resolve_shader_sources(Vizcore::DSL::Engine.load_file(@config.scene_file.to_s))
         apply_seed!
-        @scene = first_scene(@definition)
+        scenes = Array(@definition[:scenes])
+        initial_timeline_entry = initial_timeline_entry(@definition)
+        @scene = resolve_initial_scene(scenes, initial_timeline_entry)
         @transition_controller = Vizcore::DSL::TransitionController.new(
-          scenes: Array(@definition[:scenes]),
+          scenes: scenes,
           transitions: Array(@definition[:transitions])
         )
         @mapping_resolver = Vizcore::DSL::MappingResolver.new
@@ -33,6 +35,7 @@ module Vizcore
         @scene_frame_base = 0
         @scene_elapsed_base = 0.0
         @scene_beat_base = 0
+        align_timeline_start(entry: initial_timeline_entry)
         self
       end
 
@@ -87,6 +90,35 @@ module Vizcore
         return scene if scene
 
         { name: @config.scene_file.basename(".rb").to_sym, layers: [] }
+      end
+
+      def initial_timeline_entry(definition)
+        timelines = Array(definition[:timelines])
+        timelines.each do |timeline|
+          first_entry = Array(timeline).first
+          return first_entry if first_entry
+        end
+
+        nil
+      end
+
+      def resolve_initial_scene(scenes, initial_timeline_entry)
+        scene_name = initial_timeline_entry&.dig(:scene)
+        scene = scenes.find { |entry| entry[:name].to_s == scene_name.to_s } if scene_name
+        scene || first_scene({ scenes: scenes })
+      end
+
+      def align_timeline_start(entry:)
+        return unless entry
+
+        unit = entry[:unit].to_s
+        start_position = Float(entry[:at] || 0.0)
+        return unless start_position.positive?
+
+        @scene_elapsed_base = start_position if unit == "seconds"
+        @scene_beat_base = Integer(start_position) if unit == "beats"
+      rescue StandardError
+        nil
       end
 
       def evaluate_transition(audio)

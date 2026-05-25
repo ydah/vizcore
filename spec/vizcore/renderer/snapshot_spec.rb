@@ -174,6 +174,38 @@ RSpec.describe Vizcore::Renderer::Snapshot do
     end
   end
 
+  it "starts from the first timeline scene" do
+    Dir.mktmpdir("vizcore-frame-source-timeline") do |dir|
+      scene_path = File.join(dir, "scene.rb")
+      File.write(scene_path, <<~RUBY)
+        Vizcore.define do
+          scene :intro do
+            layer(:intro_layer) { type :geometry }
+          end
+
+          scene :drop do
+            layer(:drop_layer) { type :geometry }
+          end
+
+          timeline do
+            at beats(0), scene: :drop
+            at beats(4), scene: :intro
+          end
+        end
+      RUBY
+      config = Vizcore::Config.new(scene_file: scene_path, audio_source: :dummy)
+      frame_source = Vizcore::Renderer::SceneFrameSource.new(config: config, frame_rate: 30)
+      frame_source.start
+
+      frame = frame_source.capture
+
+      expect(frame[:scene_name]).to eq("drop")
+      expect(frame.dig(:scene, :layers, 0, :name)).to eq("drop_layer")
+    ensure
+      frame_source&.stop
+    end
+  end
+
   def png_scanlines(png)
     offset = Vizcore::Renderer::PngWriter::SIGNATURE.bytesize
     idat = +"".b
