@@ -19,6 +19,7 @@ module Vizcore
       def start
         @definition = resolve_shader_sources(Vizcore::DSL::Engine.load_file(@config.scene_file.to_s))
         apply_seed!
+        @source_started_at = monotonic_seconds
         scenes = Array(@definition[:scenes])
         initial_timeline_entry = initial_timeline_entry(@definition)
         @scene = resolve_initial_scene(scenes, initial_timeline_entry)
@@ -218,9 +219,23 @@ module Vizcore
       end
 
       def frame_time
-        return 0.0 unless @frame_rate
+        return monotonic_elapsed unless @frame_rate
 
         (@frame_count - 1).fdiv(@frame_rate)
+      end
+
+      def monotonic_elapsed
+        now = monotonic_seconds
+        return 0.0 unless @source_started_at
+
+        elapsed = now - @source_started_at
+        elapsed.positive? ? elapsed : 0.0
+      rescue StandardError
+        0.0
+      end
+
+      def monotonic_seconds
+        Process.clock_gettime(Process::CLOCK_MONOTONIC)
       end
 
       def audio_normalize_settings
