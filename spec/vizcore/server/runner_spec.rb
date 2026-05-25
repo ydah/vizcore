@@ -809,6 +809,36 @@ RSpec.describe Vizcore::Server::Runner do
       )
     end
 
+    it "forwards shader compile runtime errors from client" do
+      runner = described_class.new(config, output: output)
+      broadcaster = instance_double(Vizcore::Server::FrameBroadcaster)
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+
+      runner.send(
+        :handle_client_message,
+        {
+          "type" => "client_runtime_error",
+          "payload" => {
+            "source" => "shader",
+            "event" => "shader_failed",
+            "context" => "shader compile failed",
+            "message" => "layer (shaders/custom.frag) [custom-shader] syntax error"
+          }
+        },
+        broadcaster
+      )
+
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "runtime_error",
+        payload: hash_including(
+          source: "shader",
+          event: "shader_failed",
+          context: "shader compile failed",
+          message: "layer (shaders/custom.frag) [custom-shader] syntax error"
+        )
+      )
+    end
+
     it "applies tap tempo messages from the browser" do
       runner = described_class.new(config, output: output)
       broadcaster = instance_double(Vizcore::Server::FrameBroadcaster)

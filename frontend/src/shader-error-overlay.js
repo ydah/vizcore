@@ -7,6 +7,7 @@ export const buildShaderErrorDetail = ({ layer, error, phase }) => {
     name,
     shader,
     phase: String(phase || "shader"),
+    event: "shader_failed",
     message: normalizeErrorMessage(error),
   };
 };

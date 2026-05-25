@@ -1395,6 +1395,7 @@ function renderMidiLearnStatus(prefix = null) {
 function bindShaderErrorOverlay() {
   window.addEventListener(SHADER_ERROR_EVENT, (event) => {
     renderShaderError(event.detail);
+    reportShaderErrorToServer(event.detail);
   });
   if (shaderErrorCloseButton) {
     shaderErrorCloseButton.addEventListener("click", () => {
@@ -1413,6 +1414,31 @@ function renderShaderError(detail) {
   shaderErrorTitleElement.textContent = formatShaderErrorTitle(detail);
   shaderErrorMessageElement.textContent = formatShaderErrorMessage(detail);
   shaderErrorOverlay.hidden = false;
+}
+
+function reportShaderErrorToServer(detail = {}) {
+  const source = String(detail?.source || "shader").trim() || "shader";
+  const layer = String(detail?.name || "layer").trim();
+  const shader = String(detail?.shader || "unknown").trim();
+  const event = String(detail?.event || "shader_failed").trim() || "shader_failed";
+  const phase = String(detail?.phase || "").trim();
+  const message = String(detail?.message || "").trim();
+  const fullMessage = `${layer} (${shader}) ${phase ? `[${phase}] ` : ""}${message}`;
+  client.send("client_runtime_error", {
+    source,
+    event,
+    context: "shader compile failed",
+    message: fullMessage,
+    layer,
+    shader,
+    phase
+  });
+  updateRuntimeErrorStatus({
+    source,
+    event,
+    context: "shader compile failed",
+    message: fullMessage
+  });
 }
 
 function initializeFftPreview(container) {

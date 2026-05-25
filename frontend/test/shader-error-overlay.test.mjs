@@ -20,6 +20,7 @@ test("buildShaderErrorDetail normalizes layer shader errors", () => {
     name: "wave",
     shader: "shaders/bad.frag",
     phase: "custom-shader",
+    event: "shader_failed",
     message: "ERROR: 0:12: syntax error",
   });
 });

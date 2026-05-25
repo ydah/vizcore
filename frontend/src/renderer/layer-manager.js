@@ -234,6 +234,8 @@ export class LayerManager {
     this.layerTargetHeight = 0;
     this.layerTargetAvailable = true;
     this.layerErrorKeys = new Set();
+    this.lastGoodShaderPrograms = new Map();
+    this.activeShaderLayerKeys = null;
 
     this.particleSystem = new ParticleSystem(this.gl, this.shaderManager);
     this.textRenderer = new TextRenderer(this.gl, this.shaderManager);
@@ -249,6 +251,8 @@ export class LayerManager {
     const layerList = Array.isArray(layers) && layers.length > 0 ? layers : [defaultLayer(audio)];
     const width = Math.max(1, Math.floor(Number(resolution?.[0] || 1)));
     const height = Math.max(1, Math.floor(Number(resolution?.[1] || 1)));
+    const shaderLayerKeys = new Set();
+    this.activeShaderLayerKeys = shaderLayerKeys;
 
     layerList.forEach((layer, index) => {
       try {
@@ -265,7 +269,17 @@ export class LayerManager {
         this.gl.clearColor(0.0, 0.0, 0.0, 0.0);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
-        this.renderLayer(layer, audio, time, rotation, [this.layerTargetWidth, this.layerTargetHeight], globals, visualSettings, index);
+        this.renderLayer(
+          layer,
+          audio,
+          time,
+          rotation,
+          [this.layerTargetWidth, this.layerTargetHeight],
+          globals,
+          visualSettings,
+          index,
+          index
+        );
 
         this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
         this.gl.viewport(0, 0, width, height);
@@ -276,10 +290,22 @@ export class LayerManager {
         this.reportLayerError(layer, error, "layer-pass");
       }
     });
+    this.pruneLastGoodShaderPrograms(shaderLayerKeys);
+    this.activeShaderLayerKeys = null;
     this.setBlendMode("alpha");
   }
 
-  renderLayer(layer, audio, time, rotation, resolution, globals, visualSettings, paletteIndex = 0) {
+  renderLayer(
+    layer,
+    audio,
+    time,
+    rotation,
+    resolution,
+    globals,
+    visualSettings,
+    paletteIndex = 0,
+    layerIndex = null
+  ) {
     if (isParticleLayer(layer)) {
       this.renderParticleLayer(layer, audio, time, paletteIndex);
       return;
@@ -305,16 +331,36 @@ export class LayerManager {
       return;
     }
     if (isShaderLayer(layer)) {
-      this.renderShaderLayer(layer, audio, time, resolution, globals, visualSettings);
+      this.renderShaderLayer(layer, audio, time, resolution, globals, visualSettings, paletteIndex, layerIndex);
       return;
     }
-    if (this.renderPluginLayer(layer, audio, time, rotation, resolution, globals, visualSettings, paletteIndex)) {
+    if (this.renderPluginLayer(
+      layer,
+      audio,
+      time,
+      rotation,
+      resolution,
+      globals,
+      visualSettings,
+      paletteIndex,
+      layerIndex
+    )) {
       return;
     }
     this.renderGeometryLayer(layer, audio, rotation, time, paletteIndex);
   }
 
-  renderPluginLayer(layer, audio, time, rotation, resolution, globals, visualSettings, paletteIndex = 0) {
+  renderPluginLayer(
+    layer,
+    audio,
+    time,
+    rotation,
+    resolution,
+    globals,
+    visualSettings,
+    paletteIndex = 0,
+    layerIndex = null
+  ) {
     const context = {
       layer,
       audio,
@@ -327,19 +373,29 @@ export class LayerManager {
     };
 
     const renderer = resolveLayerRenderer(layer?.type);
-    if (renderer && this.renderPluginOutput(layer, renderer(context), audio, time, resolution, globals, visualSettings, paletteIndex)) {
+    if (renderer && this.renderPluginOutput(layer, renderer(context), audio, time, resolution, globals, visualSettings, paletteIndex, layerIndex)) {
       return true;
     }
 
     const shaderRenderer = resolveShaderRenderer(layer?.type);
-    if (shaderRenderer && this.renderPluginOutput(layer, shaderRenderer(context), audio, time, resolution, globals, visualSettings, paletteIndex)) {
+    if (shaderRenderer && this.renderPluginOutput(layer, shaderRenderer(context), audio, time, resolution, globals, visualSettings, paletteIndex, layerIndex)) {
       return true;
     }
 
     return false;
   }
 
-  renderPluginOutput(layer, output, audio, time, resolution, globals, visualSettings, paletteIndex = 0) {
+  renderPluginOutput(
+    layer,
+    output,
+    audio,
+    time,
+    resolution,
+    globals,
+    visualSettings,
+    paletteIndex = 0,
+    layerIndex = null
+  ) {
     const lines = normalizePluginLineOutput(output);
     if (lines) {
       const fallbackColor = resolveLayerRgbColor(layer?.params || {}, [0.82, 0.92, 1.0], paletteIndex);
@@ -357,35 +413,69 @@ export class LayerManager {
       shader: layer?.shader || "default",
       glsl: `plugin:${String(layer?.type || "layer")}:${shader.cacheKey}`,
       glsl_source: shader.fragmentShader
-    }, audio, time, resolution, globals, visualSettings);
+    }, audio, time, resolution, globals, visualSettings, paletteIndex, layerIndex);
     return true;
   }
 
-  renderShaderLayer(layer, audio, time, resolution, globals, visualSettings) {
+  renderShaderLayer(
+    layer,
+    audio,
+    time,
+    resolution,
+    globals,
+    visualSettings,
+    paletteIndex = 0,
+    layerIndex = null
+  ) {
     const shaderName = String(layer?.shader || "gradient_pulse");
     const customSource = typeof layer?.glsl_source === "string" ? layer.glsl_source : null;
     const fragmentShader = customSource || getBuiltinShader(shaderName);
     const cacheKey = shaderCacheKeyForLayer(layer, shaderName, fragmentShader);
+    const layerCacheKey = this.shaderLayerCacheKey(layer, layerIndex, customSource);
+    if (layerCacheKey) {
+      this.activeShaderLayerKeys?.add(layerCacheKey);
+    }
+
     let program = null;
     try {
       program = this.shaderManager.getProgram(cacheKey, FULLSCREEN_VERTEX_SHADER, fragmentShader);
+      if (layerCacheKey) {
+        this.lastGoodShaderPrograms.set(layerCacheKey, {
+          program,
+          cacheKey,
+          createdAt: Date.now()
+        });
+      }
     } catch (error) {
       if (customSource) {
         this.reportShaderError(layer, error, "custom-shader");
         console.warn("Failed to compile custom GLSL, falling back to builtin shader", error);
+        const cached = layerCacheKey ? this.lastGoodShaderPrograms.get(layerCacheKey) : null;
+        if (cached && cached.program) {
+          program = cached.program;
+        }
+
         try {
-          program = this.shaderManager.getProgram(
-            shaderCacheKeyForLayer({ ...layer, glsl_source: null }, shaderName, getBuiltinShader(shaderName)),
-            FULLSCREEN_VERTEX_SHADER,
-            getBuiltinShader(shaderName)
-          );
+          if (!program) {
+            program = this.shaderManager.getProgram(
+              shaderCacheKeyForLayer(
+                { ...layer, glsl_source: null },
+                shaderName,
+                getBuiltinShader(shaderName)
+              ),
+              FULLSCREEN_VERTEX_SHADER,
+              getBuiltinShader(shaderName)
+            );
+          }
         } catch (builtinError) {
           this.reportShaderError(layer, builtinError, "builtin-shader-fallback");
           this.reportLayerError(layer, builtinError, "builtin-shader-fallback");
+          program = null;
         }
       } else {
         this.reportShaderError(layer, error, "builtin-shader");
         this.reportLayerError(layer, error, "builtin-shader");
+        program = null;
       }
 
       if (!program) {
@@ -846,6 +936,27 @@ export class LayerManager {
     if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
       window.dispatchEvent(new CustomEvent(SHADER_ERROR_EVENT, { detail }));
     }
+  }
+
+  pruneLastGoodShaderPrograms(activeKeys) {
+    const active = activeKeys instanceof Set ? activeKeys : null;
+    if (!active) {
+      return;
+    }
+    for (const key of this.lastGoodShaderPrograms.keys()) {
+      if (!active.has(key)) {
+        this.lastGoodShaderPrograms.delete(key);
+      }
+    }
+  }
+
+  shaderLayerCacheKey(layer, layerIndex, hasCustomSource) {
+    const name = String(layer?.name || "unnamed");
+    const type = String(layer?.type || "layer");
+    const sourceKind = hasCustomSource ? "custom" : "builtin";
+    const sourceId = String(layer?.glsl || layer?.shader || layer?.type || "default");
+    const index = Number.isFinite(layerIndex) ? layerIndex : "static";
+    return `shader-layer|${sourceKind}|${index}|${type}|${name}|${sourceId}`;
   }
 }
 

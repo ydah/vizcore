@@ -444,6 +444,8 @@ module Vizcore
           apply_tap_tempo(payload, broadcaster)
         when "custom_shape_param"
           apply_custom_shape_param(payload, broadcaster)
+        when "client_runtime_error"
+          report_client_runtime_error(payload)
         end
       rescue StandardError => e
         @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "Client control message failed"))
@@ -462,6 +464,39 @@ module Vizcore
         response[:client_sent_at_ms] = client_sent_at_ms if client_sent_at_ms
 
         WebSocketHandler.send_to(socket, type: "latency_probe", payload: response)
+      end
+
+      def report_client_runtime_error(payload)
+        values = Hash(payload)
+        message = values["message"] || values[:message]
+        return unless message
+
+        context = values["context"] || values[:context] || "Client runtime error"
+        source = normalize_client_error_source(values["source"] || values[:source])
+        event = values["event"] || values[:event]
+        WebSocketHandler.broadcast(
+          type: "runtime_error",
+          payload: {
+            source: source,
+            context: String(context),
+            message: String(message),
+            frame_id: current_frame_id(values),
+            event: event
+          }
+        )
+      end
+
+      def current_frame_id(values)
+        frame_id = values["frame_id"] || values[:frame_id]
+        parsed = finite_float(frame_id)
+        parsed if parsed
+      rescue StandardError
+        nil
+      end
+
+      def normalize_client_error_source(value)
+        source = String(value || "runtime").strip
+        source.empty? ? "runtime" : source
       end
 
       def apply_midi_action(action, executor, broadcaster)
