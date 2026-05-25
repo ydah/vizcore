@@ -431,7 +431,8 @@ module Vizcore
         when "switch_scene"
           values = Hash(payload)
           target_name = values.fetch("scene", values.fetch(:scene, values.fetch("scene_name", values.fetch(:scene_name, nil))))
-          switch_scene_from_client(target_name, broadcaster)
+          effect = normalize_transition_effect(values["effect"] || values[:effect])
+          switch_scene_from_client(target_name, broadcaster, effect: effect)
         when "tap_tempo"
           apply_tap_tempo(payload, broadcaster)
         when "custom_shape_param"
@@ -775,7 +776,7 @@ module Vizcore
         %w[true on yes 1].include?(value.to_s.strip.downcase)
       end
 
-      def switch_scene_from_client(target_name, broadcaster, source: "ui")
+      def switch_scene_from_client(target_name, broadcaster, source: "ui", effect: nil)
         requested = target_name.to_s.strip
         return if requested.empty?
 
@@ -790,10 +791,27 @@ module Vizcore
           payload: {
             from: from_scene.to_s,
             to: target_scene[:name].to_s,
-            effect: nil,
+            effect: normalize_transition_effect(effect),
             source: source
           }
         )
+      end
+
+      def normalize_transition_effect(value)
+        return nil unless value
+        return nil if value.is_a?(Array)
+        return value unless value.is_a?(Hash)
+
+        if value[:name] || value["name"]
+          {
+            name: value[:name] || value["name"],
+            options: value[:options] || value["options"] || {}
+          }
+        else
+          value
+        end
+      rescue StandardError
+        nil
       end
 
       def find_scene_catalog_scene(name)

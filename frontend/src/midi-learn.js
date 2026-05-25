@@ -122,7 +122,9 @@ export const midiLearnActionLabel = (action) => {
   }
 
   if (safeAction.type === "switch_scene") {
-    return `Switch scene: ${safeAction.scene}`;
+    return safeAction.effect
+      ? `Switch scene: ${safeAction.scene} (${safeAction.effect?.name || "with effect"})`
+      : `Switch scene: ${safeAction.scene}`;
   }
   if (safeAction.type === "live_control") {
     return `Toggle ${safeAction.control}`;
@@ -150,7 +152,11 @@ const normalizeMidiAction = (action) => {
 
   if (type === "switch_scene") {
     const scene = String(action.scene || "").trim();
-    return scene ? { type, scene } : null;
+    if (!scene) {
+      return null;
+    }
+    const effect = normalizeTransitionEffect(action.effect);
+    return effect ? { type, scene, effect } : { type, scene };
   }
 
   if (type === "live_control") {
@@ -165,6 +171,14 @@ const normalizeMidiAction = (action) => {
 const normalizeMidiSignature = (signature) => {
   const value = String(signature || "").trim().toLowerCase();
   return value.includes(":") ? value : null;
+};
+
+const normalizeTransitionEffect = (effect) => {
+  if (!effect || typeof effect !== "object" || Array.isArray(effect)) {
+    return null;
+  }
+
+  return effect;
 };
 
 const normalizeMidiBytes = (data) => {

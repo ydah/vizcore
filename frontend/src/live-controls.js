@@ -107,7 +107,11 @@ const normalizeKeyboardAction = (action) => {
   const type = String(action?.type || "").trim();
   if (type === "switch_scene") {
     const scene = String(action?.scene || "").trim();
-    return scene ? { type, scene } : null;
+    if (!scene) {
+      return null;
+    }
+    const effect = normalizeTransitionEffect(action?.effect);
+    return effect ? { type, scene, effect } : { type, scene };
   }
 
   if (type === "live_control") {
@@ -116,6 +120,14 @@ const normalizeKeyboardAction = (action) => {
   }
 
   return null;
+};
+
+const normalizeTransitionEffect = (effect) => {
+  if (!effect || typeof effect !== "object" || Array.isArray(effect)) {
+    return null;
+  }
+
+  return effect;
 };
 
 export const isEditableShortcutTarget = (target) => {

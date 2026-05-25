@@ -791,7 +791,7 @@ function renderMappingTargetSelector(options) {
   mappingTargetSelectorElement.hidden = false;
 }
 
-function requestSceneSwitch(sceneName) {
+function requestSceneSwitch(sceneName, effect = null) {
   if (!sceneName || sceneName === currentSceneName) {
     return;
   }
@@ -801,12 +801,17 @@ function requestSceneSwitch(sceneName) {
   currentSceneName = sceneName;
   sceneStatusElement.textContent = `Scene: ${sceneName}`;
   renderSceneButtons();
-  client.send("switch_scene", { scene: sceneName });
+  const payload = { scene: sceneName };
+  const normalizedEffect = normalizeTransitionEffect(effect);
+  if (normalizedEffect) {
+    payload.effect = normalizedEffect;
+  }
+  client.send("switch_scene", payload);
 }
 
 function applyKeyboardAction(action) {
   if (action?.type === "switch_scene") {
-    requestSceneSwitch(action.scene);
+    requestSceneSwitch(action.scene, action.effect);
     return;
   }
 
@@ -841,6 +846,20 @@ function sendLatencyProbe() {
   client.send("latency_probe", {
     client_sent_at_ms: Date.now()
   });
+}
+
+function normalizeTransitionEffect(effect) {
+  if (!effect) {
+    return null;
+  }
+  if (typeof effect === "string" || typeof effect === "number" || typeof effect === "symbol") {
+    return String(effect);
+  }
+  if (typeof effect !== "object" || Array.isArray(effect)) {
+    return null;
+  }
+
+  return effect;
 }
 
 function updatePerformanceMonitor(nextState) {
@@ -1237,7 +1256,7 @@ function applyMidiLearnAction(action, unitValue, active) {
   }
 
   if (action.type === "switch_scene") {
-    requestSceneSwitch(action.scene);
+    requestSceneSwitch(action.scene, action.effect);
     renderMidiLearnStatus(`MIDI: ${midiLearnActionLabel(action)}`);
     return;
   }

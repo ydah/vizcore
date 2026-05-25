@@ -74,6 +74,20 @@ test("keyboardActionForKey resolves configured runtime key mappings", () => {
   assert.equal(keyboardActionForKey({ key: "d", target: { tagName: "INPUT" } }, mappings), null);
 });
 
+test("keyboardActionForKey preserves switch_scene transition effect", () => {
+  const mappings = normalizeKeyboardMappings([
+    {
+      key: "D",
+      action: { type: "switch_scene", scene: "drop", effect: { name: "crossfade", options: { duration: 0.5 } } },
+    },
+  ]);
+
+  assert.deepEqual(
+    keyboardActionForKey({ key: "d", target: { tagName: "DIV" } }, mappings),
+    { type: "switch_scene", scene: "drop", effect: { name: "crossfade", options: { duration: 0.5 } } },
+  );
+});
+
 test("isTapTempoShortcut matches configured keys outside editable fields", () => {
   assert.equal(isTapTempoShortcut({ key: "T", target: { tagName: "DIV" } }, "t"), true);
   assert.equal(isTapTempoShortcut({ key: " ", target: { tagName: "DIV" } }, "space"), true);

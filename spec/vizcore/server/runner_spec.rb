@@ -384,6 +384,49 @@ RSpec.describe Vizcore::Server::Runner do
       )
     end
 
+    it "switches scene from client websocket message with transition effect" do
+      runner = described_class.new(config, output: output)
+      broadcaster = instance_double(
+        Vizcore::Server::FrameBroadcaster,
+        current_scene_snapshot: { name: "build", layers: [] },
+        update_scene: nil
+      )
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+      runner.send(
+        :replace_scene_catalog,
+        [
+          { name: :build, layers: [{ name: :a }] },
+          { name: :drop, layers: [{ name: :b }] }
+        ]
+      )
+
+      runner.send(
+        :handle_client_message,
+        {
+          "type" => "switch_scene",
+          "payload" => {
+            "scene" => "drop",
+            "effect" => { "name" => "crossfade", "options" => { "duration" => 0.45 } }
+          }
+        },
+        broadcaster
+      )
+
+      expect(broadcaster).to have_received(:update_scene).with(
+        scene_name: :drop,
+        scene_layers: [hash_including(name: :b)]
+      )
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "scene_change",
+        payload: hash_including(
+          from: "build",
+          to: "drop",
+          source: "ui",
+          effect: { name: "crossfade", options: { "duration" => 0.45 } }
+        )
+      )
+    end
+
     it "applies custom shape param messages from the browser" do
       runner = described_class.new(config, output: output)
       broadcaster = instance_double(Vizcore::Server::FrameBroadcaster)

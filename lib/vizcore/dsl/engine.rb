@@ -525,11 +525,13 @@ module Vizcore
         #
         # @param name [Symbol, String]
         # @return [void]
-        def switch_scene(name)
+        def switch_scene(name, effect: nil)
           scene_name = name.to_s.strip
           raise ArgumentError, "switch_scene scene must not be empty" if scene_name.empty?
 
-          assign_action(type: :switch_scene, scene: scene_name)
+          action = { type: :switch_scene, scene: scene_name }
+          action[:effect] = effect unless effect.nil?
+          assign_action(action)
         end
 
         # Toggle browser blackout output.

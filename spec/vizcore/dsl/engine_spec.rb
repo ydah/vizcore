@@ -93,6 +93,18 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "omits nil effect from switch_scene keyboard mappings" do
+      definition = described_class.define do
+        key "d" do
+          switch_scene :drop
+        end
+      end
+
+      expect(definition[:key_mappings]).to eq(
+        [{ key: "d", action: { type: :switch_scene, scene: "drop" } }]
+      )
+    end
+
     it "stores MIDI trigger options" do
       definition = described_class.define do
         midi_map cc: 1, channel: 1, relative: true, deadband: 2, smooth: 0.25 do |value|

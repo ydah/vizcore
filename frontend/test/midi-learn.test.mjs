@@ -44,6 +44,20 @@ test("upsertMidiLearnBinding normalizes actions and keeps existing bindings", ()
   });
 });
 
+test("upsertMidiLearnBinding preserves transition effect for scene actions", () => {
+  const bindings = upsertMidiLearnBinding(
+    {},
+    "note:1:60",
+    { type: "switch_scene", scene: "drop", effect: { name: "crossfade", options: { duration: 0.5 } } },
+  );
+
+  assert.deepEqual(bindings["note:1:60"], {
+    type: "switch_scene",
+    scene: "drop",
+    effect: { name: "crossfade", options: { duration: 0.5 } },
+  });
+});
+
 test("loadMidiLearnBindings and saveMidiLearnBindings round trip valid bindings", () => {
   const storage = memoryStorage();
   const saved = saveMidiLearnBindings(storage, {
@@ -60,6 +74,10 @@ test("loadMidiLearnBindings and saveMidiLearnBindings round trip valid bindings"
 test("midi labels summarize bindings for HUD text", () => {
   assert.equal(midiSignatureLabel("cc:2:7"), "CC 7 ch 2");
   assert.equal(midiLearnActionLabel({ type: "live_control", control: "freeze" }), "Toggle freeze");
+  assert.equal(
+    midiLearnActionLabel({ type: "switch_scene", scene: "drop", effect: { name: "crossfade" } }),
+    "Switch scene: drop (crossfade)"
+  );
 });
 
 const memoryStorage = (initial = {}) => {
