@@ -155,6 +155,22 @@ module Vizcore
           }
         end
 
+        # Advance to the next scene in runtime scene order.
+        #
+        # @param effect [Hash, nil]
+        # @return [void]
+        def next_scene(effect: nil)
+          @actions << { type: :next_scene, effect: deep_dup(effect) }
+        end
+
+        # Move to the previous scene in runtime scene order.
+        #
+        # @param effect [Hash, nil]
+        # @return [void]
+        def previous_scene(effect: nil)
+          @actions << { type: :previous_scene, effect: deep_dup(effect) }
+        end
+
         # @param key [Symbol, String]
         # @param value [Object]
         # @return [void]

@@ -267,6 +267,18 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
     end
   end
 
+  describe "#update_scene" do
+    it "resets mapping resolver state when scene changes" do
+      resolver = instance_double(Vizcore::DSL::MappingResolver)
+      allow(resolver).to receive(:reset!)
+      broadcaster = described_class.new(mapping_resolver: resolver)
+
+      broadcaster.update_scene(scene_name: :drop, scene_layers: [])
+
+      expect(resolver).to have_received(:reset!)
+    end
+  end
+
   describe "#tick" do
     it "broadcasts scene_change when a transition condition is met" do
       input_manager = instance_double(

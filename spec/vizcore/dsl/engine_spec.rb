@@ -138,6 +138,7 @@ RSpec.describe Vizcore::DSL::Engine do
             map spectral_rolloff => :rolloff
             map spectral_flatness => :noise
             map zero_crossing_rate => :crossings
+            map global(:intensity) => :opacity
           end
         end
       end
@@ -150,7 +151,8 @@ RSpec.describe Vizcore::DSL::Engine do
         { source: { kind: :spectral_centroid }, target: :brightness },
         { source: { kind: :spectral_rolloff }, target: :rolloff },
         { source: { kind: :spectral_flatness }, target: :noise },
-        { source: { kind: :zero_crossing_rate }, target: :crossings }
+        { source: { kind: :zero_crossing_rate }, target: :crossings },
+        { source: { kind: :global, name: :intensity }, target: :opacity }
       )
     end
 

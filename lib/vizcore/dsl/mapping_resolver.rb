@@ -10,6 +10,13 @@ module Vizcore
         @mapping_state = {}
       end
 
+      # Clear stateful transform memory such as smoothing, hold, decay, and hysteresis.
+      #
+      # @return [void]
+      def reset!
+        @mapping_state.clear
+      end
+
       # @param scene_layers [Array<Hash>]
       # @param audio [Hash]
       # @return [Array<Hash>] normalized layer payloads with resolved params
@@ -24,7 +31,7 @@ module Vizcore
       def resolve_layer(layer, audio, time:, frame:, resolution:, globals:, custom_shape_overrides:)
         params = deep_dup(layer[:params] || {})
         apply_custom_shape_overrides!(params, layer_name: layer[:name], custom_shape_overrides: custom_shape_overrides)
-        merge_resolved_mappings!(params, resolve_mappings(layer[:mappings], audio, layer_name: layer[:name], frame: frame))
+        merge_resolved_mappings!(params, resolve_mappings(layer[:mappings], audio, globals: globals, layer_name: layer[:name], frame: frame))
         expand_dynamic_custom_shapes!(params, layer: layer, audio: audio, time: time, frame: frame, resolution: resolution, globals: globals)
 
         output = {
@@ -39,13 +46,13 @@ module Vizcore
         output
       end
 
-      def resolve_mappings(mappings, audio, layer_name:, frame:)
+      def resolve_mappings(mappings, audio, globals:, layer_name:, frame:)
         Array(mappings).each_with_object({}) do |mapping, resolved|
           source = mapping[:source]
           target = mapping[:target]
           next unless source && target
 
-          value = resolve_source_value(source, audio)
+          value = resolve_source_value(source, audio, globals: globals)
           value = apply_transform(value, mapping[:transform], state_key: [layer_name, target, source], frame: frame)
           resolved[target.to_s] = value unless value.nil?
         end
@@ -230,7 +237,7 @@ module Vizcore
         raise ArgumentError, "param #{name} must be numeric"
       end
 
-      def resolve_source_value(source, audio)
+      def resolve_source_value(source, audio, globals: {})
         case source[:kind]&.to_sym
         when :amplitude
           audio[:amplitude]
@@ -266,9 +273,21 @@ module Vizcore
           audio[:spectral_flux]
         when :zero_crossing_rate
           audio[:zero_crossing_rate]
+        when :global
+          resolve_global(source, globals)
         else
           nil
         end
+      end
+
+      def resolve_global(source, globals)
+        name = source[:name]&.to_sym
+        return nil unless name
+
+        values = Hash(globals || {})
+        values[name] || values[name.to_s]
+      rescue StandardError
+        nil
       end
 
       def resolve_onset(source, audio)

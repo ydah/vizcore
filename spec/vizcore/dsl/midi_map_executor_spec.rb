@@ -54,6 +54,23 @@ RSpec.describe Vizcore::DSL::MidiMapExecutor do
     expect(executor.globals[:global_intensity]).to be_within(0.0001).of(64.0 / 127.0)
   end
 
+  it "emits next and previous scene actions" do
+    executor = described_class.new(
+      midi_maps: [
+        { trigger: { note: 37 }, action: proc { next_scene } },
+        { trigger: { note: 38 }, action: proc { previous_scene(effect: { name: :crossfade }) } }
+      ],
+      scenes: [],
+      globals: {}
+    )
+
+    next_actions = executor.handle_event(midi_event(type: :note_on, data1: 37, data2: 100))
+    previous_actions = executor.handle_event(midi_event(type: :note_on, data1: 38, data2: 100))
+
+    expect(next_actions).to eq([{ type: :next_scene, effect: nil }])
+    expect(previous_actions).to eq([{ type: :previous_scene, effect: { name: :crossfade } }])
+  end
+
   it "ignores unmatched mappings" do
     executor = described_class.new(
       midi_maps: [{ trigger: { note: 36 }, action: proc { switch_scene :drop } }],

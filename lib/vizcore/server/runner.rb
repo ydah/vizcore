@@ -442,18 +442,13 @@ module Vizcore
           target_scene = action[:scene]
           return unless target_scene
 
-          current = broadcaster.current_scene_snapshot
-          from_scene = current[:name]
-          broadcaster.update_scene(scene_name: target_scene[:name], scene_layers: target_scene[:layers])
-          WebSocketHandler.broadcast(
-            type: "scene_change",
-            payload: {
-              from: from_scene.to_s,
-              to: target_scene[:name].to_s,
-              effect: action[:effect],
-              source: "midi"
-            }
-          )
+          apply_midi_scene_change(target_scene, action[:effect], broadcaster)
+        when :next_scene
+          target_scene = adjacent_scene_for(broadcaster.current_scene_snapshot[:name], offset: 1)
+          apply_midi_scene_change(target_scene, action[:effect], broadcaster) if target_scene
+        when :previous_scene
+          target_scene = adjacent_scene_for(broadcaster.current_scene_snapshot[:name], offset: -1)
+          apply_midi_scene_change(target_scene, action[:effect], broadcaster) if target_scene
         when :set_global
           WebSocketHandler.broadcast(
             type: "config_update",
@@ -462,6 +457,21 @@ module Vizcore
             }
           )
         end
+      end
+
+      def apply_midi_scene_change(target_scene, effect, broadcaster)
+        current = broadcaster.current_scene_snapshot
+        from_scene = current[:name]
+        broadcaster.update_scene(scene_name: target_scene[:name], scene_layers: target_scene[:layers])
+        WebSocketHandler.broadcast(
+          type: "scene_change",
+          payload: {
+            from: from_scene.to_s,
+            to: target_scene[:name].to_s,
+            effect: effect,
+            source: "midi"
+          }
+        )
       end
 
       def midi_runtime_settings(definition)
@@ -720,6 +730,26 @@ module Vizcore
             return { name: raw_name.to_sym, layers: Array(layers) }
           end
           nil
+        end
+      rescue StandardError
+        nil
+      end
+
+      def adjacent_scene_for(current_name, offset:)
+        @scene_catalog_mutex.synchronize do
+          scenes = Array(@scene_catalog)
+          return nil if scenes.empty?
+
+          current_index = scenes.index do |scene|
+            raw_name = scene.dig(:name) || scene["name"]
+            raw_name.to_s == current_name.to_s
+          end
+          return nil unless current_index
+
+          target = scenes[(current_index + Integer(offset)) % scenes.length]
+          raw_name = target.dig(:name) || target["name"]
+          layers = target.dig(:layers) || target["layers"]
+          { name: raw_name.to_sym, layers: Array(layers) }
         end
       rescue StandardError
         nil

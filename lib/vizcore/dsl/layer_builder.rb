@@ -13,7 +13,7 @@ module Vizcore
       SHAPE_SCHEMA_VERSION = 2
       MAPPING_SOURCE_KINDS = %i[
         amplitude peak frequency_band fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
-        bpm_confidence spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate
+        bpm_confidence spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate global
       ].freeze
       PATH_DEFAULT_DETAIL = 32
       PATH_MIN_DETAIL = 4
@@ -802,6 +802,12 @@ module Vizcore
       # @return [Hash] source descriptor for time-domain zero crossing rate
       def zero_crossing_rate
         mapping_source(:zero_crossing_rate)
+      end
+
+      # @param name [Symbol, String] runtime global value name
+      # @return [Hash] source descriptor for mutable runtime globals
+      def global(name)
+        mapping_source(:global, name: name.to_sym)
       end
 
       # @return [Hash] serialized layer payload

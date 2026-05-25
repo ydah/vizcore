@@ -29,7 +29,8 @@ RSpec.describe Vizcore::DSL::MappingResolver do
             { source: { kind: :spectral_rolloff }, target: :rolloff },
             { source: { kind: :spectral_flatness }, target: :noise },
             { source: { kind: :spectral_flux }, target: :flux },
-            { source: { kind: :zero_crossing_rate }, target: :crossings }
+            { source: { kind: :zero_crossing_rate }, target: :crossings },
+            { source: { kind: :global, name: :intensity }, target: :global_intensity }
           ]
         }
       ]
@@ -54,7 +55,7 @@ RSpec.describe Vizcore::DSL::MappingResolver do
         zero_crossing_rate: 0.08
       }
 
-      resolved = resolver.resolve_layers(scene_layers: scene_layers, audio: audio)
+      resolved = resolver.resolve_layers(scene_layers: scene_layers, audio: audio, globals: { intensity: 0.66 })
       layer = resolved.fetch(0)
 
       expect(layer[:name]).to eq("background")
@@ -78,7 +79,8 @@ RSpec.describe Vizcore::DSL::MappingResolver do
         rolloff: 4_500.0,
         noise: 0.33,
         flux: 0.27,
-        crossings: 0.08
+        crossings: 0.08,
+        global_intensity: 0.66
       )
     end
 

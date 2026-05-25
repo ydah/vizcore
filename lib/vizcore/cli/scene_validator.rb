@@ -13,7 +13,7 @@ module Vizcore
 
       MAPPING_SOURCE_KINDS = %i[
         amplitude peak frequency_band fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
-        bpm_confidence spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate
+        bpm_confidence spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate global
       ].freeze
 
       FREQUENCY_BANDS = %i[sub low mid high].freeze
@@ -272,6 +272,7 @@ module Vizcore
         end
         validate_frequency_band(source, scene_name, layer_name, issues) if kind == :frequency_band
         validate_onset_band(source, scene_name, layer_name, issues) if kind == :onset
+        validate_global_source(source, scene_name, layer_name, issues) if kind == :global
       end
 
       def validate_frequency_band(source, scene_name, layer_name, issues)
@@ -288,6 +289,13 @@ module Vizcore
         return if FREQUENCY_BANDS.include?(band)
 
         issues << error("scene #{scene_name} layer #{layer_name} uses unsupported onset band: #{band.inspect}", code: "E_UNKNOWN_ONSET_BAND")
+      end
+
+      def validate_global_source(source, scene_name, layer_name, issues)
+        name = source[:name] || source["name"]
+        return unless name.to_s.strip.empty?
+
+        issues << error("scene #{scene_name} layer #{layer_name} uses global mapping source without name", code: "E_GLOBAL_SOURCE_NAME")
       end
 
       def validate_transform(transform, scene_name, layer_name, target, issues)

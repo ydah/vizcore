@@ -33,6 +33,7 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
             map hihat => :scatter
             map spectral_flux => :glitch
             map zero_crossing_rate => :noise
+            map global(:intensity) => :opacity
           end
         end
 
@@ -62,6 +63,7 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
             map :mystery => :speed
             map frequency_band(:ultra) => :size
             map onset(:ultra) => :spark
+            map({ kind: :global }, to: :opacity)
           end
         end
 
@@ -82,6 +84,7 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
         "E_UNKNOWN_MAPPING_SOURCE",
         "E_UNKNOWN_FREQUENCY_BAND",
         "E_UNKNOWN_ONSET_BAND",
+        "E_GLOBAL_SOURCE_NAME",
         "E_UNKNOWN_TRANSITION_TARGET",
         "E_UNKNOWN_KEY_SCENE"
       )

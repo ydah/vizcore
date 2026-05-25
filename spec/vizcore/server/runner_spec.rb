@@ -373,6 +373,36 @@ RSpec.describe Vizcore::Server::Runner do
       )
     end
 
+    it "applies MIDI next and previous scene actions" do
+      runner = described_class.new(config, output: output)
+      broadcaster = instance_double(
+        Vizcore::Server::FrameBroadcaster,
+        current_scene_snapshot: { name: "build", layers: [] },
+        update_scene: nil
+      )
+      executor = instance_double(Vizcore::DSL::MidiMapExecutor, globals: {})
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+      runner.send(
+        :replace_scene_catalog,
+        [
+          { name: :intro, layers: [{ name: :a }] },
+          { name: :build, layers: [{ name: :b }] },
+          { name: :drop, layers: [{ name: :c }] }
+        ]
+      )
+
+      runner.send(:apply_midi_action, { type: :next_scene, effect: { name: :crossfade } }, executor, broadcaster)
+
+      expect(broadcaster).to have_received(:update_scene).with(
+        scene_name: :drop,
+        scene_layers: [hash_including(name: :c)]
+      )
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "scene_change",
+        payload: hash_including(from: "build", to: "drop", source: "midi", effect: { name: :crossfade })
+      )
+    end
+
     it "switches scene from OSC message" do
       runner = described_class.new(config, output: output)
       broadcaster = instance_double(

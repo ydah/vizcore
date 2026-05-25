@@ -167,6 +167,7 @@ module Vizcore
         @scene_mutex.synchronize do
           @scene_name = scene_name.to_s
           @scene_layers = Array(scene_layers)
+          @mapping_resolver.reset! if @mapping_resolver.respond_to?(:reset!)
           reset_transition_trigger_counters!
         end
       end
