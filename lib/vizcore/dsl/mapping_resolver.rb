@@ -245,6 +245,8 @@ module Vizcore
           audio[:peak]
         when :frequency_band
           audio.dig(:bands, source[:band]&.to_sym)
+        when :frequency_band_peak
+          audio.dig(:band_peaks, source[:band]&.to_sym)
         when :fft_spectrum
           audio[:fft]
         when :onset

@@ -162,6 +162,15 @@ module Vizcore
         @analysis_settings[:audio_normalize] = settings
       end
 
+      # Configure analysis feature extraction behavior.
+      #
+      # @param options [Hash] optional onset/FFT/silence/peak-hold settings
+      # @return [Hash] normalized analysis settings
+      def audio_analysis(**options)
+        settings = normalize_audio_analysis(options)
+        @analysis_settings.merge!(settings)
+      end
+
       # Set a fixed BPM value for analysis output.
       #
       # @param value [Numeric]
@@ -335,12 +344,30 @@ module Vizcore
         settings[:window] = positive_float(options[:window], "audio_normalize window") if options.key?(:window)
         settings[:target] = unit_float(options[:target], "audio_normalize target") if options.key?(:target)
         settings[:floor] = unit_float(options[:floor], "audio_normalize floor") if options.key?(:floor)
+        settings[:per_band] = !!options[:per_band] if options.key?(:per_band)
+        settings
+      end
+
+      def normalize_audio_analysis(options)
+        settings = {}
+        settings[:onset_sensitivity] = positive_float(options[:onset_sensitivity], "onset_sensitivity") if options.key?(:onset_sensitivity)
+        settings[:fft_bins] = ranged_integer(options[:fft_bins], "fft_bins", 8, 128) if options.key?(:fft_bins)
+        peak_hold = options.key?(:peak_hold) ? options[:peak_hold] : options[:peak_hold_frames]
+        settings[:peak_hold_frames] = ranged_integer(peak_hold, "peak_hold", 0, 10_000) unless peak_hold.nil?
+        settings[:silence_reset_frames] = ranged_integer(options[:silence_reset_frames], "silence_reset_frames", 1, 10_000) if options.key?(:silence_reset_frames)
         settings
       end
 
       def positive_integer(value, name)
         numeric = Integer(value)
         raise ArgumentError, "#{name} must be positive" unless numeric.positive?
+
+        numeric
+      end
+
+      def ranged_integer(value, name, min, max)
+        numeric = Integer(value)
+        raise ArgumentError, "#{name} must be between #{min} and #{max}" unless numeric.between?(min, max)
 
         numeric
       end

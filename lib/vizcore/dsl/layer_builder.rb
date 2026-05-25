@@ -12,7 +12,7 @@ module Vizcore
       NO_ARGUMENT = Object.new.freeze
       SHAPE_SCHEMA_VERSION = 2
       MAPPING_SOURCE_KINDS = %i[
-        amplitude peak frequency_band fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
+        amplitude peak frequency_band frequency_band_peak fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
         beat_phase beat_2 beat_4 beat_8 beat_triplet triplet bar_phase bar_count phrase_count bpm_confidence
         spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate global
       ].freeze
@@ -682,9 +682,19 @@ module Vizcore
         mapping_source(:frequency_band, band: name.to_sym)
       end
 
+      # @return [Hash] source descriptor for a held frequency-band peak
+      def frequency_band_peak(name)
+        mapping_source(:frequency_band_peak, band: name.to_sym)
+      end
+
       # @return [Hash] source descriptor for the sub-bass frequency band
       def sub
         frequency_band(:sub)
+      end
+
+      # @return [Hash] source descriptor for the held sub-bass peak
+      def sub_peak
+        frequency_band_peak(:sub)
       end
 
       # @return [Hash] source descriptor for the low/bass frequency band
@@ -692,9 +702,19 @@ module Vizcore
         frequency_band(:low)
       end
 
+      # @return [Hash] source descriptor for the held low/bass peak
+      def low_peak
+        frequency_band_peak(:low)
+      end
+
       # @return [Hash] source descriptor for the low/bass frequency band
       def bass
         frequency_band(:low)
+      end
+
+      # @return [Hash] source descriptor for the held low/bass peak
+      def bass_peak
+        frequency_band_peak(:low)
       end
 
       # @return [Hash] source descriptor for the mid frequency band
@@ -702,14 +722,29 @@ module Vizcore
         frequency_band(:mid)
       end
 
+      # @return [Hash] source descriptor for the held mid peak
+      def mid_peak
+        frequency_band_peak(:mid)
+      end
+
       # @return [Hash] source descriptor for the high frequency band
       def high
         frequency_band(:high)
       end
 
+      # @return [Hash] source descriptor for the held high peak
+      def high_peak
+        frequency_band_peak(:high)
+      end
+
       # @return [Hash] source descriptor for the high/treble frequency band
       def treble
         frequency_band(:high)
+      end
+
+      # @return [Hash] source descriptor for the held high/treble peak
+      def treble_peak
+        frequency_band_peak(:high)
       end
 
       # @return [Hash] source descriptor for FFT spectrum array

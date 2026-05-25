@@ -27,4 +27,18 @@ RSpec.describe Vizcore::Analysis::AdaptiveNormalizer do
     expect(result[:bands]).to eq(low: 0.04)
     expect(result[:fft]).to eq([0.04])
   end
+
+  it "can normalize bands against independent rolling peaks" do
+    normalizer = described_class.new(window_size: 4, target: 0.8, floor: 0.05, per_band: true)
+
+    result = normalizer.call(
+      amplitude: 0.2,
+      bands: { low: 0.1, mid: 0.4 },
+      fft: [0.1]
+    )
+
+    expect(result[:amplitude]).to eq(0.8)
+    expect(result[:bands]).to eq(low: 0.8, mid: 0.8)
+    expect(result[:fft]).to eq([0.4])
+  end
 end

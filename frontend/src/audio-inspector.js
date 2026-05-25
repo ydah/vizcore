@@ -6,10 +6,15 @@ export const buildAudioInspectorState = (audio, fftBins = DEFAULT_FFT_BINS) => {
     result[key] = clamp01(audio?.bands?.[key]);
     return result;
   }, {});
+  const bandPeaks = BAND_KEYS.reduce((result, key) => {
+    result[key] = clamp01(audio?.band_peaks?.[key]);
+    return result;
+  }, {});
 
   return {
     amplitude: clamp01(audio?.amplitude),
     bands,
+    bandPeaks,
     fft: normalizeFft(audio?.fft, fftBins),
     bpm: Number(audio?.bpm || 0),
     beat: !!audio?.beat,

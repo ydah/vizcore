@@ -9,7 +9,8 @@ RSpec.describe Vizcore::DSL::Engine do
     it "builds scenes and layers from the DSL block" do
       definition = described_class.define do
         audio :mic, device: :default, sample_rate: 44_100
-        audio_normalize mode: :adaptive, window: 3.0, target: 0.8, floor: 0.05
+        audio_normalize mode: :adaptive, window: 3.0, target: 0.8, floor: 0.05, per_band: true
+        audio_analysis onset_sensitivity: 1.4, fft_bins: 64, peak_hold: 3, silence_reset_frames: 120
         bpm 128
         bpm_lock true
         tap_tempo key: :t
@@ -34,7 +35,11 @@ RSpec.describe Vizcore::DSL::Engine do
 
       expect(definition[:audio]).to eq([{ name: :mic, options: { device: :default, sample_rate: 44_100 } }])
       expect(definition[:analysis]).to eq(
-        audio_normalize: { mode: :adaptive, window: 3.0, target: 0.8, floor: 0.05 },
+        audio_normalize: { mode: :adaptive, window: 3.0, target: 0.8, floor: 0.05, per_band: true },
+        onset_sensitivity: 1.4,
+        fft_bins: 64,
+        peak_hold_frames: 3,
+        silence_reset_frames: 120,
         bpm: 128.0,
         bpm_lock: true,
         tap_tempo: { key: "t" }
@@ -133,6 +138,7 @@ RSpec.describe Vizcore::DSL::Engine do
           layer :meters do
             type :geometry
             map peak => :peak_level
+            map frequency_band_peak(:low) => :bass_peak
             map beat_phase => :phase
             map beat_2 => :half_step
             map beat_4 => :quarter_step
@@ -155,6 +161,7 @@ RSpec.describe Vizcore::DSL::Engine do
 
       expect(mappings).to include(
         { source: { kind: :peak }, target: :peak_level },
+        { source: { kind: :frequency_band_peak, band: :low }, target: :bass_peak },
         { source: { kind: :beat_phase }, target: :phase },
         { source: { kind: :beat_2 }, target: :half_step },
         { source: { kind: :beat_4 }, target: :quarter_step },

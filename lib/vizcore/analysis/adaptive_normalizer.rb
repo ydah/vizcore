@@ -11,11 +11,14 @@ module Vizcore
       # @param window_size [Integer] number of recent active frames used to track the peak
       # @param target [Numeric] desired level for the rolling peak
       # @param floor [Numeric] minimum peak level used when calculating gain
-      def initialize(window_size: DEFAULT_WINDOW_SIZE, target: DEFAULT_TARGET, floor: DEFAULT_FLOOR)
+      # @param per_band [Boolean] true when band levels should track independent peaks
+      def initialize(window_size: DEFAULT_WINDOW_SIZE, target: DEFAULT_TARGET, floor: DEFAULT_FLOOR, per_band: false)
         @window_size = normalize_window_size(window_size)
         @target = normalize_unit(target, DEFAULT_TARGET)
         @floor = normalize_unit(floor, DEFAULT_FLOOR)
+        @per_band = !!per_band
         @history = []
+        @band_history = Hash.new { |history, key| history[key] = [] }
       end
 
       # @param amplitude [Numeric] current RMS amplitude
@@ -30,7 +33,7 @@ module Vizcore
         gain = @target / [@history.max.to_f, @floor].max
         {
           amplitude: scale_value(current_amplitude, gain),
-          bands: scale_hash(bands, gain),
+          bands: normalize_bands(bands, gain),
           fft: scale_array(fft, gain),
           gain: gain
         }
@@ -52,6 +55,21 @@ module Vizcore
 
       def scale_hash(values, gain)
         Hash(values).transform_values { |value| scale_value(value, gain) }
+      rescue StandardError
+        {}
+      end
+
+      def normalize_bands(values, amplitude_gain)
+        return scale_hash(values, amplitude_gain) unless @per_band
+
+        Hash(values).each_with_object({}) do |(key, value), output|
+          normalized = normalize_unit(value, 0.0)
+          history = @band_history[key.to_sym]
+          history << normalized
+          history.shift while history.length > @window_size
+          gain = @target / [history.max.to_f, @floor].max
+          output[key] = scale_value(normalized, gain)
+        end
       rescue StandardError
         {}
       end

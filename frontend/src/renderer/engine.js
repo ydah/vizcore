@@ -34,6 +34,7 @@ export class Engine {
       audio: {
         amplitude: 0,
         bands: { sub: 0, low: 0, mid: 0, high: 0 },
+        band_peaks: { sub: 0, low: 0, mid: 0, high: 0 },
         fft: [],
         onset: 0,
         onsets: { sub: 0, low: 0, mid: 0, high: 0 },

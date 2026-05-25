@@ -8,9 +8,11 @@ module Vizcore
       BEAT_PULSE_FLOOR = 0.001
       DEFAULT_NOISE_GATE = 0.01
       DEFAULT_AUDIO_NORMALIZE = { mode: :off }.freeze
+      DEFAULT_FFT_PREVIEW_BINS = 32
       BEATS_PER_BAR = 4
       BEATS_PER_PHRASE = 32
       BEAT_SUBDIVISIONS = { beat_2: 2, beat_4: 4, beat_8: 8, beat_triplet: 3 }.freeze
+      BAND_KEYS = %i[sub low mid high].freeze
       SILENCE_RESET_FRAMES = 90
 
       attr_reader :fft_processor, :band_splitter, :beat_detector, :bpm_estimator, :smoother
@@ -25,7 +27,11 @@ module Vizcore
       # @param audio_normalize [Hash, nil] optional audio normalization settings
       # @param bpm [Numeric, nil] fixed BPM value used when bpm_lock is true
       # @param bpm_lock [Boolean] true when BPM output should stay fixed
-      def initialize(sample_rate: 44_100, fft_size: 1024, window: :hamming, beat_detector: nil, bpm_estimator: nil, smoother: nil, noise_gate: DEFAULT_NOISE_GATE, audio_normalize: nil, bpm: nil, bpm_lock: false)
+      # @param onset_sensitivity [Numeric] multiplier applied to positive onset deltas
+      # @param fft_preview_bins [Integer] number of FFT preview bins included in payloads
+      # @param peak_hold_frames [Integer] frames to hold per-band peak values
+      # @param silence_reset_frames [Integer] silent frames before tempo state resets
+      def initialize(sample_rate: 44_100, fft_size: 1024, window: :hamming, beat_detector: nil, bpm_estimator: nil, smoother: nil, noise_gate: DEFAULT_NOISE_GATE, audio_normalize: nil, bpm: nil, bpm_lock: false, onset_sensitivity: 1.0, fft_preview_bins: DEFAULT_FFT_PREVIEW_BINS, peak_hold_frames: 0, silence_reset_frames: SILENCE_RESET_FRAMES)
         @fft_processor = FFTProcessor.new(sample_rate: sample_rate, fft_size: fft_size, window: window)
         @band_splitter = BandSplitter.new(sample_rate: sample_rate, fft_size: fft_size)
         @beat_detector = beat_detector || BeatDetector.new
@@ -33,12 +39,17 @@ module Vizcore
         @bpm_estimator = bpm_estimator || BPMEstimator.new(frame_rate: @analysis_frame_rate)
         @smoother = smoother || Smoother.new(alpha: 0.35)
         @noise_gate = normalize_noise_gate(noise_gate)
+        self.onset_sensitivity = onset_sensitivity
+        self.fft_preview_bins = fft_preview_bins
+        self.peak_hold_frames = peak_hold_frames
+        self.silence_reset_frames = silence_reset_frames
         @beat_pulse = 0.0
         @beat_phase = 0.0
         @last_bpm = 0.0
         self.bpm_lock = { bpm: bpm, locked: bpm_lock }
         self.audio_normalize = audio_normalize
         @silent_frame_count = 0
+        @band_peak_state = {}
         @previous_onset_amplitude = 0.0
         @previous_onset_bands = {}
         @previous_flux_spectrum = nil
@@ -57,6 +68,30 @@ module Vizcore
         values = symbolize_hash(settings)
         @locked_bpm = normalize_locked_bpm(values[:bpm], bpm_lock: values[:locked])
         @last_bpm = @locked_bpm if @locked_bpm
+      end
+
+      # @param value [Numeric]
+      # @return [Float]
+      def onset_sensitivity=(value)
+        @onset_sensitivity = normalize_positive_number(value, fallback: 1.0)
+      end
+
+      # @param value [Integer]
+      # @return [Integer]
+      def fft_preview_bins=(value)
+        @fft_preview_bins = normalize_integer(value, fallback: DEFAULT_FFT_PREVIEW_BINS, min: 8, max: 128)
+      end
+
+      # @param value [Integer]
+      # @return [Integer]
+      def peak_hold_frames=(value)
+        @peak_hold_frames = normalize_integer(value, fallback: 0, min: 0, max: 10_000)
+      end
+
+      # @param value [Integer]
+      # @return [Integer]
+      def silence_reset_frames=(value)
+        @silence_reset_frames = normalize_integer(value, fallback: SILENCE_RESET_FRAMES, min: 1, max: 10_000)
       end
 
       # @param samples [Array<Numeric>] audio frame samples
@@ -80,13 +115,14 @@ module Vizcore
         bpm = resolve_bpm(beat_detected)
         tempo = tempo_features(beat_detected: beat_detected, beat_count: beat[:beat_count], bpm: bpm)
         peak = peak_level(samples)
-        spectrum_preview = preview_spectrum(fft[:magnitudes])
+        spectrum_preview = preview_spectrum(fft[:magnitudes], bins: @fft_preview_bins)
         spectral = spectral_features(fft[:magnitudes], spectrum_preview)
         normalized = normalize_features(
           amplitude: amplitude,
           bands: bands,
           fft: spectrum_preview
         )
+        band_peaks = update_band_peaks(normalized[:bands])
         onsets = detect_onsets(amplitude: normalized[:amplitude], bands: normalized[:bands])
         drums = detect_drum_sources(bands: normalized[:bands], onsets: onsets[:bands])
 
@@ -94,6 +130,7 @@ module Vizcore
           amplitude: @smoother.smooth(:amplitude, normalized[:amplitude]),
           peak: peak,
           bands: @smoother.smooth_hash(normalized[:bands], namespace: :bands),
+          band_peaks: band_peaks,
           fft: @smoother.smooth_array(normalized[:fft], namespace: :fft),
           onset: onsets[:amplitude],
           onsets: onsets[:bands],
@@ -133,6 +170,21 @@ module Vizcore
         DEFAULT_NOISE_GATE
       end
 
+      def normalize_positive_number(value, fallback:)
+        numeric = Float(value)
+        return fallback unless numeric.finite? && numeric.positive?
+
+        numeric
+      rescue ArgumentError, TypeError
+        fallback
+      end
+
+      def normalize_integer(value, fallback:, min:, max:)
+        Integer(value).clamp(min, max)
+      rescue ArgumentError, TypeError
+        fallback
+      end
+
       def normalize_audio_normalize(value)
         settings = DEFAULT_AUDIO_NORMALIZE.merge(symbolize_hash(value))
         mode = settings[:mode].to_s.strip.to_sym
@@ -158,7 +210,8 @@ module Vizcore
         AdaptiveNormalizer.new(
           window_size: normalization_window_size(settings),
           target: settings.fetch(:target, AdaptiveNormalizer::DEFAULT_TARGET),
-          floor: settings.fetch(:floor, AdaptiveNormalizer::DEFAULT_FLOOR)
+          floor: settings.fetch(:floor, AdaptiveNormalizer::DEFAULT_FLOOR),
+          per_band: settings.fetch(:per_band, false)
         )
       end
 
@@ -179,6 +232,25 @@ module Vizcore
         @normalizer.call(amplitude: amplitude, bands: bands, fft: fft)
       end
 
+      def update_band_peaks(bands)
+        values = zero_bands.merge(symbolize_hash(bands))
+        return values.transform_values { |value| Float(value).clamp(0.0, 1.0) } if @peak_hold_frames <= 0
+
+        values.each_with_object({}) do |(key, value), output|
+          current = Float(value).clamp(0.0, 1.0)
+          state = @band_peak_state[key] || { value: 0.0, remaining: 0 }
+          if current >= state[:value].to_f || state[:remaining].to_i <= 0
+            @band_peak_state[key] = { value: current, remaining: @peak_hold_frames }
+            output[key] = current
+          else
+            @band_peak_state[key] = { value: state[:value].to_f, remaining: state[:remaining].to_i - 1 }
+            output[key] = state[:value].to_f
+          end
+        end
+      rescue StandardError
+        zero_bands
+      end
+
       def detect_onsets(amplitude:, bands:)
         current_amplitude = Float(amplitude).clamp(0.0, 1.0)
         current_bands = Hash(bands).transform_values { |value| Float(value).clamp(0.0, 1.0) }
@@ -197,7 +269,7 @@ module Vizcore
       end
 
       def positive_delta(current, previous)
-        [current - previous, 0.0].max.clamp(0.0, 1.0)
+        ([current - previous, 0.0].max * @onset_sensitivity).clamp(0.0, 1.0)
       end
 
       def detect_drum_sources(bands:, onsets:)
@@ -224,6 +296,7 @@ module Vizcore
         reset_tempo_state if reset_tempo
         tempo = tempo_features(beat_detected: false, beat_count: current_beat_count, bpm: @last_bpm, advance: !reset_tempo)
         @smoother.reset if @smoother.respond_to?(:reset)
+        @band_peak_state.clear
         @previous_onset_amplitude = 0.0
         @previous_onset_bands = {}
         @previous_flux_spectrum = nil
@@ -231,8 +304,9 @@ module Vizcore
         {
           amplitude: 0.0,
           peak: 0.0,
-          bands: { sub: 0.0, low: 0.0, mid: 0.0, high: 0.0 },
-          fft: Array.new(32, 0.0),
+          bands: zero_bands,
+          band_peaks: zero_bands,
+          fft: Array.new(@fft_preview_bins, 0.0),
           onset: 0.0,
           onsets: { sub: 0.0, low: 0.0, mid: 0.0, high: 0.0 },
           drums: { kick: 0.0, snare: 0.0, hihat: 0.0 },
@@ -275,7 +349,7 @@ module Vizcore
       end
 
       def sustained_silence?
-        @silent_frame_count == SILENCE_RESET_FRAMES
+        @silent_frame_count == @silence_reset_frames
       end
 
       def current_beat_count
@@ -284,6 +358,10 @@ module Vizcore
         0
       rescue StandardError
         0
+      end
+
+      def zero_bands
+        BAND_KEYS.to_h { |key| [key, 0.0] }
       end
 
       def beat_confidence(beat)

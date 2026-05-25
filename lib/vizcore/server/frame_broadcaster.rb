@@ -27,6 +27,10 @@ module Vizcore
       # @param audio_normalize [Hash, nil]
       # @param bpm [Numeric, nil]
       # @param bpm_lock [Boolean]
+      # @param onset_sensitivity [Numeric]
+      # @param fft_preview_bins [Integer]
+      # @param peak_hold_frames [Integer]
+      # @param silence_reset_frames [Integer]
       # @param error_reporter [#call, nil]
       def initialize(
         scene_name: "basic",
@@ -43,6 +47,10 @@ module Vizcore
         audio_normalize: nil,
         bpm: nil,
         bpm_lock: false,
+        onset_sensitivity: 1.0,
+        fft_preview_bins: Vizcore::Analysis::Pipeline::DEFAULT_FFT_PREVIEW_BINS,
+        peak_hold_frames: 0,
+        silence_reset_frames: Vizcore::Analysis::Pipeline::SILENCE_RESET_FRAMES,
         error_reporter: nil
       )
         @scene_name = scene_name
@@ -56,7 +64,11 @@ module Vizcore
           noise_gate: noise_gate,
           audio_normalize: audio_normalize,
           bpm: bpm,
-          bpm_lock: bpm_lock
+          bpm_lock: bpm_lock,
+          onset_sensitivity: onset_sensitivity,
+          fft_preview_bins: fft_preview_bins,
+          peak_hold_frames: peak_hold_frames,
+          silence_reset_frames: silence_reset_frames
         )
         @mapping_resolver = mapping_resolver || Vizcore::DSL::MappingResolver.new
         @scene_serializer = scene_serializer || Vizcore::Renderer::SceneSerializer.new
@@ -192,11 +204,15 @@ module Vizcore
       # @param bpm [Numeric, nil]
       # @param bpm_lock [Boolean]
       # @return [void]
-      def update_analysis_settings(audio_normalize:, bpm: nil, bpm_lock: false)
+      def update_analysis_settings(audio_normalize:, bpm: nil, bpm_lock: false, onset_sensitivity: 1.0, fft_preview_bins: Vizcore::Analysis::Pipeline::DEFAULT_FFT_PREVIEW_BINS, peak_hold_frames: 0, silence_reset_frames: Vizcore::Analysis::Pipeline::SILENCE_RESET_FRAMES)
         return unless @analysis_pipeline.respond_to?(:audio_normalize=)
 
         @analysis_pipeline.audio_normalize = audio_normalize
         @analysis_pipeline.bpm_lock = { bpm: bpm, locked: bpm_lock } if @analysis_pipeline.respond_to?(:bpm_lock=)
+        @analysis_pipeline.onset_sensitivity = onset_sensitivity if @analysis_pipeline.respond_to?(:onset_sensitivity=)
+        @analysis_pipeline.fft_preview_bins = fft_preview_bins if @analysis_pipeline.respond_to?(:fft_preview_bins=)
+        @analysis_pipeline.peak_hold_frames = peak_hold_frames if @analysis_pipeline.respond_to?(:peak_hold_frames=)
+        @analysis_pipeline.silence_reset_frames = silence_reset_frames if @analysis_pipeline.respond_to?(:silence_reset_frames=)
       end
 
       # Apply a manual tap tempo event and lock analysis BPM when enough taps exist.

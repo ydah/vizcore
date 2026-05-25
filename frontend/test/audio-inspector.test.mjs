@@ -7,6 +7,7 @@ test("buildAudioInspectorState clamps audio meters and fft bins", () => {
   const state = buildAudioInspectorState({
     amplitude: 1.4,
     bands: { sub: -0.5, low: 0.25, mid: 0.5, high: 2 },
+    band_peaks: { sub: 0.2, low: 1.2, mid: 0.6, high: "bad" },
     fft: [0, 0.4, 1.5, "bad"],
     beat: true,
     beat_pulse: 0.7,
@@ -19,6 +20,7 @@ test("buildAudioInspectorState clamps audio meters and fft bins", () => {
 
   assert.equal(state.amplitude, 1);
   assert.deepEqual(state.bands, { sub: 0, low: 0.25, mid: 0.5, high: 1 });
+  assert.deepEqual(state.bandPeaks, { sub: 0.2, low: 1, mid: 0.6, high: 0 });
   assert.deepEqual(state.fft, [0, 0.4, 1, 0]);
   assert.equal(state.beat, true);
   assert.equal(state.beatPulse, 0.7);

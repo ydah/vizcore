@@ -329,12 +329,24 @@ module Vizcore
         numeric(band(:low))
       end
 
+      def bass_peak
+        numeric(band_peak(:low))
+      end
+
       def mid
         numeric(band(:mid))
       end
 
+      def mid_peak
+        numeric(band_peak(:mid))
+      end
+
       def high
         numeric(band(:high))
+      end
+
+      def high_peak
+        numeric(band_peak(:high))
       end
 
       def fft
@@ -390,6 +402,11 @@ module Vizcore
       def band(name)
         bands = symbolize_hash(@payload[:bands])
         bands[name]
+      end
+
+      def band_peak(name)
+        peaks = symbolize_hash(@payload[:band_peaks])
+        peaks[name]
       end
 
       def drum(name)

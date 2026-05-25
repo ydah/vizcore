@@ -87,8 +87,11 @@ module Vizcore::Shape
   class AudioContext
     def amplitude: () -> Float
     def bass: () -> Float
+    def bass_peak: () -> Float
     def mid: () -> Float
+    def mid_peak: () -> Float
     def high: () -> Float
+    def high_peak: () -> Float
     def fft: () -> Array[untyped]
     def beat?: () -> bool
     def beat_pulse: () -> Float
@@ -257,6 +260,7 @@ module Vizcore::DSL
     def theme: (Symbol | String name) { () -> void } -> void
     def midi: (Symbol | String name, **untyped options) -> Array[Hash[Symbol, untyped]]
     def audio_normalize: (?mode: Symbol | String mode, **untyped options) -> Hash[Symbol, untyped]
+    def audio_analysis: (**untyped options) -> Hash[Symbol, untyped]
     def bpm: (Numeric value) -> Float
     def bpm_lock: () -> bool
                 | (bool value) -> bool
@@ -407,12 +411,19 @@ module Vizcore::DSL
     def react_to: (Hash[Symbol, untyped] | Symbol | String source_value) { () -> void } -> void
     def amplitude: () -> source
     def frequency_band: (Symbol | String name) -> source
+    def frequency_band_peak: (Symbol | String name) -> source
     def sub: () -> source
+    def sub_peak: () -> source
     def low: () -> source
+    def low_peak: () -> source
     def bass: () -> source
+    def bass_peak: () -> source
     def mid: () -> source
+    def mid_peak: () -> source
     def high: () -> source
+    def high_peak: () -> source
     def treble: () -> source
+    def treble_peak: () -> source
     def fft_spectrum: () -> source
     def onset: () -> source
              | (Symbol | String band) -> source

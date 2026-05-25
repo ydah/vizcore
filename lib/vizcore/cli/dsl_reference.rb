@@ -12,6 +12,7 @@ module Vizcore
         Entry.new(syntax: "audio :mic, **options", description: "Register an audio input definition."),
         Entry.new(syntax: "midi :controller, **options", description: "Register a MIDI input definition."),
         Entry.new(syntax: "audio_normalize mode: :adaptive", description: "Configure analysis-level normalization."),
+        Entry.new(syntax: "audio_analysis onset_sensitivity: 1.4, fft_bins: 64", description: "Tune analysis feature extraction."),
         Entry.new(syntax: "bpm 128 / bpm_lock true", description: "Set and optionally lock the analysis BPM."),
         Entry.new(syntax: "tap_tempo key: :space", description: "Enable browser tap tempo events."),
         Entry.new(syntax: "set :global_intensity, 0.8", description: "Set a runtime global exposed to shaders."),
@@ -50,7 +51,7 @@ module Vizcore
       ].freeze
 
       SOURCES = %w[
-        amplitude frequency_band(:low) sub low bass mid high treble fft_spectrum
+        amplitude frequency_band(:low) frequency_band_peak(:low) sub low bass bass_peak mid mid_peak high high_peak treble fft_spectrum
         onset onset(:high) kick snare hihat beat? beat beat_confidence beat_pulse beat_count
         beat_phase beat_2 beat_4 beat_8 triplet bar_phase bar_count phrase_count bpm
       ].freeze

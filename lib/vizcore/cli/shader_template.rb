@@ -17,6 +17,9 @@ module Vizcore
         uniform float u_bass;
         uniform float u_mid;
         uniform float u_high;
+        uniform float u_bass_peak;
+        uniform float u_mid_peak;
+        uniform float u_high_peak;
         uniform float u_beat;
         uniform float u_beat_pulse;
         uniform float u_beat_phase;
@@ -33,7 +36,7 @@ module Vizcore
           vec2 uv = gl_FragCoord.xy / u_resolution.xy;
           float wave = 0.5 + 0.5 * sin((uv.x + u_time * 0.12 + u_bar_phase * 0.2) * 12.0 + u_bass * 4.0);
           vec3 color = mix(vec3(0.02, 0.06, 0.12), vec3(0.1, 0.75, 0.95), wave);
-          color += vec3(0.95, 0.16, 0.32) * (u_beat_pulse * 0.35 + u_onset * 0.2 + u_kick * 0.25 + u_high * 0.2);
+          color += vec3(0.95, 0.16, 0.32) * (u_beat_pulse * 0.35 + u_onset * 0.2 + u_kick * 0.25 + u_high_peak * 0.2);
           color *= 0.35 + u_amplitude * 1.8;
           outColor = vec4(color, 1.0);
         }

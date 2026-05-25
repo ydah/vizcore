@@ -295,7 +295,7 @@ RSpec.describe Vizcore::DSL::TransitionController do
           {
             from: :intro,
             to: :drop,
-            trigger: proc { bass > 0.7 && treble > 0.2 }
+            trigger: proc { bass > 0.7 && treble > 0.2 && bass_peak > 0.9 }
           }
         ]
       )
@@ -309,7 +309,7 @@ RSpec.describe Vizcore::DSL::TransitionController do
       expect(
         controller.next_transition(
           scene_name: :intro,
-          audio: { bands: { low: 0.8, high: 0.3 } }
+          audio: { bands: { low: 0.8, high: 0.3 }, band_peaks: { low: 0.95 } }
         )
       ).to include(from: :intro, to: :drop)
     end

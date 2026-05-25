@@ -77,6 +77,10 @@ module Vizcore
           audio_normalize: audio_normalize_settings(definition),
           bpm: bpm_setting(definition),
           bpm_lock: bpm_lock_setting(definition),
+          onset_sensitivity: analysis_setting(definition, :onset_sensitivity, 1.0),
+          fft_preview_bins: analysis_setting(definition, :fft_bins, Vizcore::Analysis::Pipeline::DEFAULT_FFT_PREVIEW_BINS),
+          peak_hold_frames: analysis_setting(definition, :peak_hold_frames, 0),
+          silence_reset_frames: analysis_setting(definition, :silence_reset_frames, Vizcore::Analysis::Pipeline::SILENCE_RESET_FRAMES),
           error_reporter: ->(message) { @output.puts(message) }
         )
         replace_scene_catalog(definition[:scenes])
@@ -241,7 +245,11 @@ module Vizcore
           broadcaster.update_analysis_settings(
             audio_normalize: audio_normalize_settings(definition),
             bpm: bpm_setting(definition),
-            bpm_lock: bpm_lock_setting(definition)
+            bpm_lock: bpm_lock_setting(definition),
+            onset_sensitivity: analysis_setting(definition, :onset_sensitivity, 1.0),
+            fft_preview_bins: analysis_setting(definition, :fft_bins, Vizcore::Analysis::Pipeline::DEFAULT_FFT_PREVIEW_BINS),
+            peak_hold_frames: analysis_setting(definition, :peak_hold_frames, 0),
+            silence_reset_frames: analysis_setting(definition, :silence_reset_frames, Vizcore::Analysis::Pipeline::SILENCE_RESET_FRAMES)
           )
           broadcaster.update_scene(scene_name: scene[:name], scene_layers: scene[:layers])
           on_reload&.call(definition)
@@ -572,6 +580,12 @@ module Vizcore
         Hash(definition[:analysis] || {})[:audio_normalize]
       rescue StandardError
         nil
+      end
+
+      def analysis_setting(definition, key, fallback)
+        Hash(definition[:analysis] || {}).fetch(key, fallback)
+      rescue StandardError
+        fallback
       end
 
       def bpm_setting(definition)

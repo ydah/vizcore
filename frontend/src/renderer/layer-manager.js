@@ -383,6 +383,7 @@ export class LayerManager {
     gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
 
     const bands = audio?.bands || {};
+    const bandPeaks = audio?.band_peaks || {};
     const onsets = audio?.onsets || {};
     const drums = audio?.drums || {};
     this.setUniform1f(program, "u_time", time);
@@ -391,6 +392,9 @@ export class LayerManager {
     this.setUniform1f(program, "u_bass", bands.low || 0);
     this.setUniform1f(program, "u_mid", bands.mid || 0);
     this.setUniform1f(program, "u_high", bands.high || 0);
+    this.setUniform1f(program, "u_bass_peak", bandPeaks.low || 0);
+    this.setUniform1f(program, "u_mid_peak", bandPeaks.mid || 0);
+    this.setUniform1f(program, "u_high_peak", bandPeaks.high || 0);
     this.setUniform1f(program, "u_beat", audio?.beat ? 1 : 0);
     this.setUniform1f(program, "u_beat_pulse", audio?.beat_pulse || (audio?.beat ? 1 : 0));
     this.setUniform1f(program, "u_beat_phase", audio?.beat_phase || 0);

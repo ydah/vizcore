@@ -124,6 +124,7 @@ module Vizcore
         def initialize(audio, frame_count:, elapsed_seconds: nil)
           @audio = symbolize_hash(audio)
           @bands = symbolize_hash(@audio[:bands])
+          @band_peaks = symbolize_hash(@audio[:band_peaks])
           @onsets = symbolize_hash(@audio[:onsets])
           @drums = symbolize_hash(@audio[:drums])
           @frame_count = Integer(frame_count)
@@ -149,9 +150,20 @@ module Vizcore
           @bands[name.to_sym].to_f
         end
 
+        # @param name [Symbol, String]
+        # @return [Float]
+        def frequency_band_peak(name)
+          @band_peaks[name.to_sym].to_f
+        end
+
         # @return [Float]
         def sub
           frequency_band(:sub)
+        end
+
+        # @return [Float]
+        def sub_peak
+          frequency_band_peak(:sub)
         end
 
         # @return [Float]
@@ -160,8 +172,18 @@ module Vizcore
         end
 
         # @return [Float]
+        def low_peak
+          frequency_band_peak(:low)
+        end
+
+        # @return [Float]
         def bass
           frequency_band(:low)
+        end
+
+        # @return [Float]
+        def bass_peak
+          frequency_band_peak(:low)
         end
 
         # @return [Float]
@@ -170,13 +192,28 @@ module Vizcore
         end
 
         # @return [Float]
+        def mid_peak
+          frequency_band_peak(:mid)
+        end
+
+        # @return [Float]
         def high
           frequency_band(:high)
         end
 
         # @return [Float]
+        def high_peak
+          frequency_band_peak(:high)
+        end
+
+        # @return [Float]
         def treble
           frequency_band(:high)
+        end
+
+        # @return [Float]
+        def treble_peak
+          frequency_band_peak(:high)
         end
 
         # @return [Array<Float>]

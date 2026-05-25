@@ -170,7 +170,11 @@ module Vizcore
           noise_gate: @config.noise_gate,
           audio_normalize: audio_normalize_settings,
           bpm: bpm_setting,
-          bpm_lock: bpm_lock_setting
+          bpm_lock: bpm_lock_setting,
+          onset_sensitivity: analysis_setting(:onset_sensitivity, 1.0),
+          fft_preview_bins: analysis_setting(:fft_bins, Vizcore::Analysis::Pipeline::DEFAULT_FFT_PREVIEW_BINS),
+          peak_hold_frames: analysis_setting(:peak_hold_frames, 0),
+          silence_reset_frames: analysis_setting(:silence_reset_frames, Vizcore::Analysis::Pipeline::SILENCE_RESET_FRAMES)
         )
       end
 
@@ -184,6 +188,12 @@ module Vizcore
         Hash(@definition[:analysis] || {})[:audio_normalize]
       rescue StandardError
         nil
+      end
+
+      def analysis_setting(key, fallback)
+        Hash(@definition[:analysis] || {}).fetch(key, fallback)
+      rescue StandardError
+        fallback
       end
 
       def bpm_setting

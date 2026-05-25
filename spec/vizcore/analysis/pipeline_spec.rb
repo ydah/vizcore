@@ -18,6 +18,7 @@ RSpec.describe Vizcore::Analysis::Pipeline do
       :amplitude,
       :peak,
       :bands,
+      :band_peaks,
       :fft,
       :onset,
       :onsets,
@@ -44,6 +45,7 @@ RSpec.describe Vizcore::Analysis::Pipeline do
       :peak_frequency
     )
     expect(result[:bands].keys).to contain_exactly(:sub, :low, :mid, :high)
+    expect(result[:band_peaks].keys).to contain_exactly(:sub, :low, :mid, :high)
     expect(result[:fft].length).to eq(32)
     expect(result[:peak]).to be_within(0.001).of(0.8)
     expect(result[:spectral_centroid]).to be > 0.0
@@ -61,6 +63,7 @@ RSpec.describe Vizcore::Analysis::Pipeline do
     expect(result[:amplitude]).to eq(0.0)
     expect(result[:peak]).to eq(0.0)
     expect(result[:bands]).to eq(sub: 0.0, low: 0.0, mid: 0.0, high: 0.0)
+    expect(result[:band_peaks]).to eq(sub: 0.0, low: 0.0, mid: 0.0, high: 0.0)
     expect(result[:fft]).to eq(Array.new(32, 0.0))
     expect(result[:beat_confidence]).to eq(0.0)
     expect(result[:beat_pulse]).to eq(0.0)
@@ -241,7 +244,35 @@ RSpec.describe Vizcore::Analysis::Pipeline do
     expect(active[:fft].sum).to be > 0.0
     expect(silent[:amplitude]).to eq(0.0)
     expect(silent[:bands]).to eq(sub: 0.0, low: 0.0, mid: 0.0, high: 0.0)
+    expect(silent[:band_peaks]).to eq(sub: 0.0, low: 0.0, mid: 0.0, high: 0.0)
     expect(silent[:fft]).to eq(Array.new(32, 0.0))
+  end
+
+  it "can emit configurable FFT bins and held per-band peaks" do
+    pipeline = described_class.new(sample_rate: 44_100, fft_size: 1024, fft_preview_bins: 64, peak_hold_frames: 2)
+    loud = sine_samples(frequency_hz: 90.0, sample_rate: 44_100, count: 1024, amplitude: 0.8)
+    quiet = sine_samples(frequency_hz: 90.0, sample_rate: 44_100, count: 1024, amplitude: 0.2)
+
+    first = pipeline.call(loud)
+    second = pipeline.call(quiet)
+
+    expect(first[:fft].length).to eq(64)
+    expect(second[:fft].length).to eq(64)
+    expect(second[:band_peaks].fetch(:low)).to be >= second[:bands].fetch(:low)
+  end
+
+  it "applies onset sensitivity to positive deltas" do
+    normal = described_class.new(sample_rate: 44_100, fft_size: 1024)
+    sensitive = described_class.new(sample_rate: 44_100, fft_size: 1024, onset_sensitivity: 2.0)
+    quiet = sine_samples(frequency_hz: 180.0, sample_rate: 44_100, count: 1024, amplitude: 0.2)
+    loud = sine_samples(frequency_hz: 180.0, sample_rate: 44_100, count: 1024, amplitude: 0.6)
+
+    normal.call(quiet)
+    sensitive.call(quiet)
+    normal_onset = normal.call(loud)[:onset]
+    sensitive_onset = sensitive.call(loud)[:onset]
+
+    expect(sensitive_onset).to be > normal_onset
   end
 
   it "integrates bpm estimator and smoother in the output path" do

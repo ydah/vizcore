@@ -12,7 +12,7 @@ module Vizcore
       BUILTIN_SHADERS = Vizcore::LayerCatalog::BUILTIN_SHADERS
 
       MAPPING_SOURCE_KINDS = %i[
-        amplitude peak frequency_band fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
+        amplitude peak frequency_band frequency_band_peak fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
         beat_phase beat_2 beat_4 beat_8 beat_triplet triplet bar_phase bar_count phrase_count bpm_confidence
         spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate global
       ].freeze
@@ -272,6 +272,7 @@ module Vizcore
           issues << error("scene #{scene_name} layer #{layer_name} uses unsupported mapping source: #{kind}", code: "E_UNKNOWN_MAPPING_SOURCE")
         end
         validate_frequency_band(source, scene_name, layer_name, issues) if kind == :frequency_band
+        validate_frequency_band(source, scene_name, layer_name, issues) if kind == :frequency_band_peak
         validate_onset_band(source, scene_name, layer_name, issues) if kind == :onset
         validate_global_source(source, scene_name, layer_name, issues) if kind == :global
       end
