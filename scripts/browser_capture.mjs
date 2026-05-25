@@ -4,7 +4,7 @@ import path from "node:path";
 const options = parseArgs(process.argv.slice(2));
 
 if (!options.url) {
-  console.error("Usage: node scripts/browser_capture.mjs URL --out browser-capture.png [--selector #vizcore-canvas] [--wait 1000]");
+  console.error("Usage: node scripts/browser_capture.mjs URL --out browser-capture.png [--selector #vizcore-canvas] [--wait 1000] [--wait-for-frame]");
   process.exit(1);
 }
 
@@ -26,6 +26,9 @@ try {
 
   const element = await resolveCaptureLocator(page, options.selector);
   await element.waitFor({ state: "visible", timeout: 10000 });
+  if (options.waitForFrame) {
+    await waitForVizcoreFrame(page, options.frameTimeout);
+  }
   await fs.mkdir(path.dirname(options.out), { recursive: true });
   await element.screenshot({ path: options.out });
   console.log(`Browser capture written: ${options.out}`);
@@ -44,6 +47,14 @@ async function resolveCaptureLocator(page, selector) {
   return page.locator(selector).first();
 }
 
+async function waitForVizcoreFrame(page, timeout) {
+  await page.waitForFunction(
+    () => Number(document.body?.dataset?.vizcoreFrameCount || 0) > 0,
+    null,
+    { timeout }
+  );
+}
+
 function parseArgs(args) {
   const parsed = {
     url: null,
@@ -52,6 +63,8 @@ function parseArgs(args) {
     wait: 1000,
     width: 1280,
     height: 720,
+    waitForFrame: false,
+    frameTimeout: 10000,
   };
 
   for (let index = 0; index < args.length; index += 1) {
@@ -70,6 +83,11 @@ function parseArgs(args) {
       index += 1;
     } else if (value === "--height") {
       parsed.height = finiteNumber(args[index + 1], parsed.height);
+      index += 1;
+    } else if (value === "--wait-for-frame") {
+      parsed.waitForFrame = true;
+    } else if (value === "--frame-timeout") {
+      parsed.frameTimeout = finiteNumber(args[index + 1], parsed.frameTimeout);
       index += 1;
     } else if (!parsed.url) {
       parsed.url = value;

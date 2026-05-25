@@ -190,6 +190,8 @@ const client = new WebSocketClient(websocketUrl, {
     engine.setAudioFrame(frame);
     frameCount += 1;
     let sceneName = String(frame?.scene?.name || currentSceneName);
+    document.body.dataset.vizcoreFrameCount = String(frameCount);
+    document.body.dataset.vizcoreScene = sceneName;
     const now = performance.now();
     if (
       pendingSceneName &&

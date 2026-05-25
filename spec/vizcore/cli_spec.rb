@@ -331,7 +331,10 @@ RSpec.describe Vizcore::CLI do
         "--width",
         "320",
         "--height",
-        "180"
+        "180",
+        "--wait-for-frame",
+        "--frame-timeout",
+        "10000"
       ).and_return(true)
       expect(Process).to receive(:kill).with("TERM", 12_345)
       expect(Process).to receive(:wait).with(12_345)

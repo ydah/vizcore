@@ -429,6 +429,8 @@ module Vizcore
     option :wait, type: :numeric, default: 1000, desc: "Milliseconds to wait after page load"
     option :width, type: :numeric, default: 1280, desc: "Browser viewport width"
     option :height, type: :numeric, default: 720, desc: "Browser viewport height"
+    option :wait_for_frame, type: :boolean, default: false, desc: "Wait until the Vizcore page receives an audio frame"
+    option :frame_timeout, type: :numeric, default: 10_000, desc: "Milliseconds to wait for the first Vizcore frame"
     # Capture browser-rendered output from a running Vizcore server.
     #
     # @param url [String]
@@ -441,7 +443,9 @@ module Vizcore
         selector: options.fetch(:selector),
         wait: options.fetch(:wait),
         width: options.fetch(:width),
-        height: options.fetch(:height)
+        height: options.fetch(:height),
+        wait_for_frame: options.fetch(:wait_for_frame),
+        frame_timeout: options.fetch(:frame_timeout)
       )
     end
 
@@ -458,6 +462,8 @@ module Vizcore
     option :timeout, type: :numeric, default: 10, desc: "Seconds to wait for the temporary server"
     option :width, type: :numeric, default: 1280, desc: "Browser viewport width"
     option :height, type: :numeric, default: 720, desc: "Browser viewport height"
+    option :wait_for_frame, type: :boolean, default: true, desc: "Wait until the projector receives an audio frame"
+    option :frame_timeout, type: :numeric, default: 10_000, desc: "Milliseconds to wait for the first projector frame"
     option :allow_public_control, type: :boolean, default: false, desc: "Allow control panel/WebSocket when binding to a public host"
     option :trust, type: :boolean, default: false, desc: "Suppress Ruby scene execution safety warning"
     # Start Vizcore and capture a browser-rendered canvas from the projector route.
@@ -490,7 +496,9 @@ module Vizcore
           selector: options.fetch(:selector),
           wait: options.fetch(:wait),
           width: options.fetch(:width),
-          height: options.fetch(:height)
+          height: options.fetch(:height),
+          wait_for_frame: options.fetch(:wait_for_frame),
+          frame_timeout: options.fetch(:frame_timeout)
         )
       ensure
         stop_temporary_server(pid)
@@ -760,7 +768,7 @@ module Vizcore
       end
     end
 
-    def run_browser_capture(url, out:, selector:, wait:, width:, height:)
+    def run_browser_capture(url, out:, selector:, wait:, width:, height:, wait_for_frame: false, frame_timeout: 10_000)
       script = Vizcore.root.join("scripts", "browser_capture.mjs")
       command = [
         "node",
@@ -777,6 +785,11 @@ module Vizcore
         "--height",
         height.to_s
       ]
+      if wait_for_frame
+        command << "--wait-for-frame"
+        command << "--frame-timeout"
+        command << frame_timeout.to_s
+      end
       success = Kernel.system(*command)
       raise Thor::Error, "browser capture failed" unless success
     end
