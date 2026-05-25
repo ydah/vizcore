@@ -324,12 +324,15 @@ module Vizcore
           end
           fade = action.key?(:fade) ? action[:fade] : action["fade"]
           release = action.key?(:release) ? action[:release] : action["release"]
+          color = action.key?(:color) ? action[:color] : action["color"]
           normalized_fade = finite_float(fade)
           normalized_release = finite_float(release)
-          return live_control if normalized_fade.nil? && normalized_release.nil? && !live_control.key?(:value)
+          normalized_color = normalize_control_color(color)
+          return live_control if normalized_fade.nil? && normalized_release.nil? && !live_control.key?(:value) && normalized_color.nil?
 
           live_control[:fade] = normalized_fade if normalized_fade
           live_control[:release] = normalized_release if normalized_release
+          live_control[:color] = normalized_color if normalized_color
           live_control
         end
       end
@@ -363,6 +366,37 @@ module Vizcore
         return numeric if numeric.finite?
 
         nil
+      rescue ArgumentError, TypeError
+        nil
+      end
+
+      def normalize_control_color(value)
+        return nil if value.nil?
+
+        if value.is_a?(Array)
+          channels = Array(value).take(3).map { |entry| Float(entry, exception: false) }
+          return nil if channels.include?(nil) || channels.length < 3
+
+          normalized = if channels.all? { |channel| channel >= 0 && channel <= 1 }
+            channels
+          else
+            channels.map { |channel| channel / 255.0 }
+          end
+          return normalized.map { |channel| [0.0, [1.0, channel].min].max }
+        end
+
+        raw = value.to_s.strip
+        match = raw.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/)
+        return nil unless match
+
+        hex = match[1].length == 3 ? match[1].chars.map { |entry| "#{entry}#{entry}" }.join("") : match[1]
+        return nil unless hex.length == 6
+
+        [
+          Integer("0x#{hex[0, 2]}", 16) / 255.0,
+          Integer("0x#{hex[2, 2]}", 16) / 255.0,
+          Integer("0x#{hex[4, 2]}", 16) / 255.0
+        ].map { |channel| [0.0, [1.0, channel].min].max }
       rescue ArgumentError, TypeError
         nil
       end

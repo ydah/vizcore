@@ -978,12 +978,14 @@ function mergeLiveControlState(currentState, nextState) {
   const normalized = normalizeLiveControlPayload(nextState);
   const nextHasFade = Object.prototype.hasOwnProperty.call(nextState, "fade");
   const nextHasRelease = Object.prototype.hasOwnProperty.call(nextState, "release");
+  const nextHasColor = Object.prototype.hasOwnProperty.call(nextState, "color");
 
   return {
     ...current,
     ...normalized,
     ...(nextHasFade ? { fade: normalized.fade } : {}),
     ...(nextHasRelease ? { release: normalized.release } : {}),
+    ...(nextHasColor ? { color: normalized.color } : {}),
   };
 }
 

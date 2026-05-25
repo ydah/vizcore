@@ -731,7 +731,8 @@ module Vizcore
         @live_controls[control] = default_live_control_state(
           enabled: osc_truthy?(values.first),
           fade: values[1],
-          release: values[2]
+          release: values[2],
+          color: values[3]
         )
         WebSocketHandler.broadcast(
           type: "config_update",
@@ -784,11 +785,12 @@ module Vizcore
         %w[true on yes 1].include?(value.to_s.strip.downcase)
       end
 
-      def default_live_control_state(enabled: false, fade: nil, release: nil)
+      def default_live_control_state(enabled: false, fade: nil, release: nil, color: nil)
         {
           "enabled" => !!enabled,
           "fade" => finite_float(fade),
-          "release" => finite_float(release)
+          "release" => finite_float(release),
+          "color" => normalize_control_color(color)
         }.compact
       end
 
@@ -801,7 +803,8 @@ module Vizcore
         default_live_control_state(
           enabled: values.fetch("value", values.fetch("enabled", false)),
           fade: values["fade"],
-          release: values["release"]
+          release: values["release"],
+          color: values["color"]
         )
       end
 
@@ -888,6 +891,37 @@ module Vizcore
         return nil unless numeric.finite?
 
         numeric
+      rescue StandardError
+        nil
+      end
+
+      def normalize_control_color(value)
+        return nil if value.nil?
+
+        if value.is_a?(Array)
+          channels = Array(value).take(3).map { |entry| Float(entry, exception: false) }
+          return nil if channels.include?(nil) || channels.length < 3
+
+          normalized = if channels.all? { |channel| channel >= 0 && channel <= 1 }
+            channels
+          else
+            channels.map { |channel| channel / 255.0 }
+          end
+          return normalized.map { |channel| [0.0, [1.0, channel].min].max }
+        end
+
+        raw = value.to_s.strip
+        match = raw.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/)
+        return nil unless match
+
+        hex = match[1].length == 3 ? match[1].chars.map { |entry| "#{entry}#{entry}" }.join("") : match[1]
+        return nil unless hex.length == 6
+
+        [
+          Integer("0x#{hex[0, 2]}", 16) / 255.0,
+          Integer("0x#{hex[2, 2]}", 16) / 255.0,
+          Integer("0x#{hex[4, 2]}", 16) / 255.0
+        ].map { |channel| [0.0, [1.0, channel].min].max }
       rescue StandardError
         nil
       end

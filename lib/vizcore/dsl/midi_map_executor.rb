@@ -256,12 +256,14 @@ module Vizcore
         # @param fade [Numeric, nil] optional seconds for transition to `value == true`
         # @param release [Numeric, nil] optional seconds for transition to `value == false`
         # @return [void]
-        def live_control(control, value = nil, fade: nil, release: nil)
+        def live_control(control, value = nil, fade: nil, release: nil, color: nil)
           state = normalize_live_control_state(value)
           state[:fade] = normalize_control_transition(fade)
           state[:release] = normalize_control_transition(release)
+          state[:color] = normalize_control_color(color)
           state.delete(:fade) if state[:fade].nil?
           state.delete(:release) if state[:release].nil?
+          state.delete(:color) if state[:color].nil?
 
           @actions << {
             type: :live_control,
@@ -272,8 +274,8 @@ module Vizcore
 
         # @param value [Boolean, nil]
         # @return [void]
-        def blackout(value = nil, fade: nil, release: nil)
-          live_control(:blackout, value, fade: fade, release: release)
+        def blackout(value = nil, fade: nil, release: nil, color: nil)
+          live_control(:blackout, value, fade: fade, release: release, color: color)
         end
 
         # @param value [Boolean, nil]
@@ -288,7 +290,12 @@ module Vizcore
           if value.is_a?(Hash)
             state = value.transform_keys(&:to_sym)
             enabled = state.key?(:value) ? state[:value] : true
-            return { value: !!enabled, fade: normalize_control_transition(state[:fade]), release: normalize_control_transition(state[:release]) }
+            return {
+              value: !!enabled,
+              fade: normalize_control_transition(state[:fade]),
+              release: normalize_control_transition(state[:release]),
+              color: normalize_control_color(state[:color]),
+            }
           end
 
           { value: !!(value.nil? || value) }
@@ -314,6 +321,38 @@ module Vizcore
           return nil if numeric.negative? || !numeric.finite?
 
           numeric
+        rescue ArgumentError, TypeError
+          nil
+        end
+
+        def normalize_control_color(value)
+          return nil if value.nil?
+
+          if value.is_a?(Array)
+            return nil unless value.length >= 3
+            channels = value.take(3).map { |entry| Float(entry, exception: false) }
+            return nil if channels.include?(nil)
+
+            normalized = if channels.all? { |channel| channel >= 0 && channel <= 1 }
+              channels
+            else
+              channels.map { |channel| channel / 255.0 }
+            end
+            return normalized.map { |channel| [0.0, [1.0, channel].min].max }
+          end
+
+          raw = value.to_s.strip
+          match = raw.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/)
+          return nil unless match
+
+          hex = match[1].length == 3 ? match[1].chars.map { |char| "#{char}#{char}" }.join("") : match[1]
+          return nil unless hex.length == 6
+
+          [
+            Integer("0x#{hex[0, 2]}", 16),
+            Integer("0x#{hex[2, 2]}", 16),
+            Integer("0x#{hex[4, 2]}", 16)
+          ].map { |channel| channel / 255.0 }
         rescue ArgumentError, TypeError
           nil
         end

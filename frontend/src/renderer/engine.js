@@ -2,6 +2,7 @@ import { LayerManager } from "./layer-manager.js";
 import { ShaderManager } from "./shader-manager.js";
 import { applyShaderParamOverrides } from "../shader-param-controls.js";
 import { applyShapeEditorOverrides } from "../shape-editor-controls.js";
+import { parseHexColor } from "./layer-manager.js";
 
 export const RENDERER_CAPABILITIES_EVENT = "vizcore:renderer-capabilities";
 export const RENDERER_SAFE_MODE_EVENT = "vizcore:renderer-safe-mode";
@@ -37,7 +38,7 @@ export class Engine {
     };
     this.visualAudioState = null;
     this.liveControls = {
-      blackout: { enabled: false },
+      blackout: { enabled: false, color: [0, 0, 0] },
       freeze: { enabled: false },
     };
     this.liveControlRuntime = {
@@ -47,6 +48,7 @@ export class Engine {
         transitionFrom: 0,
         transitionStartedAt: 0,
         transitionDuration: 0,
+        color: [0, 0, 0],
       },
       freeze: {
         enabled: false,
@@ -144,6 +146,11 @@ export class Engine {
 
   applyBlackoutRuntime(control, now) {
     const targetOpacity = control.enabled ? 1 : 0;
+    const color = normalizeLiveControlColor(control.color);
+    if (color) {
+      this.liveControlRuntime.blackout.color = color;
+    }
+
     if (targetOpacity === this.liveControlRuntime.blackout.targetOpacity) {
       this.liveControlRuntime.blackout.transitionDuration = 0;
       this.liveControlRuntime.blackout.opacity = targetOpacity;
@@ -290,7 +297,8 @@ export class Engine {
     this.updateLiveControlRuntime(time);
 
     if (this.liveControlRuntime.blackout.opacity >= 1) {
-      this.gl.clearColor(0, 0, 0, 1);
+      const [r, g, b] = this.liveControlRuntime.blackout.color;
+      this.gl.clearColor(r, g, b, 1);
       this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
       requestAnimationFrame((nextTime) => this.render(nextTime));
       return;
@@ -328,10 +336,11 @@ export class Engine {
 
     if (this.liveControlRuntime.blackout.opacity > 0) {
       const blackout = this.liveControlRuntime.blackout.opacity;
+      const [r, g, b] = this.liveControlRuntime.blackout.color;
       this.gl.clearColor(
-        0,
-        0,
-        0,
+        r,
+        g,
+        b,
         clamp(blackout, 0, 1) * 0.999 + 0.001
       );
       this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
@@ -389,12 +398,39 @@ const normalizeLiveControlState = (state) => {
     enabled: state.value !== undefined ? !!state.value : !!state.enabled,
     fade: finiteFloat(state.fade),
     release: finiteFloat(state.release),
+    color: normalizeLiveControlColor(state.color),
   };
 };
 
 const finiteFloat = (value) => {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : null;
+};
+
+const normalizeLiveControlColor = (value) => {
+  if (value == null) {
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    const channels = Array.from(value)
+      .slice(0, 3)
+      .map((channel) => Number(channel));
+    if (channels.length !== 3 || channels.some((channel) => !Number.isFinite(channel))) {
+      return null;
+    }
+
+    return channels.every((channel) => channel >= 0 && channel <= 1)
+      ? channels.map((channel) => clamp(channel, 0, 1))
+      : channels.map((channel) => clamp(channel / 255, 0, 1));
+  }
+
+  const color = parseHexColor(String(value || ""));
+  const rgb = Array.isArray(color) && color.length === 3 ? color : null;
+  if (!rgb) {
+    return null;
+  }
+  return rgb.map((channel) => clamp(channel, 0, 1));
 };
 
 const resolveRotationSpeed = (layers, amplitude) => {

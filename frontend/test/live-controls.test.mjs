@@ -6,6 +6,7 @@ import {
   isTapTempoShortcut,
   isEditableShortcutTarget,
   keyboardActionForKey,
+  normalizeLiveControlPayload,
   liveControlStatusText,
   normalizeKeyboardMappings,
   shortcutActionForKey,
@@ -18,6 +19,13 @@ test("createLiveControlState starts with live output enabled", () => {
     blackout: { enabled: false },
     freeze: { enabled: false },
   });
+});
+
+test("normalizeLiveControlPayload parses blackout color", () => {
+  assert.deepEqual(
+    normalizeLiveControlPayload({ value: true, color: "#3366ff", fade: 0.25 }),
+    { enabled: true, fade: 0.25, color: [0.2, 0.4, 1] },
+  );
 });
 
 test("toggleLiveControl toggles known controls without mutating input", () => {

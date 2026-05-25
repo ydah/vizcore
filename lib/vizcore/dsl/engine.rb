@@ -537,8 +537,8 @@ module Vizcore
         # Toggle browser blackout output.
         #
         # @return [void]
-        def blackout(value = nil, fade: nil, release: nil)
-          live_control(:blackout, value, fade: fade, release: release)
+        def blackout(value = nil, fade: nil, release: nil, color: nil)
+          live_control(:blackout, value, fade: fade, release: release, color: color)
         end
 
         # Toggle browser freeze output.
@@ -553,7 +553,7 @@ module Vizcore
         # @param control [Symbol, String]
         # @param value [Object, nil] target value; nil means UI-side toggle for keyboard/live mapping
         # @return [void]
-        def live_control(control, value = nil, fade: nil, release: nil)
+        def live_control(control, value = nil, fade: nil, release: nil, color: nil)
           normalized = control.to_s.strip.downcase.to_sym
           raise ArgumentError, "unsupported live control: #{control}" unless %i[blackout freeze].include?(normalized)
 
@@ -565,8 +565,10 @@ module Vizcore
           action[:value] = value unless value.nil?
           action[:fade] = normalize_control_transition(fade)
           action[:release] = normalize_control_transition(release)
+          action[:color] = normalize_control_color(color) unless color.nil?
           action.delete(:fade) if action[:fade].nil?
           action.delete(:release) if action[:release].nil?
+          action.delete(:color) if action[:color].nil?
         end
 
         # @return [Hash] serialized key action
@@ -589,6 +591,38 @@ module Vizcore
           return nil if numeric.negative? || !numeric.finite?
 
           numeric
+        rescue ArgumentError, TypeError
+          nil
+        end
+
+        def normalize_control_color(value)
+          return nil if value.nil?
+
+          if value.is_a?(Array)
+            return nil unless value.length >= 3
+            channels = value.take(3).map { |entry| Float(entry, exception: false) }
+            return nil if channels.include?(nil)
+
+            normalized = if channels.all? { |channel| channel >= 0 && channel <= 1 }
+              channels
+            else
+              channels.map { |channel| channel / 255.0 }
+            end
+            return normalized.map { |channel| [0.0, [1.0, channel].min].max }
+          end
+
+          raw = value.to_s.strip
+          match = raw.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/)
+          return nil unless match
+
+          hex = match[1].length == 3 ? match[1].chars.map { |char| "#{char}#{char}" }.join("") : match[1]
+          return nil unless hex.length == 6
+
+          [
+            Integer("0x#{hex[0, 2]}", 16),
+            Integer("0x#{hex[2, 2]}", 16),
+            Integer("0x#{hex[4, 2]}", 16)
+          ].map { |channel| channel / 255.0 }
         rescue ArgumentError, TypeError
           nil
         end

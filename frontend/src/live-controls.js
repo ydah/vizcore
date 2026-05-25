@@ -3,11 +3,46 @@ const finiteFloat = (value) => {
   return Number.isFinite(numeric) ? numeric : null;
 };
 
-const createLiveControlEntry = (enabled = false, fade = undefined, release = undefined) => {
+const normalizeLiveControlColor = (value) => {
+  if (value == null) {
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    const channels = Array.from(value)
+      .slice(0, 3)
+      .map((channel) => Number(channel));
+    if (channels.length < 3 || channels.some((channel) => !Number.isFinite(channel))) {
+      return null;
+    }
+
+    const normalized = channels.every((channel) => channel >= 0 && channel <= 1)
+      ? channels.map((channel) => clamp(channel, 0, 1))
+      : channels.map((channel) => clamp(channel / 255, 0, 1));
+    return normalized.length === 3 ? normalized : null;
+  }
+
+  const raw = String(value || "").trim();
+  const match = raw.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
+  if (!match) {
+    return null;
+  }
+
+  const hex = match[1].length === 3
+    ? match[1].split("").map((entry) => `${entry}${entry}`).join("")
+    : match[1];
+  const rgb = [0, 2, 4].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255);
+  return rgb.every((channel) => Number.isFinite(channel))
+    ? rgb.map((channel) => clamp(channel, 0, 1))
+    : null;
+};
+
+const createLiveControlEntry = (enabled = false, fade = undefined, release = undefined, color = undefined) => {
   return compactLiveControlEntry({
     enabled: !!enabled,
     fade: finiteFloat(fade),
     release: finiteFloat(release),
+    color: normalizeLiveControlColor(color),
   });
 };
 
@@ -22,6 +57,9 @@ const compactLiveControlEntry = (entry) => {
   if (output.release === null || output.release === undefined) {
     delete output.release;
   }
+  if (output.color === null || output.color === undefined) {
+    delete output.color;
+  }
   return output;
 };
 
@@ -31,14 +69,16 @@ const normalizeLiveControlState = (value) => {
       return compactLiveControlEntry(createLiveControlEntry(
         !!value.value,
         value.fade,
-        value.release
+        value.release,
+        value.color
       ));
     }
 
     return compactLiveControlEntry(createLiveControlEntry(
       Object.prototype.hasOwnProperty.call(value, "enabled") ? !!value.enabled : false,
       value.fade,
-      value.release
+      value.release,
+      value.color
     ));
   }
 
@@ -208,6 +248,11 @@ const normalizeKeyboardAction = (action) => {
       payload.release = release;
     }
 
+    const color = normalizeLiveControlColor(action?.color);
+    if (color !== null) {
+      payload.color = color;
+    }
+
     return payload;
   }
 
@@ -238,4 +283,13 @@ export const isEditableShortcutTarget = (target) => {
     || tagName === "textarea"
     || tagName === "select"
     || target.isContentEditable === true;
+};
+
+const clamp = (value, min, max) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+
+  return Math.min(max, Math.max(min, numeric));
 };
