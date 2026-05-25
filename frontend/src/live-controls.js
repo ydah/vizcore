@@ -123,7 +123,13 @@ const normalizeKeyboardAction = (action) => {
 };
 
 const normalizeTransitionEffect = (effect) => {
-  if (!effect || typeof effect !== "object" || Array.isArray(effect)) {
+  if (!effect) {
+    return null;
+  }
+  if (typeof effect === "string" || typeof effect === "number" || typeof effect === "symbol") {
+    return { name: String(effect) };
+  }
+  if (typeof effect !== "object" || Array.isArray(effect)) {
     return null;
   }
 
