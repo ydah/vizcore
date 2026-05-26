@@ -160,7 +160,7 @@ module Vizcore
         allow_public_control: options.fetch(:allow_public_control)
       )
       warn_untrusted_scene(config.scene_file, project_root: manifest&.root || Dir.pwd) unless options.fetch(:trust)
-      Server::Runner.new(config).run
+      Server::Runner.new(config, manifest: manifest, initial_profile: profile).run
     rescue ArgumentError => e
       raise Thor::Error, e.message
     end

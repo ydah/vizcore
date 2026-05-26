@@ -15,17 +15,29 @@ module Vizcore
   module Server
     # Bootstraps Rack/Puma, audio pipeline, scene reload, and MIDI runtime.
     class Runner
+      DEFAULT_PROFILE_NAME = "default".freeze
+
       # @param config [Vizcore::Config]
+      # @param manifest [Vizcore::ProjectManifest, nil]
+      # @param initial_profile [String, nil]
       # @param output [#puts]
-      def initialize(config, output: $stdout)
+      def initialize(config, manifest: nil, initial_profile: nil, output: $stdout)
         @config = config
+        @manifest = manifest
+        @available_profiles = derive_available_profiles
+        @active_profile = normalize_profile_name(initial_profile)
+        @active_scene_file = active_scene_file_for_profile(@active_profile)
         @output = output
         @shader_source_resolver = Vizcore::DSL::ShaderSourceResolver.new
         @scene_catalog_mutex = Mutex.new
         @scene_catalog = []
+        @scene_watcher = nil
         @osc_schedule_mutex = Mutex.new
         @osc_schedule_threads = []
         @osc_runtime_active = false
+        @midi_runtime = nil
+        @osc_runtime = nil
+        @broadcaster = nil
         @runtime_globals_mutex = Mutex.new
         @runtime_globals = {}
         @live_controls = {
@@ -46,13 +58,10 @@ module Vizcore
         validate_control_preset_settings!
         validate_plugin_asset_settings!
         validate_audio_settings!
-        definition = load_definition!
+        definition = load_definition_for_profile(@active_profile)
         control_preset = load_control_preset
-        replace_runtime_globals(globals_for(definition))
-        @tap_tempo_key = tap_tempo_key(definition)
         timeline_entry = initial_timeline_entry(definition)
         scene = initial_scene(definition) || fallback_scene
-
         broadcaster = nil
         app = RackApp.new(
           frontend_root: Vizcore.frontend_root,
@@ -66,7 +75,7 @@ module Vizcore
           control_preset_path: @config.control_preset,
           plugin_assets: @config.plugin_assets,
           projector_mode: @config.projector_mode,
-          runtime_status_provider: -> { broadcaster&.runtime_status || {} }
+          runtime_status_provider: -> { runtime_status_payload }
         )
         server = Puma::Server.new(app, nil, min_threads: 0, max_threads: 4)
         server.add_tcp_listener(@config.host, @config.port)
@@ -92,19 +101,21 @@ module Vizcore
           silence_reset_frames: analysis_setting(definition, :silence_reset_frames, Vizcore::Analysis::Pipeline::SILENCE_RESET_FRAMES),
           error_reporter: ->(message) { @output.puts(message) }
         )
+        @broadcaster = broadcaster
+        configure_runtime_for_definition(definition: definition, broadcaster: broadcaster)
         replace_scene_catalog(definition[:scenes])
         if file_transport_enabled?
           broadcaster.sync_transport(playing: false, position_seconds: 0.0)
         end
         broadcaster.start
         register_client_message_handler(broadcaster)
-        midi_runtime = start_midi_runtime(definition, broadcaster)
-        osc_runtime = start_osc_runtime(broadcaster)
-        watcher = if @config.reload?
-                    start_scene_watcher(broadcaster, definition: definition) do |updated_definition|
-                      midi_runtime = refresh_midi_runtime(midi_runtime, updated_definition, broadcaster)
-                    end
-                  end
+        @midi_runtime = start_midi_runtime(definition, broadcaster)
+        @osc_runtime = start_osc_runtime(broadcaster)
+        @scene_watcher = start_scene_watcher(
+          broadcaster,
+          definition: definition,
+          scene_file: active_scene_file
+        ) if @config.reload?
 
         @output.puts("Vizcore server listening at http://#{@config.host}:#{@config.port}")
         @output.puts("Projector output: http://#{@config.host}:#{@config.port}/projector")
@@ -113,15 +124,15 @@ module Vizcore
         @output.puts("Hot reload: #{@config.reload? ? 'enabled' : 'disabled'}")
         @output.puts("Audio playback: http://#{@config.host}:#{@config.port}/audio-file") if file_transport_enabled?
         @output.puts("Feature replay: #{@config.feature_file}") if feature_replay?
-        @output.puts("OSC sync: udp://#{@config.host}:#{@config.osc_port}") if osc_runtime
+        @output.puts("OSC sync: udp://#{@config.host}:#{@config.osc_port}") if @osc_runtime
         @output.puts("Press Ctrl+C to stop.")
 
         wait_for_interrupt
       ensure
         Vizcore::Server::WebSocketHandler.clear_message_handler
-        stop_osc_runtime(osc_runtime)
-        stop_midi_runtime(midi_runtime)
-        watcher&.stop
+        stop_osc_runtime(@osc_runtime)
+        stop_midi_runtime(@midi_runtime)
+        @scene_watcher&.stop
         broadcaster&.stop
         server&.stop(true)
       end
@@ -144,11 +155,53 @@ module Vizcore
 
       private
 
-      def validate_scene_file!
-        return if @config.scene_exists?
+      def derive_available_profiles
+        base_profiles = [DEFAULT_PROFILE_NAME]
+        manifest_profiles = @manifest ? Array(@manifest.profile_names).map(&:to_s) : []
+        all_profiles = (base_profiles + manifest_profiles).map { |profile| normalize_profile_name(profile) }
+        all_profiles.uniq
+      end
 
-        message = if @config.scene_file
-                    "Scene file not found: #{@config.scene_file}"
+      def normalize_profile_name(value)
+        raw = value.to_s.strip
+        raw.empty? ? DEFAULT_PROFILE_NAME : raw
+      end
+
+      def active_profile_for_api
+        @active_profile
+      end
+
+      def available_profiles_for_api
+        Array(@available_profiles)
+      end
+
+      def active_scene_file_for_profile(profile)
+        normalized_profile = normalize_profile_name(profile)
+        defaults = manifest_config_defaults_for(normalized_profile)
+        defaults.fetch(:scene_file, @config.scene_file)
+      rescue StandardError
+        @config.scene_file
+      end
+
+      def manifest_config_defaults_for(profile)
+        return {} unless @manifest
+
+        @manifest.config_defaults(profile: profile)
+      end
+
+      def active_scene_file
+        @active_scene_file
+      end
+
+      def active_profile? (candidate)
+        active_profile_for_api == normalize_profile_name(candidate)
+      end
+
+      def validate_scene_file!
+        return if active_scene_file&.file?
+
+        message = if active_scene_file
+                    "Scene file not found: #{active_scene_file}"
                   else
                     "Scene file is required"
                   end
@@ -156,14 +209,19 @@ module Vizcore
         raise Vizcore::ConfigurationError, message
       end
 
-      def load_definition!
-        raw_definition = Vizcore::DSL::Engine.load_file(@config.scene_file.to_s)
-        resolve_shader_sources(raw_definition)
+      def load_definition_for_profile(profile)
+        scene_file = active_scene_file_for_profile(profile)
+        raw_definition = Vizcore::DSL::Engine.load_file(scene_file.to_s)
+        resolve_shader_sources(raw_definition, scene_file: scene_file)
       rescue StandardError => e
         raise Vizcore::SceneLoadError, Vizcore::ErrorFormatting.summarize(
           e,
-          context: "Failed to load scene file #{@config.scene_file}"
+          context: "Failed to load scene file #{scene_file}"
         )
+      end
+
+      def load_definition!
+        load_definition_for_profile(active_profile_for_api)
       end
 
       def validate_audio_settings!
@@ -246,6 +304,59 @@ module Vizcore
         feature_replay? ? nil : @config.audio_file
       end
 
+      def runtime_status_payload
+        payload = @broadcaster ? @broadcaster.runtime_status : {}
+        payload.merge(
+          active_profile: active_profile_for_api,
+          available_profiles: available_profiles_for_api
+        )
+      rescue StandardError
+        {
+          active_profile: active_profile_for_api,
+          available_profiles: available_profiles_for_api
+        }
+      end
+
+      def configure_runtime_for_definition(definition:, broadcaster: @broadcaster)
+        replace_runtime_globals(globals_for(definition))
+        @tap_tempo_key = tap_tempo_key(definition)
+        broadcaster.update_transition_definition(
+          scenes: Array(definition[:scenes]),
+          transitions: Array(definition[:transitions])
+        )
+        broadcaster.update_analysis_settings(
+          audio_normalize: audio_normalize_settings(definition),
+          bpm: bpm_setting(definition),
+          bpm_lock: bpm_lock_setting(definition),
+          onset_sensitivity: analysis_setting(definition, :onset_sensitivity, 1.0),
+          fft_preview_bins: analysis_setting(definition, :fft_bins, Vizcore::Analysis::Pipeline::DEFAULT_FFT_PREVIEW_BINS),
+          peak_hold_frames: analysis_setting(definition, :peak_hold_frames, 0),
+          silence_reset_frames: analysis_setting(definition, :silence_reset_frames, Vizcore::Analysis::Pipeline::SILENCE_RESET_FRAMES)
+        )
+        scene = initial_scene(definition) || fallback_scene
+        broadcaster.update_scene(scene_name: scene[:name], scene_layers: scene[:layers])
+        scene
+      end
+
+      def runtime_config_update_payload(scene:, definition:)
+        {
+          scene: scene,
+          scenes: scene_names_for(definition),
+          tap_tempo_key: @tap_tempo_key,
+          key_mappings: key_mappings_for(definition),
+          globals: runtime_globals_snapshot,
+          active_profile: active_profile_for_api,
+          available_profiles: available_profiles_for_api
+        }
+      end
+
+      def broadcast_config_update(scene:, definition:)
+        WebSocketHandler.broadcast(
+          type: "config_update",
+          payload: runtime_config_update_payload(scene: scene, definition: definition)
+        )
+      end
+
       def wait_for_interrupt
         stop_requested = false
         %w[INT TERM].each do |signal_name|
@@ -256,38 +367,15 @@ module Vizcore
         sleep(0.1) until stop_requested
       end
 
-      def start_scene_watcher(broadcaster, definition:, &on_reload)
-        watcher = Vizcore::Server::SceneDependencyWatcher.new(scene_file: @config.scene_file.to_s, definition: definition) do |definition, _changed_path|
-          definition = resolve_shader_sources(definition)
-          replace_scene_catalog(definition[:scenes])
-          replace_runtime_globals(globals_for(definition))
-          @tap_tempo_key = tap_tempo_key(definition)
-          scene = initial_scene(definition) || fallback_scene
-          broadcaster.update_transition_definition(
-            scenes: Array(definition[:scenes]),
-            transitions: Array(definition[:transitions])
-          )
-          broadcaster.update_analysis_settings(
-            audio_normalize: audio_normalize_settings(definition),
-            bpm: bpm_setting(definition),
-            bpm_lock: bpm_lock_setting(definition),
-            onset_sensitivity: analysis_setting(definition, :onset_sensitivity, 1.0),
-            fft_preview_bins: analysis_setting(definition, :fft_bins, Vizcore::Analysis::Pipeline::DEFAULT_FFT_PREVIEW_BINS),
-            peak_hold_frames: analysis_setting(definition, :peak_hold_frames, 0),
-            silence_reset_frames: analysis_setting(definition, :silence_reset_frames, Vizcore::Analysis::Pipeline::SILENCE_RESET_FRAMES)
-          )
-          broadcaster.update_scene(scene_name: scene[:name], scene_layers: scene[:layers])
-          on_reload&.call(definition)
-          WebSocketHandler.broadcast(
-            type: "config_update",
-            payload: {
-              scene: scene,
-              scenes: scene_names_for(definition),
-              tap_tempo_key: @tap_tempo_key,
-              key_mappings: key_mappings_for(definition),
-              globals: runtime_globals_snapshot
-            }
-          )
+      def start_scene_watcher(broadcaster, definition:, scene_file: nil, &on_reload)
+        watcher = Vizcore::Server::SceneDependencyWatcher.new(
+          scene_file: (scene_file || active_scene_file).to_s,
+          definition: definition
+        ) do |reloaded_definition, _changed_path|
+          reloaded_definition = resolve_shader_sources(reloaded_definition, scene_file: (scene_file || active_scene_file))
+          scene = configure_runtime_for_definition(definition: reloaded_definition, broadcaster: broadcaster)
+          on_reload&.call(reloaded_definition)
+          broadcast_config_update(scene: scene, definition: reloaded_definition)
           @output.puts("Scene reloaded: #{scene[:name]}")
         rescue StandardError => e
           message = Vizcore::ErrorFormatting.summarize(e, context: "Scene reload failed")
@@ -334,8 +422,11 @@ module Vizcore
       end
 
       def fallback_scene
+        scene_file = active_scene_file
+        scene_name = scene_file ? scene_file.basename(".rb").to_s : ""
+
         {
-          name: @config.scene_file.basename(".rb").to_sym,
+          name: scene_name.empty? ? DEFAULT_PROFILE_NAME.to_sym : scene_name.to_sym,
           layers: []
         }
       end
@@ -511,6 +602,73 @@ module Vizcore
         end
       end
 
+      def switch_profile(raw_profile, broadcaster)
+        profile = normalize_profile_name(raw_profile)
+        return if profile == active_profile_for_api
+
+        unless available_profiles_for_api.include?(profile)
+          WebSocketHandler.broadcast(
+            type: "runtime_error",
+            payload: {
+              source: "profile",
+              context: "Unknown profile: #{profile}",
+              event: "unknown_profile",
+              message: "Profile not found: #{profile}"
+            }
+          )
+          return
+        end
+
+        scene_file = active_scene_file_for_profile(profile)
+        if scene_file.nil? || !scene_file.file?
+          WebSocketHandler.broadcast(
+            type: "runtime_error",
+            payload: {
+              source: "profile",
+              context: "Profile scene file missing",
+              event: "profile_scene_missing",
+              message: "Missing scene file for profile: #{profile}"
+            }
+          )
+          return
+        end
+
+        definition = load_definition_for_profile(profile)
+        scene = configure_runtime_for_definition(definition: definition, broadcaster: broadcaster)
+        @midi_runtime = refresh_midi_runtime(@midi_runtime, definition, broadcaster)
+        restart_scene_watcher_for_profile(profile_scene_file: scene_file, definition: definition, broadcaster: broadcaster)
+        @active_profile = profile
+        @active_scene_file = scene_file
+        broadcast_config_update(scene: scene, definition: definition)
+      rescue StandardError => e
+        message = Vizcore::ErrorFormatting.summarize(e, context: "Profile switch failed")
+        @output.puts(message)
+        WebSocketHandler.broadcast(
+          type: "runtime_error",
+          payload: {
+            source: "profile",
+            context: "Profile switch failed",
+            event: "profile_switch_failed",
+            message: message
+          }
+        )
+      end
+
+      def restart_scene_watcher_for_profile(profile_scene_file:, definition:, broadcaster:)
+        return unless @config.reload?
+
+        new_watcher = start_scene_watcher(
+          broadcaster,
+          definition: definition,
+          scene_file: profile_scene_file
+        )
+        return unless new_watcher
+
+        old_watcher = @scene_watcher
+        @scene_watcher = new_watcher
+        old_watcher&.stop
+      end
+
       def handle_client_message(message, broadcaster, socket = nil)
         type = message["type"] || message[:type]
         payload = message["payload"] || message[:payload]
@@ -530,6 +688,8 @@ module Vizcore
           target_name = values.fetch("scene", values.fetch(:scene, values.fetch("scene_name", values.fetch(:scene_name, nil))))
           effect = normalize_transition_effect(values["effect"] || values[:effect])
           switch_scene_from_client(target_name, broadcaster, effect: effect)
+        when "switch_profile"
+          switch_profile((payload || {})["profile"] || (payload || {})[:profile], broadcaster)
         when "tap_tempo"
           apply_tap_tempo(payload, broadcaster)
         when "custom_shape_param"
@@ -703,8 +863,11 @@ module Vizcore
         []
       end
 
-      def resolve_shader_sources(definition)
-        @shader_source_resolver.resolve(definition: definition, scene_file: @config.scene_file.to_s)
+      def resolve_shader_sources(definition, scene_file: nil)
+        @shader_source_resolver.resolve(
+          definition: definition,
+          scene_file: (scene_file || active_scene_file).to_s
+        )
       end
 
       def replace_scene_catalog(scenes)
