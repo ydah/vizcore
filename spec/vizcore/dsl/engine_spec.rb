@@ -1354,6 +1354,84 @@ RSpec.describe Vizcore::DSL::Engine do
       expect(controller.next_transition(scene_name: :drop, audio: { beat_count: 3 })).to include(to: :outro)
     end
 
+    it "builds looping section transitions" do
+      definition = described_class.define do
+        section :drop, bars: 2, loop: true do
+          layer(:a) { type :geometry }
+        end
+      end
+
+      controller = Vizcore::DSL::TransitionController.new(
+        scenes: definition[:scenes],
+        transitions: definition[:transitions]
+      )
+
+      expect(definition[:transitions].map { |transition| transition.slice(:from, :to) }).to eq([
+        { from: :drop, to: :drop }
+      ])
+      expect(controller.next_transition(scene_name: :drop, audio: { beat_count: 7 })).to be_nil
+      expect(controller.next_transition(scene_name: :drop, audio: { beat_count: 8 })).to include(to: :drop)
+    end
+
+    it "supports section hold before transition" do
+      definition = described_class.define do
+        section :intro, bars: 1, hold: 2 do
+          layer(:a) { type :geometry }
+        end
+
+        section :outro, bars: 1 do
+          layer(:b) { type :geometry }
+        end
+      end
+
+      controller = Vizcore::DSL::TransitionController.new(
+        scenes: definition[:scenes],
+        transitions: definition[:transitions]
+      )
+
+      expect(controller.next_transition(scene_name: :intro, audio: { beat_count: 4 })).to be_nil
+      expect(controller.next_transition(scene_name: :intro, audio: { beat_count: 5 })).to be_nil
+      expect(controller.next_transition(scene_name: :intro, audio: { beat_count: 6 })).to include(to: :outro)
+    end
+
+    it "skips auto transitions from outro sections" do
+      definition = described_class.define do
+        section :intro, bars: 1 do
+          layer(:a) { type :geometry }
+        end
+
+        section :outro, bars: 1, outro: true do
+          layer(:b) { type :geometry }
+        end
+
+        section :post, bars: 1 do
+          layer(:c) { type :geometry }
+        end
+      end
+
+      expect(definition[:transitions].map { |transition| transition.slice(:from, :to) }).to eq([
+        { from: :intro, to: :outro }
+      ])
+
+      controller = Vizcore::DSL::TransitionController.new(
+        scenes: definition[:scenes],
+        transitions: definition[:transitions]
+      )
+
+      expect(controller.next_transition(scene_name: :outro, audio: { beat_count: 4 })).to be_nil
+      expect(controller.next_transition(scene_name: :intro, audio: { beat_count: 4 })).to include(to: :outro)
+    end
+
+    it "rejects sections marked as both loop and outro" do
+      expect do
+        described_class.define do
+          section :intro, bars: 1, loop: true, outro: true do
+            layer(:a) { type :geometry }
+          end
+        end
+      end.to raise_error(ArgumentError, /section cannot be both loop and outro/)
+    end
+
     it "builds timeline transitions from beat markers" do
       definition = described_class.define do
         scene(:intro) { layer(:a) { type :geometry } }

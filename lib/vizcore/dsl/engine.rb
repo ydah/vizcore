@@ -231,15 +231,30 @@ module Vizcore
       # @param name [Symbol, String] scene/section identifier
       # @param bars [Integer] section duration in bars
       # @param beats_per_bar [Integer] meter used to convert bars into beats
+      # @param loop [Boolean] whether the section should loop to itself
+      # @param hold [Numeric] optional additional beats to wait before transitioning
+      # @param outro [Boolean] whether to skip auto-transitioning to the next section
       # @yield Scene definition block
       # @return [void]
-      def section(name, bars:, beats_per_bar: 4, &block)
+      def section(name, bars:, beats_per_bar: 4, loop: false, hold: 0, outro: false, &block)
         section_name = name.to_sym
         section_beats = positive_integer(bars, "section bars") * positive_integer(beats_per_bar, "beats_per_bar")
+        normalized_hold = non_negative_float(hold, "section hold")
+        is_loop = !!loop
+        is_outro = !!outro
+        if is_loop && is_outro
+          raise ArgumentError, "section cannot be both loop and outro"
+        end
 
         scene(section_name, &block)
         add_section_transition(to: section_name) if @section_tail
-        @section_tail = { name: section_name, beats: section_beats }
+        @section_tail = {
+          name: section_name,
+          beats: section_beats,
+          hold: normalized_hold,
+          loop: is_loop,
+          outro: is_outro
+        }
       end
 
       # Define ordered scene markers and derive transitions between them.
@@ -334,6 +349,7 @@ module Vizcore
 
       # @return [Hash] deep-copied definition payload for renderer/runtime.
       def result
+        append_pending_section_transition
         definition = {
           audio: @audio_inputs.map { |item| deep_dup(item) },
           midi: @midi_inputs.map { |item| deep_dup(item) },
@@ -451,11 +467,29 @@ module Vizcore
       def add_section_transition(to:)
         from = @section_tail.fetch(:name)
         beats = @section_tail.fetch(:beats)
+        hold = @section_tail.fetch(:hold, 0.0)
+        return if @section_tail.fetch(:loop, false)
+        return if @section_tail.fetch(:outro, false)
+
         @transitions << {
           from: from,
           to: to,
-          trigger: proc { beat_count >= beats }
+          trigger: proc { beat_count >= (beats + hold) }
         }
+      end
+
+      def append_pending_section_transition
+        return unless @section_tail && @section_tail.fetch(:loop, false)
+
+        from = @section_tail.fetch(:name)
+        beats = @section_tail.fetch(:beats, 0)
+        hold = @section_tail.fetch(:hold, 0.0)
+        @transitions << {
+          from: from,
+          to: from,
+          trigger: proc { beat_count >= (beats + hold) }
+        }
+        @section_tail = @section_tail.merge(loop: false)
       end
 
       def inherited_layers(scene_name)

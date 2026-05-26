@@ -274,7 +274,7 @@ module Vizcore::DSL
     def tap_tempo: (?key: Symbol | String key) -> Hash[Symbol, untyped]
     def key: (Symbol | String value) { () -> void } -> void
     def scene: (Symbol | String name, ?extends: Symbol | String? extends) { () -> void } -> void
-    def section: (Symbol | String name, bars: Integer bars, ?beats_per_bar: Integer beats_per_bar) { () -> void } -> void
+    def section: (Symbol | String name, bars: Integer bars, ?beats_per_bar: Integer beats_per_bar, ?loop: bool loop, ?hold: Numeric hold, ?outro: bool outro) { () -> void } -> void
     def timeline: (?beats_per_bar: Integer beats_per_bar) { () -> void } -> void
     def transition: (from: Symbol | String, to: Symbol | String) { () -> void } -> void
     def midi_map: (
