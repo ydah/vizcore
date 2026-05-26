@@ -115,7 +115,9 @@ module Vizcore
           broadcaster,
           definition: definition,
           scene_file: active_scene_file
-        ) if @config.reload?
+        ) do |reloaded_definition|
+          @midi_runtime = refresh_midi_runtime(@midi_runtime, reloaded_definition, broadcaster)
+        end if @config.reload?
 
         @output.puts("Vizcore server listening at http://#{@config.host}:#{@config.port}")
         @output.puts("Projector output: http://#{@config.host}:#{@config.port}/projector")
