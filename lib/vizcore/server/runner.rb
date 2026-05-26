@@ -50,7 +50,8 @@ module Vizcore
         control_preset = load_control_preset
         replace_runtime_globals(globals_for(definition))
         @tap_tempo_key = tap_tempo_key(definition)
-        scene = first_scene(definition) || fallback_scene
+        timeline_entry = initial_timeline_entry(definition)
+        scene = initial_scene(definition) || fallback_scene
 
         broadcaster = nil
         app = RackApp.new(
@@ -78,6 +79,7 @@ module Vizcore
           scene_layers: scene[:layers],
           scene_catalog: definition[:scenes],
           transitions: definition[:transitions],
+          initial_timeline_entry: timeline_entry,
           input_manager: input_manager,
           analysis_pipeline: replay_pipeline,
           noise_gate: @config.noise_gate,
@@ -260,7 +262,7 @@ module Vizcore
           replace_scene_catalog(definition[:scenes])
           replace_runtime_globals(globals_for(definition))
           @tap_tempo_key = tap_tempo_key(definition)
-          scene = first_scene(definition) || fallback_scene
+          scene = initial_scene(definition) || fallback_scene
           broadcaster.update_transition_definition(
             scenes: Array(definition[:scenes]),
             transitions: Array(definition[:transitions])
@@ -310,6 +312,25 @@ module Vizcore
 
       def first_scene(definition)
         definition.fetch(:scenes, []).first
+      end
+
+      def initial_timeline_entry(definition)
+        Array(definition[:timelines]).each do |timeline|
+          entry = Array(timeline).first
+          return entry if entry
+        end
+
+        nil
+      end
+
+      def initial_scene(definition)
+        entry = initial_timeline_entry(definition)
+        scene_name = entry&.dig(:scene)
+        return first_scene(definition) unless scene_name
+
+        Array(definition[:scenes]).find do |candidate|
+          candidate[:name].to_s == scene_name.to_s
+        end
       end
 
       def fallback_scene

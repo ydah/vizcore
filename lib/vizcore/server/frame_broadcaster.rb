@@ -24,6 +24,7 @@ module Vizcore
       # @param scene_catalog [Array<Hash>, nil]
       # @param transitions [Array<Hash>, nil]
       # @param transition_controller [Vizcore::DSL::TransitionController, nil]
+      # @param initial_timeline_entry [Hash, nil]
       # @param noise_gate [Numeric]
       # @param audio_normalize [Hash, nil]
       # @param bpm [Numeric, nil]
@@ -44,6 +45,7 @@ module Vizcore
         scene_catalog: nil,
         transitions: nil,
         transition_controller: nil,
+        initial_timeline_entry: nil,
         noise_gate: Vizcore::Analysis::Pipeline::DEFAULT_NOISE_GATE,
         audio_normalize: nil,
         bpm: nil,
@@ -103,6 +105,7 @@ module Vizcore
         @transport_drift_threshold_seconds = 0.08
         @transport_playing = initial_transport_playing_state
         reset_transition_trigger_counters!
+        apply_initial_timeline_entry(initial_timeline_entry)
         @tap_tempo = Vizcore::Analysis::TapTempo.new
         @frame_scheduler = frame_scheduler || Vizcore::Renderer::FrameScheduler.new(frame_rate: FRAME_RATE) do |elapsed|
           tick(elapsed)
@@ -739,6 +742,54 @@ module Vizcore
         @transition_counter_frame_base = 0
         @transition_counter_beat_base = 0
         @transition_counter_elapsed_base = 0.0
+      end
+
+      def apply_initial_timeline_entry(entry)
+        normalized = normalize_timeline_entry(entry)
+        unit = normalized[:unit]
+        start_position = normalized[:at]
+        return unless unit
+
+        if unit == "seconds"
+          return unless start_position.positive?
+
+          @transition_counter_elapsed_scene_name = @scene_name
+          @transition_counter_elapsed_base = start_position
+          return
+        end
+
+        return unless unit == "beats"
+        return unless start_position.positive?
+
+        @transition_counter_scene_name = @scene_name
+        @transition_counter_beat_base = start_position.to_i
+      end
+
+      def normalize_timeline_entry(entry)
+        values = Hash(entry || {})
+        return { unit: nil, at: nil } unless values
+
+        unit = values[:unit] || values["unit"]
+        at = values[:at] || values["at"]
+        {
+          unit: unit.to_s,
+          at: parse_timeline_position(at)
+        }
+      rescue StandardError
+        { unit: nil, at: nil }
+      end
+
+      def parse_timeline_position(value)
+        numeric = Float(value)
+        return nil unless numeric.finite?
+
+        numeric
+      rescue StandardError
+        begin
+          Integer(value)
+        rescue StandardError
+          nil
+        end
       end
 
       def transition_evaluation_paused?
