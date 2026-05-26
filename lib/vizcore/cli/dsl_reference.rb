@@ -63,6 +63,7 @@ module Vizcore
       SOURCES = %w[
         amplitude frequency_band(:low) frequency_band_peak(:low) sub low bass bass_peak mid mid_peak high high_peak treble fft_spectrum
         onset onset(:high) kick snare hihat beat? beat beat_confidence beat_pulse beat_count
+        adsr(:kick, attack: 0.02, decay: 0.08, sustain: 0.7, release: 0.16, threshold: 0.0, peak: 1.0) envelope(:kick, attack: 0.02)
         beat_phase beat_2 beat_4 beat_8 triplet bar_phase bar_count phrase_count bpm
       ].freeze
 

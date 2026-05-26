@@ -341,6 +341,80 @@ RSpec.describe Vizcore::DSL::MappingResolver do
       expect(fourth[0][:params][:flash]).to eq(0.0)
     end
 
+    it "applies ADSR envelope states over time" do
+      resolver = described_class.new
+      scene_layers = [
+        {
+          name: :envelope,
+          params: {},
+          mappings: [
+            {
+              source: { kind: :adsr, source: :beat, attack: 0.1, decay: 0.1, sustain: 0.5, release: 0.2, threshold: 0.0, peak: 1.0 },
+              target: :level
+            }
+          ]
+        }
+      ]
+
+      at_attack_start = resolver.resolve_layers(
+        scene_layers: scene_layers,
+        audio: { beat: true, bands: {} },
+        time: 0.0,
+        frame: 0
+      )
+      at_attack_mid = resolver.resolve_layers(
+        scene_layers: scene_layers,
+        audio: { beat: true, bands: {} },
+        time: 0.05,
+        frame: 1
+      )
+      at_decay_start = resolver.resolve_layers(
+        scene_layers: scene_layers,
+        audio: { beat: true, bands: {} },
+        time: 0.12,
+        frame: 2
+      )
+      at_decay_mid = resolver.resolve_layers(
+        scene_layers: scene_layers,
+        audio: { beat: true, bands: {} },
+        time: 0.16,
+        frame: 3
+      )
+      at_sustain_to_release = resolver.resolve_layers(
+        scene_layers: scene_layers,
+        audio: { beat: true, bands: {} },
+        time: 0.25,
+        frame: 4
+      )
+      at_release = resolver.resolve_layers(
+        scene_layers: scene_layers,
+        audio: { beat: false, bands: {} },
+        time: 0.5,
+        frame: 5
+      )
+      later_release = resolver.resolve_layers(
+        scene_layers: scene_layers,
+        audio: { beat: false, bands: {} },
+        time: 0.6,
+        frame: 6
+      )
+      end_release = resolver.resolve_layers(
+        scene_layers: scene_layers,
+        audio: { beat: false, bands: {} },
+        time: 0.9,
+        frame: 7
+      )
+
+      expect(at_attack_start[0][:params][:level]).to eq(0.0)
+      expect(at_attack_mid[0][:params][:level]).to be_within(0.0001).of(0.5)
+      expect(at_decay_start[0][:params][:level]).to eq(1.0)
+      expect(at_decay_mid[0][:params][:level]).to be_within(0.0001).of(0.8)
+      expect(at_sustain_to_release[0][:params][:level]).to eq(0.5)
+      expect(at_release[0][:params][:level]).to eq(0.5)
+      expect(later_release[0][:params][:level]).to be_within(0.0001).of(0.25)
+      expect(end_release[0][:params][:level]).to eq(0.0)
+    end
+
     it "applies square curve after gain and before range clamping" do
       resolver = described_class.new
       scene_layers = [

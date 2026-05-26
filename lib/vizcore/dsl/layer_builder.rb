@@ -17,7 +17,7 @@ module Vizcore
       MAPPING_SOURCE_KINDS = %i[
         amplitude peak frequency_band frequency_band_peak fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
         beat_phase beat_2 beat_4 beat_8 beat_triplet triplet bar_phase bar_count phrase_count bpm_confidence
-        spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate global lfo
+        spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate global lfo adsr envelope
       ].freeze
       PATH_DEFAULT_DETAIL = 32
       PATH_MIN_DETAIL = 4
@@ -936,6 +936,37 @@ module Vizcore
         mapping_source(:lfo, wave: wave.to_sym, rate: Float(rate), phase: Float(phase))
       rescue ArgumentError, TypeError
         raise ArgumentError, "lfo rate and phase must be numeric"
+      end
+
+      # @param source [Symbol, Hash] source to trigger the envelope
+      # @param attack [Numeric] seconds from 0.0 to peak
+      # @param decay [Numeric] seconds from peak to sustain
+      # @param sustain [Numeric] sustain gain once decay is complete (0.0..1.0)
+      # @param release [Numeric] seconds from sustain to 0.0
+      # @param threshold [Numeric] value threshold that starts attack
+      # @param peak [Numeric] peak gain multiplier
+      # @return [Hash] source descriptor for an ADSR envelope
+      def adsr(source = :kick, attack: 0.02, decay: 0.08, sustain: 0.7, release: 0.16, threshold: 0.0, peak: 1.0)
+        source_value = source.nil? ? { kind: :kick } : normalize_source(source)
+        mapping_source(
+          :adsr,
+          source: source_value,
+          attack: normalize_non_negative_float(attack, :attack),
+          decay: normalize_non_negative_float(decay, :decay),
+          sustain: clamp(normalize_float(sustain, :sustain), 0.0, 1.0),
+          release: normalize_non_negative_float(release, :release),
+          threshold: normalize_float(threshold, :threshold),
+          peak: normalize_float(peak, :peak)
+        )
+      end
+
+      # Alias for ADSR envelope mapping source.
+      #
+      # @param source [Symbol, Hash] source to trigger the envelope
+      # @param options [Numeric] envelope timing and shaping values
+      # @return [Hash] source descriptor for a general envelope
+      def envelope(source = :kick, **options)
+        adsr(source, **options)
       end
 
       # @return [Hash] serialized layer payload

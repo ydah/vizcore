@@ -54,8 +54,16 @@ module Vizcore
           target = mapping[:target]
           next unless source && target
 
-          value = resolve_source_value(source, audio, globals: globals, time: time)
-          value = apply_transform(value, mapping[:transform], state_key: [layer_name, target, source], frame: frame)
+          state_key = [layer_name, target, source]
+          value = resolve_source_value(
+            source,
+            audio,
+            globals: globals,
+            time: time,
+            state_key: state_key,
+            frame: frame
+          )
+          value = apply_transform(value, mapping[:transform], state_key: state_key, frame: frame)
           resolved[target.to_s] = value unless value.nil?
         end
       end
@@ -251,7 +259,9 @@ module Vizcore
         raise ArgumentError, "param #{name} must be numeric"
       end
 
-      def resolve_source_value(source, audio, globals: {}, time: 0.0)
+      def resolve_source_value(source, audio, globals: {}, time: 0.0, state_key: nil, frame: 0)
+        return 0.0 unless source
+
         case source[:kind]&.to_sym
         when :amplitude
           audio[:amplitude]
@@ -309,9 +319,68 @@ module Vizcore
           resolve_global(source, globals)
         when :lfo
           resolve_lfo(source, time)
+        when :adsr, :envelope
+          resolve_envelope(source, audio, globals: globals, time: time, state_key: state_key, frame: frame)
         else
           nil
         end
+      end
+
+      def resolve_envelope(source, audio, globals: {}, time: 0.0, state_key:, frame:)
+        state = envelope_state(state_key)
+        params = envelope_params(source)
+        nested = source[:source] || :kick
+        normalized_nested = normalize_source_descriptor(nested)
+        trigger_value = resolve_nested_source_value(normalized_nested, audio, globals: globals, time: time)
+        trigger = trigger_numeric(trigger_value)
+
+        now = normalized_time(time)
+        state[:time] = now
+        state[:last_frame] = frame
+        state[:gate] = trigger > params[:threshold]
+        state[:note_on] = state[:gate]
+
+        peak = normalize_envelope_peak(params.fetch(:peak)) * trigger
+        if state[:gate]
+          if state[:phase] == :idle || state[:phase] == :release
+            state[:phase] = :attack
+            state[:phase_started_at] = now
+            state[:phase_start_value] = state[:value]
+            state[:peak] = peak
+          else
+            state[:peak] = [state[:peak], peak].max
+          end
+        end
+
+        state[:value], state[:phase] = next_envelope_step(
+          state,
+          params: params,
+          now: now
+        )
+        state[:value]
+      rescue StandardError
+        0.0
+      ensure
+        @mapping_state[state_key] = state if state_key
+      end
+
+      def resolve_nested_source_value(source, audio, globals:, time:)
+        return resolve_source_value({ kind: :amplitude }, audio, globals: globals, time: time) if source.nil?
+
+        nested_kind = source[:kind]&.to_sym
+        return 0.0 if nested_kind == :adsr || nested_kind == :envelope
+
+        resolve_source_value(source, audio, globals: globals, time: time)
+      rescue StandardError
+        0.0
+      end
+
+      def normalize_source_descriptor(source)
+        return source if source.is_a?(Hash) && source[:kind]
+
+        { kind: source.to_sym }
+      rescue StandardError
+        nil
       end
 
       def resolve_lfo(source, time)
@@ -340,6 +409,128 @@ module Vizcore
         values[name] || values[name.to_s]
       rescue StandardError
         nil
+      end
+
+      def envelope_state(state_key)
+        return {} unless state_key
+
+        @mapping_state[state_key] ||= {
+          phase: :idle,
+          value: 0.0,
+          peak: 0.0,
+          phase_started_at: 0.0,
+          phase_start_value: 0.0,
+          time: 0.0,
+          note_on: false,
+          gate: false
+        }
+      end
+
+      def envelope_params(source)
+        {
+          attack: Float(source[:attack] || 0.02),
+          decay: Float(source[:decay] || 0.08),
+          sustain: Float(source[:sustain] || 0.7).clamp(0.0, 1.0),
+          release: Float(source[:release] || 0.16),
+          threshold: Float(source[:threshold] || 0.0),
+          peak: Float(source[:peak] || 1.0)
+        }
+      rescue StandardError
+        { attack: 0.02, decay: 0.08, sustain: 0.7, release: 0.16, threshold: 0.0, peak: 1.0 }
+      end
+
+      def normalized_time(value)
+        numeric = Float(value)
+        numeric.nan? ? 0.0 : numeric
+      rescue StandardError
+        0.0
+      end
+
+      def normalize_envelope_peak(value)
+        value = Float(value)
+        value.nan? ? 1.0 : value
+      rescue StandardError
+        1.0
+      end
+
+      def next_envelope_step(state, params:, now:)
+        phase = state[:phase] || :idle
+        if phase == :attack
+          return [state[:peak], :sustain] if params[:attack] <= 0.0
+
+          elapsed = now - state[:phase_started_at]
+          if elapsed >= params[:attack]
+            state[:phase_started_at] = now
+            state[:phase_start_value] = state[:peak]
+            return [state[:peak], :decay]
+          end
+
+          ratio = [elapsed / params[:attack], 1.0].min
+          value = state[:phase_start_value] + (state[:peak] - state[:phase_start_value]) * ratio
+          return [value, :attack]
+        end
+
+        if phase == :decay
+          return [state[:peak] * params[:sustain], :sustain] if params[:decay] <= 0.0
+
+          elapsed = now - state[:phase_started_at]
+          target = state[:peak] * params[:sustain]
+          if elapsed >= params[:decay]
+            state[:phase_started_at] = now
+            state[:phase_start_value] = target
+            return [target, :sustain]
+          end
+
+          ratio = [elapsed / params[:decay], 1.0].min
+          value = state[:phase_start_value] + (target - state[:phase_start_value]) * ratio
+          return [value, :decay]
+        end
+
+        if phase == :sustain
+          return state[:phase_start_value], :sustain if state[:gate]
+
+          state[:phase] = :release
+          state[:phase_started_at] = now
+          state[:phase_start_value] = state[:value]
+          return [state[:value], :release]
+        end
+
+        if phase == :release
+          return [0.0, :idle] if params[:release] <= 0.0
+
+          elapsed = now - state[:phase_started_at]
+          target = 0.0
+          if elapsed >= params[:release]
+            state[:phase_started_at] = now
+            state[:phase_start_value] = 0.0
+            return [0.0, :idle]
+          end
+
+          ratio = [elapsed / params[:release], 1.0].min
+          value = state[:phase_start_value] * (1.0 - ratio)
+          return [value, :release]
+        end
+
+        if phase == :idle
+          return [0.0, :idle] unless state[:gate] && params[:attack] > 0.0
+
+          state[:phase_started_at] = now
+          state[:phase_start_value] = 0.0
+          state[:peak] = state[:peak]
+          return [0.0, :attack]
+        end
+
+        [0.0, :idle]
+      end
+
+      def trigger_numeric(value)
+        return 0.0 if value == false || value == 0
+        return 1.0 if value == true
+        return 0.0 if value.nil?
+
+        Float(value)
+      rescue StandardError
+        0.0
       end
 
       def resolve_onset(source, audio)

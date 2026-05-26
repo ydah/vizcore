@@ -232,6 +232,31 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "builds ADSR and envelope mapping sources" do
+      definition = described_class.define do
+        scene :mapped do
+          layer :meters do
+            type :geometry
+            map adsr(:kick, attack: 0.05, decay: 0.08, sustain: 0.7, release: 0.16, threshold: 0.3, peak: 1.2) => :kick_envelope
+            map envelope(:snare, attack: 0.01, decay: 0.04, sustain: 0.9, release: 0.07, threshold: 0.1, peak: 0.8) => :snare_envelope
+          end
+        end
+      end
+
+      mappings = definition[:scenes].first[:layers].first[:mappings]
+
+      expect(mappings).to include(
+        {
+          source: { kind: :adsr, source: { kind: :kick }, attack: 0.05, decay: 0.08, sustain: 0.7, release: 0.16, threshold: 0.3, peak: 1.2 },
+          target: :kick_envelope
+        },
+        {
+          source: { kind: :adsr, source: { kind: :snare }, attack: 0.01, decay: 0.04, sustain: 0.9, release: 0.07, threshold: 0.1, peak: 0.8 },
+          target: :snare_envelope
+        }
+      )
+    end
+
     it "rejects unknown layer params in strict mode" do
       expect do
         described_class.define do

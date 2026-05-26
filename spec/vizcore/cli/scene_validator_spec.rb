@@ -54,6 +54,46 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
     end
   end
 
+  it "validates ADSR mapping sources with nested trigger sources" do
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :mapped do
+          layer :audio_meter do
+            map adsr(:kick, attack: 0.08, decay: 0.14, sustain: 0.6, release: 0.2, threshold: 0.1, peak: 1.3) => :kick_env
+            map envelope({ kind: :frequency_band, band: :low }, attack: 0.02, decay: 0.03, sustain: 0.4, release: 0.1, threshold: 0.2, peak: 0.9) => :bass_env
+          end
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+
+      expect(result).to be_valid
+      expect(result.issues).to be_empty
+    end
+  end
+
+  it "reports invalid envelope source options and nested kinds" do
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :bad do
+          layer :audio_meter do
+            map({ kind: :adsr, source: :kick, attack: :fast, decay: -0.5, sustain: 3.0, release: nil, threshold: :none, peak: "hi" }, to: :kick_env)
+            map({ kind: :envelope, source: :unknown }, to: :broken)
+          end
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+      codes = result.issues.map(&:code)
+      messages = result.issues.map(&:message).join("\n")
+
+      expect(result).not_to be_valid
+      expect(codes).to include("E_ENVELOPE_SOURCE")
+      expect(messages).to include("envelope option attack must be numeric")
+      expect(messages).to include("unsupported envelope source")
+    end
+  end
+
   it "reports structural scene mistakes before server startup" do
     with_scene_file(<<~RUBY) do |scene_path|
       Vizcore.define do

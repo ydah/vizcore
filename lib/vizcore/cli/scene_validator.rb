@@ -15,7 +15,7 @@ module Vizcore
       MAPPING_SOURCE_KINDS = %i[
         amplitude peak frequency_band frequency_band_peak fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
         beat_phase beat_2 beat_4 beat_8 beat_triplet triplet bar_phase bar_count phrase_count bpm_confidence
-        spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate global lfo
+        spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate global lfo adsr envelope
       ].freeze
 
       LFO_WAVES = %i[sine triangle saw square].freeze
@@ -308,6 +308,87 @@ module Vizcore
         validate_onset_band(source, scene_name, layer_name, issues) if kind == :onset
         validate_global_source(source, scene_name, layer_name, issues) if kind == :global
         validate_lfo_source(source, scene_name, layer_name, issues) if kind == :lfo
+        validate_envelope_source(source, scene_name, layer_name, issues) if kind == :adsr || kind == :envelope
+        return unless kind == :adsr || kind == :envelope
+
+        validate_source_option_type(source, :attack, scene_name, layer_name, issues, allow_negative: false)
+        validate_source_option_type(source, :decay, scene_name, layer_name, issues, allow_negative: false)
+        validate_source_option_type(source, :release, scene_name, layer_name, issues, allow_negative: false)
+        validate_source_option_type(source, :threshold, scene_name, layer_name, issues, allow_negative: true)
+        validate_source_option_type(source, :peak, scene_name, layer_name, issues, allow_negative: true)
+        validate_source_option_type(source, :sustain, scene_name, layer_name, issues, allow_negative: true, min: 0.0, max: 1.0)
+      end
+
+      def validate_envelope_source(source, scene_name, layer_name, issues)
+        raw_nested = source[:source]
+        raw_nested = source["source"] if raw_nested.nil?
+        raw_nested = :kick if raw_nested.nil?
+        nested = normalize_mapping_source(raw_nested)
+        nested_kind = nested[:kind]&.to_sym
+        unless MAPPING_SOURCE_KINDS.include?(nested_kind)
+          issues << error(
+            "scene #{scene_name} layer #{layer_name} uses unsupported envelope source: #{nested_kind}",
+            code: "E_ENVELOPE_SOURCE"
+          )
+          return
+        end
+
+        if nested_kind == :adsr || nested_kind == :envelope
+          issues << error(
+            "scene #{scene_name} layer #{layer_name} does not support nested envelope source: #{nested_kind}",
+            code: "E_ENVELOPE_SOURCE"
+          )
+          return
+        end
+
+        validate_mapping_source(nested_kind, nested, scene_name, layer_name, issues)
+      end
+
+      def validate_source_option_type(source, key, scene_name, layer_name, issues, allow_negative:, min: nil, max: nil)
+        value = source[key]
+        value = source[key.to_s] if value.nil?
+        return if value.nil?
+
+        numeric = Float(value)
+        if min || max
+          within_min = min.nil? ? true : numeric >= min
+          within_max = max.nil? ? true : numeric <= max
+          unless within_min && within_max
+            issues << error(
+              "scene #{scene_name} layer #{layer_name} envelope option #{key} must be between #{min} and #{max}: #{value}",
+              code: "E_ENVELOPE_SOURCE"
+            )
+          end
+          return
+        end
+
+        if !allow_negative && numeric.negative?
+          issues << error(
+            "scene #{scene_name} layer #{layer_name} envelope option #{key} must be non-negative: #{value}",
+            code: "E_ENVELOPE_SOURCE"
+          )
+        end
+      rescue StandardError
+        issues << error(
+          "scene #{scene_name} layer #{layer_name} envelope option #{key} must be numeric: #{value}",
+          code: "E_ENVELOPE_SOURCE"
+        )
+      end
+
+      def normalize_mapping_source(raw)
+        return {} if raw.nil?
+        if raw.is_a?(Hash)
+          normalized = {}
+          raw.each do |key, value|
+            normalized[key.to_sym] = value.respond_to?(:to_sym) ? value.to_sym : value
+          end
+          return normalized if normalized[:kind]
+          return {}
+        end
+
+        return { kind: raw.to_sym } if raw.respond_to?(:to_sym)
+      rescue StandardError
+        {}
       end
 
       def validate_frequency_band(source, scene_name, layer_name, issues)
