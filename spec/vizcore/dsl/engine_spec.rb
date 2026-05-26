@@ -674,6 +674,20 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "suggests close shape ids for unknown references" do
+      expect do
+        described_class.define do
+          scene :shape_lookup do
+            layer :badge do
+              rect :panel, width: 200, height: 100
+              rect :plate, width: 60, height: 40
+              map bass, to: shape(:pnal).rotate, range: -10..10
+            end
+          end
+        end
+      end.to raise_error(ArgumentError, /unknown shape id: :pnal\. Did you mean: :panel, :plate/)
+    end
+
     it "expands registered custom shapes into primitive shapes" do
       shape_class = Class.new do
         include Vizcore::Shape

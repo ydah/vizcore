@@ -531,7 +531,12 @@ module Vizcore
       # @return [ShapeReference]
       def shape(id)
         key = id.to_sym
-        index = @shape_index_by_id.fetch(key) { raise ArgumentError, "unknown shape id: #{key.inspect}" }
+        index = @shape_index_by_id.fetch(key) do
+          suggestion_message = shape_id_suggestions(key)
+          message = "unknown shape id: #{key.inspect}"
+          message = "#{message}. Did you mean: #{suggestion_message}" unless suggestion_message.empty?
+          raise ArgumentError, message
+        end
         ShapeReference.new("shapes.#{index}")
       end
 
@@ -1591,6 +1596,44 @@ module Vizcore
           kind: kind.to_sym,
           **options
         }
+      end
+
+      def shape_id_suggestions(key)
+        return "" if @shape_index_by_id.empty?
+
+        candidates = @shape_index_by_id.keys
+          .map do |shape_id|
+            [shape_id, levenshtein_distance(shape_id.to_s, key.to_s)]
+          end
+          .select { |_, distance| distance <= 3 }
+          .sort_by { |shape_id, distance| [distance, shape_id.to_s] }
+          .first(3)
+
+        return "" if candidates.empty?
+
+        candidates.map { |shape_id, _| shape_id.inspect }.join(", ")
+      end
+
+      def levenshtein_distance(a, b)
+        prev = (0..b.length).to_a
+        b_chars = b.bytes
+        a_bytes = a.bytes
+
+        a_bytes.each_with_index do |codepoint_a, index_a|
+          current = [index_a + 1]
+          b_chars.each_with_index do |codepoint_b, index_b|
+            cost = codepoint_a == codepoint_b ? 0 : 1
+            current << [
+              current[index_b] + 1,
+              prev[index_b + 1] + 1,
+              prev[index_b] + cost
+            ].min
+          end
+
+          prev = current
+        end
+
+        prev[b.length]
       end
     end
   end
