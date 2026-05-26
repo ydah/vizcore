@@ -106,6 +106,32 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
     end
   end
 
+  it "rejects unsupported mapping as mode" do
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :bad_map do
+          layer :source do
+            type :shape
+            map amplitude, to: :radius, as: :glow
+          end
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+
+      expect(result).not_to be_valid
+      expect(result.errors.map(&:code)).to include("E_SCENE_LOAD")
+      expect(result.errors.map(&:message).join("\n")).to include("unsupported mapping mode: :glow")
+    end
+
+    validator = described_class.new(scene_file: __FILE__)
+    issues = []
+    validator.send(:validate_transform, { as: :glow }, "scene", "layer", "target", issues)
+
+    expect(issues.map(&:code)).to include("E_MAPPING_TRANSFORM_AS")
+    expect(issues.map(&:message).join("\n")).to include("unsupported as mode: glow")
+  end
+
   it "reports strict unknown params and duplicate control bindings" do
     with_scene_file(<<~RUBY) do |scene_path|
       Vizcore.define do

@@ -357,8 +357,10 @@ module Vizcore
         transformed = transform_scalar(value, transform, state_key: state_key)
         return nil if transformed.nil?
 
+        transformed = apply_trigger_mode(transformed, transform, state_key: state_key) if transform[:as] == :trigger
         transformed = apply_event_shaping(transformed, transform, state_key: state_key, frame: frame)
-        apply_smoothing(transformed, transform, state_key)
+        return apply_smoothing(transformed, transform, state_key) unless transform[:as] == :trigger
+        transformed
       end
 
       def transform_array(value, transform)
@@ -431,6 +433,14 @@ module Vizcore
         when :step
           value >= 0.5 ? 1.0 : 0.0
         end
+      end
+
+      def apply_trigger_mode(value, _transform, state_key:)
+        key = [:trigger, state_key]
+        active = value.to_f > 0.0
+        previous = !!@mapping_state[key]
+        @mapping_state[key] = active
+        (active && !previous) ? 1.0 : 0.0
       end
 
       def apply_event_shaping(value, transform, state_key:, frame:)

@@ -1139,7 +1139,28 @@ RSpec.describe Vizcore::DSL::Engine do
           target: :speed,
           transform: { gain: 2.5, min: 0.1, max: 4.0 }
         },
-        { source: { kind: :beat }, target: :burst }
+        { source: { kind: :beat }, target: :burst, transform: { as: :trigger } }
+      )
+    end
+
+    it "supports trigger mode via map transform" do
+      definition = described_class.define do
+        scene :reactive do
+          layer :particles do
+            type :particle_field
+            map beat, to: :burst, as: :trigger
+          end
+        end
+      end
+
+      mappings = definition[:scenes].first[:layers].first[:mappings]
+
+      expect(mappings).to include(
+        {
+          source: { kind: :beat },
+          target: :burst,
+          transform: { as: :trigger }
+        }
       )
     end
 

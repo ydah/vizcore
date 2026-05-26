@@ -57,7 +57,7 @@ module Vizcore
       ].freeze
 
       TRANSFORMS = %w[
-        gain range min max curve deadzone smooth(attack:,release:)
+        as(:trigger) gain range min max curve deadzone smooth(attack:,release:)
       ].freeze
 
       # @return [Array<String>]

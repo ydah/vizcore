@@ -4,6 +4,8 @@ module Vizcore
   module DSL
     # Collects block-style mapping transform options.
     class MappingTransformBuilder
+      TRIGGER_MODES = %i[continuous trigger].freeze
+
       # @param initial [Hash]
       def initialize(initial = {})
         @values = initial.each_with_object({}) do |(key, value), output|
@@ -84,6 +86,18 @@ module Vizcore
         @values[:attack] = attack unless attack.nil?
         @values[:release] = release unless release.nil?
         @values
+      end
+
+      # @param mode [Symbol, String]
+      # @return [Symbol]
+      def as(mode)
+        normalized = mode.to_sym
+        unless TRIGGER_MODES.include?(normalized)
+          raise ArgumentError, "mapping as must be :continuous or :trigger"
+        end
+
+        @values[:as] = normalized
+        normalized
       end
 
       # @return [Hash]

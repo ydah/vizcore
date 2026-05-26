@@ -258,6 +258,33 @@ RSpec.describe Vizcore::DSL::MappingResolver do
       expect(decayed[0][:params][:flash]).to eq(0.3)
     end
 
+    it "emits edge-trigger pulses when map mode is trigger" do
+      resolver = described_class.new
+      scene_layers = [
+        {
+          name: :triggered,
+          params: {},
+          mappings: [
+            {
+              source: { kind: :beat },
+              target: :flash,
+              transform: { as: :trigger }
+            }
+          ]
+        }
+      ]
+
+      first = resolver.resolve_layers(scene_layers: scene_layers, audio: { beat: true, bands: {} }, frame: 0)
+      second = resolver.resolve_layers(scene_layers: scene_layers, audio: { beat: true, bands: {} }, frame: 1)
+      dropped = resolver.resolve_layers(scene_layers: scene_layers, audio: { beat: false, bands: {} }, frame: 2)
+      third = resolver.resolve_layers(scene_layers: scene_layers, audio: { beat: true, bands: {} }, frame: 3)
+
+      expect(first[0][:params][:flash]).to eq(1.0)
+      expect(second[0][:params][:flash]).to eq(0.0)
+      expect(dropped[0][:params][:flash]).to eq(0.0)
+      expect(third[0][:params][:flash]).to eq(1.0)
+    end
+
     it "applies square curve after gain and before range clamping" do
       resolver = described_class.new
       scene_layers = [

@@ -1499,13 +1499,14 @@ module Vizcore
         raise ArgumentError, "param min must be less than or equal to max"
       end
 
-      def normalize_transform(gain: nil, range: nil, min: nil, max: nil, curve: nil, attack: nil, release: nil, deadzone: nil, threshold: nil, hysteresis: nil, hold: nil, decay: nil)
+      def normalize_transform(gain: nil, range: nil, min: nil, max: nil, curve: nil, attack: nil, release: nil, deadzone: nil, threshold: nil, hysteresis: nil, hold: nil, decay: nil, as: nil)
         range_min, range_max = normalize_range(range, context: "mapping")
         min = range_min if min.nil?
         max = range_max if max.nil?
 
         output = {}
         output[:deadzone] = normalize_non_negative_float(deadzone, :deadzone) unless deadzone.nil?
+        output[:as] = normalize_mapping_mode(as) unless as.nil?
         output[:threshold] = normalize_float(threshold, :threshold) unless threshold.nil?
         output[:hysteresis] = normalize_non_negative_float(hysteresis, :hysteresis) unless hysteresis.nil?
         output[:gain] = normalize_float(gain, :gain) unless gain.nil?
@@ -1560,6 +1561,13 @@ module Vizcore
         return curve if %i[linear sqrt square ease_out ease_in ease_in_out smoothstep exp log step].include?(curve)
 
         raise ArgumentError, "unsupported mapping curve: #{value.inspect}"
+      end
+
+      def normalize_mapping_mode(value)
+        mode = value.to_sym
+        return mode if %i[continuous trigger].include?(mode)
+
+        raise ArgumentError, "unsupported mapping mode: #{value.inspect}"
       end
 
       def validate_strict_params!

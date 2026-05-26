@@ -18,7 +18,7 @@ RSpec.describe Vizcore::DSL::ReactionBuilder do
     expect(mappings).to eq(
       [
         { target: :speed, transform: { gain: 2.0 } },
-        { target: :burst, transform: {} }
+        { target: :burst, transform: { as: :trigger } }
       ]
     )
   end

@@ -37,6 +37,7 @@ module Vizcore
       # @param options [Hash] mapping transform options
       # @return [void]
       def trigger(target, **options)
+        options = options.merge(as: :trigger) unless options.key?(:as)
         change(target, **options)
       end
     end

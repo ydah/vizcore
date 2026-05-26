@@ -321,6 +321,14 @@ module Vizcore
       end
 
       def validate_transform(transform, scene_name, layer_name, target, issues)
+        if transform.key?(:as)
+          mode = transform[:as]
+          mode_value = mode.respond_to?(:to_sym) ? mode.to_sym : nil
+          unless %i[continuous trigger].include?(mode_value)
+            issues << error("scene #{scene_name} layer #{layer_name} mapping #{target} has unsupported as mode: #{mode}", code: "E_MAPPING_TRANSFORM_AS")
+          end
+        end
+
         return unless transform.key?(:min) && transform.key?(:max)
         return unless Float(transform[:min]) > Float(transform[:max])
 
