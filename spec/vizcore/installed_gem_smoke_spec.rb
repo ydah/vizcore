@@ -126,8 +126,6 @@ RSpec.describe "Installed gem smoke" do
           "-S",
           "gem",
           "install",
-          "--local",
-          "--ignore-dependencies",
           "--no-document",
           gem_file,
           env: installed_env(install_root)
