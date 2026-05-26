@@ -6,6 +6,31 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-05-27
+
+### Added
+
+- Added manifest-profile-driven runtime switching for scene loading and status reporting in CLI and server workflows.
+- Added post-effect chain support to the layer DSL and renderer, with validation and usage guidance.
+- Added offline rendering stability features, including feature-cache reuse and feature replay during snapshot/render workflows.
+- Added timeline and section enhancements: mixed timeline behavior controls, optional cue metadata, section loop/hold/outro options, and timeline scene validation coverage.
+- Added DSP/scene interaction features including ADSR/envelope mapping sources, cooldown and one-shot transform controls, and additional mapping preset support.
+- Added live-control quality updates such as fade/release behavior and richer blackout/color override handling.
+
+### Improved
+
+- Improved live reliability by splitting websocket usage between control and projector roles, exposing backpressure metrics, and forwarding runtime errors (including transition failures) to the frontend.
+- Improved rendering and transport stability with scene patch transport improvements, projector-frame capture timing, and file transport drift correction/visibility.
+- Improved MIDI/OSC usability and safety with manifest-aware scene switch validation, MIDI mapping conflict validation, CC soft takeover, OSC timetag bundle support, and mapping runtime sync updates.
+- Improved diagnostics and safety with plugin asset MIME checks and runtime status exposure for audio input health and pipeline timing.
+
+### Fixed
+
+- Fixed hot-reload edge cases to refresh MIDI runtime mappings and keep scene-switch actions stable.
+- Fixed control-layer command restrictions for read-only control modes to prevent unintended scene controls.
+- Fixed websocket role handling and live-monitor behavior for low-bandwidth monitor clients and reconnection handling.
+- Fixed dependency installation reliability for packaged-gem smoke checks.
+
 ## [1.1.0] - 2026-05-20
 
 ### Added
