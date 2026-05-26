@@ -353,32 +353,48 @@ module Vizcore
           return nil if value.nil?
 
           if value.is_a?(Array)
-            return nil unless value.length >= 3
-            channels = value.take(3).map { |entry| Float(entry, exception: false) }
+            return nil unless (3..4).cover?(value.length)
+
+            channels = Array(value).map { |entry| Float(entry, exception: false) }
             return nil if channels.include?(nil)
 
-            normalized = if channels.all? { |channel| channel >= 0 && channel <= 1 }
-              channels
+            rgb = channels.take(3)
+            alpha = channels[3]
+            normalized_rgb = if rgb.all? { |channel| channel.between?(0.0, 1.0) }
+              rgb
             else
-              channels.map { |channel| channel / 255.0 }
+              rgb.map { |channel| channel / 255.0 }
             end
-            return normalized.map { |channel| [0.0, [1.0, channel].min].max }
+            normalized = normalized_rgb.map { |channel| [0.0, [1.0, channel].min].max }
+            return alpha.nil? ? normalized : normalized + [normalize_control_alpha(alpha)]
           end
 
           raw = value.to_s.strip
-          match = raw.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/)
+          match = raw.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/)
           return nil unless match
 
-          hex = match[1].length == 3 ? match[1].chars.map { |char| "#{char}#{char}" }.join("") : match[1]
-          return nil unless hex.length == 6
+          raw_hex = match[1]
+          hex = raw_hex.length == 3 || raw_hex.length == 4 ? raw_hex.chars.map { |char| "#{char}#{char}" }.join("") : raw_hex
 
           [
             Integer("0x#{hex[0, 2]}", 16),
             Integer("0x#{hex[2, 2]}", 16),
-            Integer("0x#{hex[4, 2]}", 16)
-          ].map { |channel| channel / 255.0 }
+            Integer("0x#{hex[4, 2]}", 16),
+            Integer("0x#{hex[6, 2]}", 16)
+          ].take(raw_hex.length > 4 ? 4 : 3).map { |channel| [0.0, [1.0, channel / 255.0].min].max }
         rescue ArgumentError, TypeError
           nil
+        end
+
+        def normalize_control_alpha(value)
+          return nil if value.nil?
+
+          alpha = Float(value, exception: false)
+          return nil if alpha.nil?
+
+          return [0.0, [1.0, alpha].min].max if alpha.between?(0.0, 1.0)
+
+          [0.0, [1.0, alpha / 255.0].min].max
         end
       end
     end

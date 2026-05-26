@@ -573,7 +573,7 @@ RSpec.describe Vizcore::Server::Runner do
 
       runner.send(
         :apply_midi_action,
-        { type: :live_control, control: "blackout", value: true, fade: 0.25, release: 0.8, color: [51, 102, 255] },
+        { type: :live_control, control: "blackout", value: true, fade: 0.25, release: 0.8, color: [51, 102, 255, 128] },
         executor,
         broadcaster
       )
@@ -582,7 +582,7 @@ RSpec.describe Vizcore::Server::Runner do
         type: "config_update",
         payload: hash_including(
           live_controls: {
-            "blackout" => { "enabled" => true, "fade" => 0.25, "release" => 0.8, "color" => [0.2, 0.4, 1] },
+            "blackout" => { "enabled" => true, "fade" => 0.25, "release" => 0.8, "color" => [0.2, 0.4, 1, 0.5019607843137255] },
             "freeze" => { "enabled" => false }
           },
           source: "midi"
@@ -789,7 +789,7 @@ RSpec.describe Vizcore::Server::Runner do
       )
       runner.send(
         :handle_osc_message,
-        Vizcore::Sync::OscMessage.new(address: "/vizcore/live/blackout", arguments: [1, 0, 0.8, "#3366ff"]),
+        Vizcore::Sync::OscMessage.new(address: "/vizcore/live/blackout", arguments: [1, 0, 0.8, "#3366ff80"]),
         broadcaster
       )
 
@@ -801,7 +801,7 @@ RSpec.describe Vizcore::Server::Runner do
         type: "config_update",
         payload: hash_including(
           live_controls: {
-            "blackout" => { "enabled" => true, "fade" => 0.0, "release" => 0.8, "color" => [0.2, 0.4, 1] },
+            "blackout" => { "enabled" => true, "fade" => 0.0, "release" => 0.8, "color" => [0.2, 0.4, 1, 0.5019607843137255] },
             "freeze" => { "enabled" => false }
           },
           source: "osc"

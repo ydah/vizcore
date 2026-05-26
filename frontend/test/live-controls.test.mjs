@@ -28,6 +28,20 @@ test("normalizeLiveControlPayload parses blackout color", () => {
   );
 });
 
+test("normalizeLiveControlPayload parses blackout color with alpha", () => {
+  assert.deepEqual(
+    normalizeLiveControlPayload({ value: true, color: "#3366ff80", fade: 0.25 }),
+    { enabled: true, fade: 0.25, color: [0.2, 0.4, 1, 0.5019607843137255] },
+  );
+});
+
+test("normalizeLiveControlPayload parses blackout color array with alpha", () => {
+  assert.deepEqual(
+    normalizeLiveControlPayload({ value: true, color: [51, 102, 255, 128], fade: 0.25 }),
+    { enabled: true, fade: 0.25, color: [0.2, 0.4, 1, 0.5019607843137255] },
+  );
+});
+
 test("toggleLiveControl toggles known controls without mutating input", () => {
   const state = createLiveControlState();
   const next = toggleLiveControl(state, "blackout");

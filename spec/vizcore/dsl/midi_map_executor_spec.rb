@@ -129,7 +129,7 @@ RSpec.describe Vizcore::DSL::MidiMapExecutor do
   it "emits live control actions" do
     executor = described_class.new(
       midi_maps: [
-        { trigger: { note: 40 }, action: proc { blackout } },
+        { trigger: { note: 40 }, action: proc { blackout(true, color: "#3366ff80") } },
         { trigger: { note: 41 }, action: proc { freeze(false) } }
       ],
       scenes: [],
@@ -137,7 +137,7 @@ RSpec.describe Vizcore::DSL::MidiMapExecutor do
     )
 
     expect(executor.handle_event(midi_event(type: :note_on, data1: 40, data2: 100))).to eq(
-      [{ type: :live_control, control: "blackout", value: true }]
+      [{ type: :live_control, control: "blackout", value: true, color: [0.2, 0.4, 1, 0.5019607843137255] }]
     )
     expect(executor.handle_event(midi_event(type: :note_on, data1: 41, data2: 100))).to eq(
       [{ type: :live_control, control: "freeze", value: false }]

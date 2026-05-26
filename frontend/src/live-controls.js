@@ -3,6 +3,54 @@ const finiteFloat = (value) => {
   return Number.isFinite(numeric) ? numeric : null;
 };
 
+const clamp01 = (value) => {
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+  return Math.min(1, Math.max(0, value));
+};
+
+const parseHexColor = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw.startsWith("#")) {
+    return null;
+  }
+
+  const rawHex = raw.slice(1);
+  const isShort = rawHex.length === 3 || rawHex.length === 4;
+  const isLong = rawHex.length === 6 || rawHex.length === 8;
+  if (!/^[0-9a-fA-F]+$/.test(rawHex) || (!isShort && !isLong)) {
+    return null;
+  }
+
+  const expanded = isShort
+    ? rawHex.split("").map((entry) => `${entry}${entry}`).join("")
+    : rawHex;
+
+  const channels = [];
+  for (let index = 0; index < expanded.length; index += 2) {
+    const channel = Number.parseInt(expanded.slice(index, index + 2), 16);
+    channels.push(clamp01(channel / 255));
+  }
+
+  return channels;
+};
+
+const normalizeColorChannels = (value, hasAlpha = false) => {
+  const values = Array.from(value || []);
+  if (values.length < 3 || values.length > 4) {
+    return null;
+  }
+
+  const rgb = values.slice(0, 3).map(clamp01);
+  const alpha = values.length === 4 ? clamp01(values[3]) : null;
+  if (rgb.includes(null) || (values.length === 4 && alpha === null)) {
+    return null;
+  }
+
+  return hasAlpha ? [...rgb, alpha] : rgb;
+};
+
 const normalizeLiveControlColor = (value) => {
   if (value == null) {
     return null;
@@ -10,31 +58,24 @@ const normalizeLiveControlColor = (value) => {
 
   if (Array.isArray(value)) {
     const channels = Array.from(value)
-      .slice(0, 3)
+      .slice(0, 4)
       .map((channel) => Number(channel));
     if (channels.length < 3 || channels.some((channel) => !Number.isFinite(channel))) {
       return null;
     }
 
     const normalized = channels.every((channel) => channel >= 0 && channel <= 1)
-      ? channels.map((channel) => clamp(channel, 0, 1))
-      : channels.map((channel) => clamp(channel / 255, 0, 1));
-    return normalized.length === 3 ? normalized : null;
+      ? channels.map((channel) => clamp01(channel))
+      : channels.map((channel) => clamp01(channel / 255));
+    return normalizeColorChannels(normalized, channels.length >= 4);
   }
 
-  const raw = String(value || "").trim();
-  const match = raw.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
-  if (!match) {
+  const parsed = parseHexColor(value);
+  if (!parsed) {
     return null;
   }
 
-  const hex = match[1].length === 3
-    ? match[1].split("").map((entry) => `${entry}${entry}`).join("")
-    : match[1];
-  const rgb = [0, 2, 4].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255);
-  return rgb.every((channel) => Number.isFinite(channel))
-    ? rgb.map((channel) => clamp(channel, 0, 1))
-    : null;
+  return normalizeColorChannels(parsed, parsed.length === 4);
 };
 
 const createLiveControlEntry = (enabled = false, fade = undefined, release = undefined, color = undefined) => {

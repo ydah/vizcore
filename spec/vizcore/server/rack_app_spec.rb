@@ -189,6 +189,24 @@ RSpec.describe Vizcore::Server::RackApp do
     end
   end
 
+  it "normalizes live control action colors with alpha" do
+    app = described_class.new(frontend_root: Vizcore.frontend_root)
+    normalized = app.send(
+      :normalize_key_action,
+      { type: "live_control", control: "blackout", color: "#3366ff80", fade: 0.2, release: 0.8 }
+    )
+
+    expect(normalized).to eq(
+      {
+        type: "live_control",
+        control: "blackout",
+        fade: 0.2,
+        release: 0.8,
+        color: [0.2, 0.4, 1, 0.5019607843137255]
+      }
+    )
+  end
+
   it "injects and serves configured plugin assets" do
     Dir.mktmpdir("vizcore-plugin-assets") do |dir|
       asset_path = Pathname.new(dir).join("laser-renderer.js")

@@ -2,7 +2,6 @@ import { LayerManager } from "./layer-manager.js";
 import { ShaderManager } from "./shader-manager.js";
 import { applyShaderParamOverrides } from "../shader-param-controls.js";
 import { applyShapeEditorOverrides } from "../shape-editor-controls.js";
-import { parseHexColor } from "./layer-manager.js";
 
 export const RENDERER_CAPABILITIES_EVENT = "vizcore:renderer-capabilities";
 export const RENDERER_SAFE_MODE_EVENT = "vizcore:renderer-safe-mode";
@@ -38,7 +37,7 @@ export class Engine {
     };
     this.visualAudioState = null;
     this.liveControls = {
-      blackout: { enabled: false, color: [0, 0, 0] },
+      blackout: { enabled: false, color: [0, 0, 0, 1] },
       freeze: { enabled: false },
     };
     this.liveControlRuntime = {
@@ -48,7 +47,7 @@ export class Engine {
         transitionFrom: 0,
         transitionStartedAt: 0,
         transitionDuration: 0,
-        color: [0, 0, 0],
+        color: [0, 0, 0, 1],
       },
       freeze: {
         enabled: false,
@@ -296,9 +295,12 @@ export class Engine {
     this.updateSafeMode(deltaSeconds * 1000);
     this.updateLiveControlRuntime(time);
 
-    if (this.liveControlRuntime.blackout.opacity >= 1) {
-      const [r, g, b] = this.liveControlRuntime.blackout.color;
-      this.gl.clearColor(r, g, b, 1);
+    const blackout = this.liveControlRuntime.blackout;
+    const blackoutColor = blackout.color || [0, 0, 0, 1];
+    const [blackoutRed, blackoutGreen, blackoutBlue, blackoutAlpha = 1] = blackoutColor;
+    const effectiveBlackoutAlpha = clamp(blackout.opacity * blackoutAlpha, 0, 1);
+    if (effectiveBlackoutAlpha >= 1) {
+      this.gl.clearColor(blackoutRed, blackoutGreen, blackoutBlue, 1);
       this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
       requestAnimationFrame((nextTime) => this.render(nextTime));
       return;
@@ -334,14 +336,12 @@ export class Engine {
     );
     this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
-    if (this.liveControlRuntime.blackout.opacity > 0) {
-      const blackout = this.liveControlRuntime.blackout.opacity;
-      const [r, g, b] = this.liveControlRuntime.blackout.color;
+    if (effectiveBlackoutAlpha > 0) {
       this.gl.clearColor(
-        r,
-        g,
-        b,
-        clamp(blackout, 0, 1) * 0.999 + 0.001
+        blackoutRed,
+        blackoutGreen,
+        blackoutBlue,
+        effectiveBlackoutAlpha
       );
       this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
     }
@@ -414,23 +414,56 @@ const normalizeLiveControlColor = (value) => {
 
   if (Array.isArray(value)) {
     const channels = Array.from(value)
-      .slice(0, 3)
+      .slice(0, 4)
       .map((channel) => Number(channel));
-    if (channels.length !== 3 || channels.some((channel) => !Number.isFinite(channel))) {
+    if (channels.length < 3 || channels.length > 4 || channels.some((channel) => !Number.isFinite(channel))) {
       return null;
     }
 
-    return channels.every((channel) => channel >= 0 && channel <= 1)
+    const normalized = channels.every((channel) => channel >= 0 && channel <= 1)
       ? channels.map((channel) => clamp(channel, 0, 1))
       : channels.map((channel) => clamp(channel / 255, 0, 1));
+    if (normalized.length >= 4) {
+      return normalized.slice(0, 4);
+    }
+    return normalized;
   }
 
   const color = parseHexColor(String(value || ""));
-  const rgb = Array.isArray(color) && color.length === 3 ? color : null;
-  if (!rgb) {
+  if (!Array.isArray(color)) {
     return null;
   }
-  return rgb.map((channel) => clamp(channel, 0, 1));
+
+  if (color.length === 4) {
+    return color.map((channel) => clamp(channel, 0, 1));
+  }
+
+  if (color.length === 3) {
+    return color.map((channel) => clamp(channel, 0, 1));
+  }
+
+  return null;
+};
+
+const parseHexColor = (value) => {
+  const raw = String(value || "").trim();
+  const match = raw.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/);
+  if (!match) {
+    return null;
+  }
+
+  const rawHex = match[1];
+  const hex = rawHex.length === 3 || rawHex.length === 4
+    ? rawHex.split("").map((entry) => `${entry}${entry}`).join("")
+    : rawHex;
+
+  const channels = [];
+  for (let index = 0; index < hex.length; index += 2) {
+    const value = Number.parseInt(hex.slice(index, index + 2), 16);
+    channels.push(value / 255);
+  }
+
+  return channels;
 };
 
 const resolveRotationSpeed = (layers, amplitude) => {

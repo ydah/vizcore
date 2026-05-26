@@ -93,6 +93,18 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "normalizes blackout live control colors with alpha" do
+      definition = described_class.define do
+        key "d" do
+          blackout true, color: "#3366ff80"
+        end
+      end
+
+      expect(definition[:key_mappings]).to eq(
+        [{ key: "d", action: { type: :live_control, control: :blackout, value: true, color: [0.2, 0.4, 1, 0.5019607843137255] } }]
+      )
+    end
+
     it "omits nil effect from switch_scene keyboard mappings" do
       definition = described_class.define do
         key "d" do
