@@ -54,6 +54,7 @@ module Vizcore
         Entry.new(syntax: "circle_pack(count: 20, radius: 140)", description: "Generate packed points in concentric circles."),
         Entry.new(syntax: "scatter(count: 12, width: 320, height: 180, seed: 7)", description: "Generate deterministic scattered point layouts."),
         Entry.new(syntax: "blend :add / effect :bloom / vj_effect :mirror", description: "Set compositing and browser effects."),
+        Entry.new(syntax: "post :bloom / post :motion_blur / post :chromatic", description: "Build a post effect chain for a layer."),
         Entry.new(syntax: "param :wobble, default: 0.3, range: 0.0..2.0", description: "Declare numeric shader parameter metadata."),
         Entry.new(syntax: "map amplitude, to: :speed, range: 0.0..2.0", description: "Map audio features to layer params."),
         Entry.new(syntax: "react_to bass { change :size }", description: "Group mappings by source.")

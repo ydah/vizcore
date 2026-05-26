@@ -384,6 +384,7 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
             type :shader
             post :bloom
             post :chromatic
+            post :mirror
           end
         end
       end
@@ -410,6 +411,25 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
       expect(result.errors.map(&:code)).to include("E_UNSUPPORTED_POST_EFFECTS")
       expect(messages).to include("unsupported post_effects at index 0: unknown_post")
 
+    end
+
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :bad_post_type do
+          layer :broken do
+            type :shader
+          end
+
+          override_layer :broken, post_effects: [7]
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+      messages = result.errors.map(&:message).join("\n")
+
+      expect(result).not_to be_valid
+      expect(result.errors.map(&:code)).to include("E_UNSUPPORTED_POST_EFFECTS")
+      expect(messages).to include("unsupported post_effects at index 0: 7")
     end
 
     with_scene_file(<<~RUBY) do |scene_path|
