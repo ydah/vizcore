@@ -3,6 +3,32 @@
 require "vizcore/sync/osc_message"
 
 RSpec.describe Vizcore::Sync::OscMessage do
+  it "parses OSC bundles with NTP timetags" do
+    direct = osc_string("/vizcore/scene") +
+             osc_string(",s") +
+             osc_string("drop")
+    nested = osc_string("/vizcore/tap") + osc_string("")
+    nested_bundle = osc_string("#bundle") +
+                    [0].pack("Q>") +
+                    [nested.bytesize].pack("N") +
+                    nested
+    bundle = osc_string("#bundle") +
+             [((1_600_000_123 + OSC_NTP_OFFSET) << 32)].pack("Q>") +
+             [direct.bytesize].pack("N") +
+             direct +
+             [nested_bundle.bytesize].pack("N") +
+             nested_bundle
+
+    messages = described_class.parse(bundle)
+
+    expect(messages).to be_an(Array)
+    expect(messages.size).to eq(2)
+    expect(messages[0].address).to eq("/vizcore/scene")
+    expect(messages[0].timetag).to eq(1_600_000_123.0)
+    expect(messages[1].address).to eq("/vizcore/tap")
+    expect(messages[1].timetag).to be_nil
+  end
+
   it "parses OSC strings, integers, floats, and booleans" do
     payload = osc_string("/vizcore/scene") +
               osc_string(",sifTF") +
@@ -29,4 +55,6 @@ RSpec.describe Vizcore::Sync::OscMessage do
     bytes << "\0" while (bytes.bytesize % 4).positive?
     bytes
   end
+
+  OSC_NTP_OFFSET = 2_208_988_800
 end

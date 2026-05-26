@@ -592,6 +592,7 @@ RSpec.describe Vizcore::Server::Runner do
 
     it "switches scene from OSC message" do
       runner = described_class.new(config, output: output)
+      runner.instance_variable_set(:@osc_runtime_active, true)
       broadcaster = instance_double(
         Vizcore::Server::FrameBroadcaster,
         current_scene_snapshot: { name: "build", layers: [] },
@@ -622,8 +623,87 @@ RSpec.describe Vizcore::Server::Runner do
       )
     end
 
+    it "handles OSC bundles as multiple messages" do
+      runner = described_class.new(config, output: output)
+      runner.instance_variable_set(:@osc_runtime_active, true)
+      broadcaster = instance_double(
+        Vizcore::Server::FrameBroadcaster,
+        current_scene_snapshot: { name: "build", layers: [] },
+        update_scene: nil
+      )
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+      runner.send(
+        :replace_scene_catalog,
+        [
+          { name: :build, layers: [{ name: :a }] },
+          { name: :drop, layers: [{ name: :b }] }
+        ]
+      )
+
+      runner.send(
+        :handle_osc_messages,
+        [
+          Vizcore::Sync::OscMessage.new(address: "/vizcore/scene", arguments: ["drop"]),
+          Vizcore::Sync::OscMessage.new(address: "/vizcore/scene", arguments: ["build"])
+        ],
+        broadcaster
+      )
+
+      expect(broadcaster).to have_received(:update_scene).with(
+        scene_name: :drop,
+        scene_layers: [hash_including(name: :b)]
+      )
+      expect(broadcaster).to have_received(:update_scene).with(
+        scene_name: :build,
+        scene_layers: [hash_including(name: :a)]
+      )
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "scene_change",
+        payload: hash_including(source: "osc", to: "drop")
+      )
+      expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+        type: "scene_change",
+        payload: hash_including(source: "osc", to: "build")
+      )
+    end
+
+    it "schedules OSC messages with future timetags" do
+      runner = described_class.new(config, output: output)
+      runner.instance_variable_set(:@osc_runtime_active, true)
+      broadcaster = instance_double(
+        Vizcore::Server::FrameBroadcaster,
+        current_scene_snapshot: { name: "build", layers: [] },
+        update_scene: nil
+      )
+      allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+      runner.send(
+        :replace_scene_catalog,
+        [
+          { name: :build, layers: [{ name: :a }] },
+          { name: :drop, layers: [{ name: :b }] }
+        ]
+      )
+
+      baseline_time = 2_000_000_000.0
+      allow(runner).to receive(:wall_clock_seconds).and_return(baseline_time)
+
+      runner.send(
+        :handle_osc_message,
+        Vizcore::Sync::OscMessage.new(address: "/vizcore/scene", arguments: ["drop"], timetag: baseline_time + 0.05),
+        broadcaster
+      )
+
+      expect(broadcaster).not_to have_received(:update_scene)
+      sleep(0.08)
+      expect(broadcaster).to have_received(:update_scene).with(
+        scene_name: :drop,
+        scene_layers: [hash_including(name: :b)]
+      )
+    end
+
     it "switches scene from OSC message with transition effect" do
       runner = described_class.new(config, output: output)
+      runner.instance_variable_set(:@osc_runtime_active, true)
       broadcaster = instance_double(
         Vizcore::Server::FrameBroadcaster,
         current_scene_snapshot: { name: "build", layers: [] },
@@ -657,6 +737,7 @@ RSpec.describe Vizcore::Server::Runner do
 
     it "applies OSC tap tempo messages" do
       runner = described_class.new(config, output: output)
+      runner.instance_variable_set(:@osc_runtime_active, true)
       broadcaster = instance_double(Vizcore::Server::FrameBroadcaster)
       runner.instance_variable_set(:@tap_tempo_key, "t")
       allow(runner).to receive(:wall_clock_ms).and_return(2_500.0)
@@ -678,6 +759,7 @@ RSpec.describe Vizcore::Server::Runner do
 
     it "applies OSC BPM lock messages" do
       runner = described_class.new(config, output: output)
+      runner.instance_variable_set(:@osc_runtime_active, true)
       broadcaster = instance_double(Vizcore::Server::FrameBroadcaster, lock_bpm: 128.0)
       allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
 
@@ -696,6 +778,7 @@ RSpec.describe Vizcore::Server::Runner do
 
     it "applies OSC global and live control messages" do
       runner = described_class.new(config, output: output)
+      runner.instance_variable_set(:@osc_runtime_active, true)
       broadcaster = instance_double(Vizcore::Server::FrameBroadcaster)
       allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
 
@@ -728,6 +811,7 @@ RSpec.describe Vizcore::Server::Runner do
 
     it "applies OSC layer params and normalizes ranged values" do
       runner = described_class.new(config, output: output)
+      runner.instance_variable_set(:@osc_runtime_active, true)
       broadcaster = instance_double(
         Vizcore::Server::FrameBroadcaster,
         set_layer_param: { "rings" => { "opacity" => 0.5 } }
@@ -753,6 +837,7 @@ RSpec.describe Vizcore::Server::Runner do
 
     it "normalizes OSC value with 0..127 preset" do
       runner = described_class.new(config, output: output)
+      runner.instance_variable_set(:@osc_runtime_active, true)
       broadcaster = instance_double(
         Vizcore::Server::FrameBroadcaster,
         set_layer_param: { "rings" => { "opacity" => 0.5 } }
@@ -774,6 +859,7 @@ RSpec.describe Vizcore::Server::Runner do
 
     it "normalizes OSC value with range expression" do
       runner = described_class.new(config, output: output)
+      runner.instance_variable_set(:@osc_runtime_active, true)
       broadcaster = instance_double(
         Vizcore::Server::FrameBroadcaster,
         set_layer_param: { "rings" => { "x" => 0.5 } }
@@ -803,6 +889,7 @@ RSpec.describe Vizcore::Server::Runner do
         audio_file: fixture.to_s
       )
       runner = described_class.new(file_config, output: output)
+      runner.instance_variable_set(:@osc_runtime_active, true)
       broadcaster = instance_double(Vizcore::Server::FrameBroadcaster, sync_transport: nil)
 
       runner.send(

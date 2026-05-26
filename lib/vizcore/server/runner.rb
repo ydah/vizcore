@@ -23,6 +23,9 @@ module Vizcore
         @shader_source_resolver = Vizcore::DSL::ShaderSourceResolver.new
         @scene_catalog_mutex = Mutex.new
         @scene_catalog = []
+        @osc_schedule_mutex = Mutex.new
+        @osc_schedule_threads = []
+        @osc_runtime_active = false
         @runtime_globals_mutex = Mutex.new
         @runtime_globals = {}
         @live_controls = {
@@ -374,20 +377,24 @@ module Vizcore
       def start_osc_runtime(broadcaster)
         return nil unless @config.osc_port
 
+        @osc_runtime_active = true
         receiver = Vizcore::Sync::OscReceiver.new(
           host: @config.host,
           port: @config.osc_port,
-          handler: ->(message) { handle_osc_message(message, broadcaster) },
+          handler: ->(message) { handle_osc_messages(message, broadcaster) },
           error_reporter: ->(message) { @output.puts(message) }
         )
         receiver.start
       rescue StandardError => e
         @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "OSC runtime disabled"))
         receiver&.stop
+        @osc_runtime_active = false
         nil
       end
 
       def stop_osc_runtime(runtime)
+        @osc_runtime_active = false
+        clear_scheduled_osc_messages
         runtime&.stop
         nil
       rescue StandardError => e
@@ -395,7 +402,54 @@ module Vizcore
         nil
       end
 
+      def handle_osc_messages(messages, broadcaster)
+        Array(messages).each do |message|
+          next unless message
+          handle_osc_message(message, broadcaster)
+        end
+      end
+
       def handle_osc_message(message, broadcaster)
+        return unless @osc_runtime_active
+
+        target_time = finite_float(message.timetag)
+        return process_osc_message(message, broadcaster) if target_time.nil?
+
+        delay = target_time - wall_clock_seconds
+        return process_osc_message(message, broadcaster) if delay <= 0
+
+        schedule_osc_message(message, broadcaster, delay)
+      rescue StandardError => e
+        @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "OSC control message failed"))
+      end
+
+      def schedule_osc_message(message, broadcaster, delay)
+        thread = Thread.new do
+          sleep(delay)
+          return unless @osc_runtime_active
+
+          process_osc_message(message, broadcaster)
+        ensure
+          @osc_schedule_mutex.synchronize { @osc_schedule_threads.delete(Thread.current) }
+        end
+        @osc_schedule_mutex.synchronize { @osc_schedule_threads << thread }
+      end
+
+      def clear_scheduled_osc_messages
+        threads = @osc_schedule_mutex.synchronize do
+          threads = Array(@osc_schedule_threads)
+          @osc_schedule_threads.clear
+          threads
+        end
+        threads.each do |thread|
+          thread.kill
+          thread.join(0.05)
+        rescue StandardError
+          nil
+        end
+      end
+
+      def process_osc_message(message, broadcaster)
         case message.address
         when "/vizcore/scene"
           arguments = Array(message.arguments)
@@ -419,8 +473,6 @@ module Vizcore
         when "/vizcore/transport/stop"
           apply_osc_transport(broadcaster, playing: false, position_seconds: message.arguments.first)
         end
-      rescue StandardError => e
-        @output.puts(Vizcore::ErrorFormatting.summarize(e, context: "OSC control message failed"))
       end
 
       def handle_midi_event(executor, event, broadcaster)
@@ -1022,7 +1074,11 @@ module Vizcore
       end
 
       def wall_clock_ms
-        Time.now.to_f * 1000.0
+        wall_clock_seconds * 1000.0
+      end
+
+      def wall_clock_seconds
+        Time.now.to_f
       end
 
       def finite_float(value)
