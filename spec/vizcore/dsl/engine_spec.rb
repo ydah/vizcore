@@ -1387,6 +1387,24 @@ RSpec.describe Vizcore::DSL::Engine do
       expect(params[:blend]).to eq(:screen)
     end
 
+    it "stores post effect chains" do
+      definition = described_class.define do
+        scene :chained_effects do
+          layer :glitched do
+            type :shader
+            effect :bloom
+            post :motion_blur
+            post :chromatic
+            post :crt
+          end
+        end
+      end
+
+      params = definition[:scenes].first[:layers].first[:params]
+      expect(params[:effect]).to eq(:bloom)
+      expect(params[:post_effects]).to eq([:motion_blur, :chromatic, :crt])
+    end
+
     it "declares numeric shader parameter metadata" do
       definition = described_class.define do
         scene :custom do

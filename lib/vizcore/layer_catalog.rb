@@ -19,6 +19,7 @@ module Vizcore
       opacity: "Float",
       blend: "Symbol",
       effect: "Symbol",
+      post_effects: "Array<Symbol>",
       effect_intensity: "Float",
       vj_effect: "Symbol",
       palette: "Array<String>",

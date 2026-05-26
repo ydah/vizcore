@@ -355,6 +355,7 @@ export class LayerManager {
 
     this.layerFramebuffer = null;
     this.layerTexture = null;
+    this.layerTextureSecondary = null;
     this.layerDepthRenderbuffer = null;
     this.layerTargetWidth = 0;
     this.layerTargetHeight = 0;
@@ -849,30 +850,96 @@ export class LayerManager {
   compositeLayer(layer, { audio, time, resolution }) {
     const gl = this.gl;
     const params = layer?.params || {};
-    const opacity = clamp(Number(params.opacity || 1), 0, 1);
-    const blend = String(params.blend || "alpha").toLowerCase();
-    const effectName = String(params.effect || "");
-    const vjEffectName = String(params.vj_effect || "");
-    const effectIntensity = clamp(Number(params.effect_intensity || audio?.amplitude || 0.35), 0, 1);
-    const effectShader = getPostEffectShader(effectName);
-    const vjShader = getVJEffectShader(vjEffectName);
-    const selectedShader = vjShader || effectShader;
-    const selectedEffectName = vjShader ? `vj:${vjEffectName}` : `post:${effectName}`;
-    let program = this.compositeProgram;
-    if (selectedShader) {
-      try {
-        program = this.shaderManager.getProgram(
-          selectedEffectName,
-          FULLSCREEN_VERTEX_SHADER,
-          selectedShader
-        );
-      } catch (error) {
-        this.reportLayerError(layer, error, selectedEffectName);
-        program = this.compositeProgram;
-      }
+    const effects = this.resolvePostEffects(params);
+    if (effects.length === 0) {
+      this.drawLayerTexture(this.layerTexture, { layer, audio, time, resolution, opacity: params.opacity });
+      return;
     }
 
+    const blend = String(params.blend || "alpha").toLowerCase();
+    const effectIntensity = clamp(Number(params.effect_intensity || audio?.amplitude || 0.35), 0, 1);
+    let sourceTexture = this.layerTexture;
+    let targetTexture = this.layerTextureSecondary;
+
     this.setBlendMode(blend);
+    effects.forEach((effectName) => {
+      const resolvedName = String(effectName);
+      const vjShader = getVJEffectShader(resolvedName);
+      const effectShader = getPostEffectShader(resolvedName);
+      const selectedShader = vjShader || effectShader;
+      const selectedEffectName = vjShader ? `vj:${resolvedName}` : `post:${resolvedName}`;
+      let program = this.compositeProgram;
+
+      if (selectedShader) {
+        try {
+          program = this.shaderManager.getProgram(
+            selectedEffectName,
+            FULLSCREEN_VERTEX_SHADER,
+            selectedShader
+          );
+        } catch (error) {
+          this.reportLayerError(layer, error, selectedEffectName);
+          program = this.compositeProgram;
+        }
+      }
+
+      this.applyEffectPass({
+        sourceTexture,
+        destinationTexture: targetTexture,
+        program,
+        time,
+        resolution: [this.layerTargetWidth, this.layerTargetHeight],
+        effectIntensity
+      });
+
+      [sourceTexture, targetTexture] = [targetTexture, sourceTexture];
+    });
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, resolution[0], resolution[1]);
+    this.drawLayerTexture(sourceTexture, {
+      layer,
+      audio,
+      time,
+      resolution,
+      opacity: params.opacity
+    });
+  }
+
+  resolvePostEffects(params) {
+    const postEffects = Array.isArray(params?.post_effects)
+      ? params.post_effects
+          .map((value) => String(value || "").trim().toLowerCase())
+          .filter((value) => value.length > 0)
+      : [];
+    if (postEffects.length > 0) {
+      return postEffects;
+    }
+
+    const vjEffectName = String(params?.vj_effect || "").trim().toLowerCase();
+    if (vjEffectName) {
+      return [vjEffectName];
+    }
+
+    const effectName = String(params?.effect || "").trim().toLowerCase();
+    if (effectName) {
+      return [effectName];
+    }
+
+    return [];
+  }
+
+  applyEffectPass({ sourceTexture, destinationTexture, program, time, resolution, effectIntensity }) {
+    const gl = this.gl;
+    if (!sourceTexture || !destinationTexture) {
+      return;
+    }
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.layerFramebuffer);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, destinationTexture, 0);
+    gl.viewport(0, 0, this.layerTargetWidth, this.layerTargetHeight);
+    gl.clearColor(0.0, 0.0, 0.0, 0.0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     gl.useProgram(program);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.fullscreenBuffer);
@@ -881,12 +948,31 @@ export class LayerManager {
     gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
 
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.layerTexture);
+    gl.bindTexture(gl.TEXTURE_2D, sourceTexture);
     this.setUniform1i(program, "u_texture", 0);
-    this.setUniform1f(program, "u_opacity", opacity);
     this.setUniform1f(program, "u_time", time);
     this.setUniform1f(program, "u_intensity", effectIntensity);
     this.setUniform2f(program, "u_resolution", resolution[0], resolution[1]);
+    this.setUniform1f(program, "u_opacity", 1);
+
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  drawLayerTexture(texture, { layer, audio, time, resolution, opacity }) {
+    const gl = this.gl;
+    const params = layer?.params || {};
+    gl.useProgram(this.compositeProgram);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.fullscreenBuffer);
+    gl.enableVertexAttribArray(this.compositePositionLocation);
+    gl.vertexAttribPointer(this.compositePositionLocation, 2, gl.FLOAT, false, 0, 0);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    this.setUniform1i(this.compositeProgram, "u_texture", 0);
+    this.setUniform1f(this.compositeProgram, "u_opacity", clamp(Number(opacity || 1), 0, 1));
+    this.setUniform1f(this.compositeProgram, "u_time", time);
+    this.setUniform1f(this.compositeProgram, "u_intensity", params.effect_intensity || audio?.amplitude || 0.35);
+    this.setUniform2f(this.compositeProgram, "u_resolution", resolution[0], resolution[1]);
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
@@ -907,15 +993,9 @@ export class LayerManager {
 
     const gl = this.gl;
     this.layerFramebuffer = gl.createFramebuffer();
-    this.layerTexture = gl.createTexture();
+    this.layerTexture = this.createLayerTexture(targetWidth, targetHeight);
+    this.layerTextureSecondary = this.createLayerTexture(targetWidth, targetHeight);
     this.layerDepthRenderbuffer = gl.createRenderbuffer();
-
-    gl.bindTexture(gl.TEXTURE_2D, this.layerTexture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, targetWidth, targetHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.layerFramebuffer);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.layerTexture, 0);
@@ -938,10 +1018,26 @@ export class LayerManager {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 
+  createLayerTexture(width, height) {
+    const gl = this.gl;
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return texture;
+  }
+
   disposeLayerTarget() {
     if (this.layerTexture) {
       this.gl.deleteTexture(this.layerTexture);
       this.layerTexture = null;
+    }
+    if (this.layerTextureSecondary) {
+      this.gl.deleteTexture(this.layerTextureSecondary);
+      this.layerTextureSecondary = null;
     }
     if (this.layerDepthRenderbuffer) {
       this.gl.deleteRenderbuffer(this.layerDepthRenderbuffer);

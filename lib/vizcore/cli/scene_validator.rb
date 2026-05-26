@@ -143,6 +143,7 @@ module Vizcore
         params = layer[:params] || {}
         validate_effect_name(params[:effect], SUPPORTED_POST_EFFECTS, "effect", scene_name, layer_name, issues)
         validate_effect_name(params[:vj_effect], SUPPORTED_VJ_EFFECTS, "vj_effect", scene_name, layer_name, issues)
+        validate_effect_chain(params[:post_effects], SUPPORTED_POST_EFFECTS, "post_effects", scene_name, layer_name, issues)
       end
 
       def validate_shape_layer(layer, scene_name, layer_name, issues)
@@ -249,6 +250,21 @@ module Vizcore
         return if supported.include?(value.to_sym)
 
         issues << error("scene #{scene_name} layer #{layer_name} uses unsupported #{field}: #{value}", code: "E_UNSUPPORTED_#{field.to_s.upcase}")
+      end
+
+      def validate_effect_chain(value, supported, field, scene_name, layer_name, issues)
+        return if value.nil? || Array(value).empty?
+        unless value.is_a?(Array)
+          issues << error("scene #{scene_name} layer #{layer_name} #{field} must be an array", code: "E_INVALID_#{field.upcase}_FORMAT")
+          return
+        end
+
+        value.each_with_index do |name, index|
+          next if name.nil?
+          next if supported.include?(name.to_sym)
+
+          issues << error("scene #{scene_name} layer #{layer_name} uses unsupported #{field} at index #{index}: #{name}", code: "E_UNSUPPORTED_#{field.upcase}")
+        end
       end
 
       def validate_mappings(mappings, layer, scene_name, layer_name, issues)

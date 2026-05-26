@@ -588,6 +588,17 @@ module Vizcore
         @params[:palette] = normalize_palette(colors)
       end
 
+      # Append one post effect to this layer's post effect chain.
+      #
+      # @param name [Symbol, String] effect key
+      # @return [Symbol]
+      def post(name)
+        raise ArgumentError, "post expects a symbol or string" unless name
+
+        @params[:post_effects] ||= []
+        @params[:post_effects] << name.to_sym
+      end
+
       # Apply a named style by merging its params into this layer.
       #
       # @param name [Symbol, String] style identifier

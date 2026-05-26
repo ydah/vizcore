@@ -376,6 +376,62 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
     end
   end
 
+  it "validates post effect chains" do
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :good_chain do
+          layer :chained do
+            type :shader
+            post :bloom
+            post :chromatic
+          end
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+
+      expect(result).to be_valid
+    end
+
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :bad_chain do
+          layer :broken_chain do
+            type :shader
+            post :unknown_post
+          end
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+      messages = result.errors.map(&:message).join("\n")
+
+      expect(result).not_to be_valid
+      expect(result.errors.map(&:code)).to include("E_UNSUPPORTED_POST_EFFECTS")
+      expect(messages).to include("unsupported post_effects at index 0: unknown_post")
+
+    end
+
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :bad_chain_format do
+          layer :broken_chain do
+            type :shader
+          end
+
+          override_layer :broken_chain, post_effects: 7
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+      messages = result.errors.map(&:message).join("\n")
+
+      expect(result).not_to be_valid
+      expect(result.errors.map(&:code)).to include("E_INVALID_POST_EFFECTS_FORMAT")
+      expect(messages).to include("post_effects must be an array")
+    end
+  end
+
   it "validates nested shape mapping targets through existing nested containers" do
     with_scene_file(<<~RUBY) do |scene_path|
       Vizcore.define do
