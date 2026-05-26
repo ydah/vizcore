@@ -69,6 +69,7 @@ module Vizcore
         server.run
 
         input_manager = build_input_manager
+        warn_if_sample_rate_mismatch(input_manager)
         broadcaster = FrameBroadcaster.new(
           scene_name: scene[:name].to_s,
           scene_layers: scene[:layers],
@@ -118,6 +119,22 @@ module Vizcore
         watcher&.stop
         broadcaster&.stop
         server&.stop(true)
+      end
+
+      def warn_if_sample_rate_mismatch(input_manager)
+        return unless input_manager.respond_to?(:status)
+
+        status = input_manager.status
+        return unless status[:sample_rate_mismatch]
+
+        requested = status[:requested_sample_rate]
+        actual = status[:sample_rate]
+        return unless requested && actual
+
+        @output.puts(
+          "Warning: requested audio sample rate #{requested} does not match device sample rate #{actual}; " \
+          "analysis will use #{actual}."
+        )
       end
 
       private

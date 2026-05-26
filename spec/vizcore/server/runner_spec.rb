@@ -35,6 +35,14 @@ RSpec.describe Vizcore::Server::Runner do
       allow(Vizcore::Server::RackApp).to receive(:new).and_return(rack_app)
       allow(Puma::Server).to receive(:new).and_return(puma_server)
       allow(Vizcore::Audio::InputManager).to receive(:new).and_return(input_manager)
+      allow(input_manager).to receive(:status).and_return(
+        source: :mic,
+        sample_rate: 44_100,
+        frame_size: 1024,
+        requested_sample_rate: 44_100,
+        sample_rate_mismatch: false,
+        ring_buffer: {}
+      )
       allow(Vizcore::Server::FrameBroadcaster).to receive(:new).and_return(broadcaster)
 
       runner = described_class.new(config, output: output)
@@ -80,6 +88,28 @@ RSpec.describe Vizcore::Server::Runner do
       expect(puma_server).to have_received(:stop).with(true)
       expect(broadcaster).to have_received(:start)
       expect(broadcaster).to have_received(:stop)
+    end
+
+    it "warns when requested sample rate differs from input stream sample rate" do
+      allow(Vizcore::Server::RackApp).to receive(:new).and_return(rack_app)
+      allow(Puma::Server).to receive(:new).and_return(puma_server)
+      allow(Vizcore::Audio::InputManager).to receive(:new).and_return(input_manager)
+      allow(input_manager).to receive(:status).and_return(
+        source: :mic,
+        sample_rate: 48_000,
+        frame_size: 1024,
+        requested_sample_rate: 44_100,
+        sample_rate_mismatch: true,
+        ring_buffer: {}
+      )
+      allow(Vizcore::Server::FrameBroadcaster).to receive(:new).and_return(broadcaster)
+
+      runner = described_class.new(config, output: output)
+      allow(runner).to receive(:wait_for_interrupt)
+
+      runner.run
+
+      expect(output.string).to include("Warning: requested audio sample rate 44100 does not match device sample rate 48000; analysis will use 48000.")
     end
 
     it "skips scene watcher when hot reload is disabled" do
