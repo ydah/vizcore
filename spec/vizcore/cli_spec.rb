@@ -676,6 +676,12 @@ RSpec.describe Vizcore::CLI do
 
         described_class.start(["start", "--manifest", File.join(dir, "vizcore.yml"), "--profile", "rehearsal"])
 
+        expect(Vizcore::Server::Runner).to have_received(:new).with(
+          kind_of(Vizcore::Config),
+          manifest: kind_of(Vizcore::ProjectManifest),
+          initial_profile: "rehearsal"
+        )
+
         expect(Vizcore::Server::Runner).to have_received(:new) do |config|
           expect(config.scene_file.to_s).to eq(Pathname.new(scene_path).expand_path.to_s)
           expect(config.audio_source).to eq(:dummy)

@@ -3,6 +3,7 @@
 require "stringio"
 require "tmpdir"
 require "vizcore/config"
+require "vizcore/project_manifest"
 require "vizcore/server/runner"
 
 RSpec.describe Vizcore::Server::Runner do
@@ -380,7 +381,7 @@ RSpec.describe Vizcore::Server::Runner do
         scenes: [hash_including(name: :updated)],
         transitions: []
       )
-      expect(broadcaster).to have_received(:update_analysis_settings).with(
+      expect(broadcaster).to have_received(:update_analysis_settings).at_least(:once).with(
         hash_including(audio_normalize: nil, bpm: nil, bpm_lock: false)
       )
       expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
@@ -438,6 +439,157 @@ RSpec.describe Vizcore::Server::Runner do
           keeping_last_good_scene: true
         )
       )
+    end
+
+    it "switches to another manifest profile at runtime" do
+      Dir.mktmpdir("vizcore-runner-profile-switch") do |dir|
+        manifest_path = File.join(dir, "vizcore.yml")
+        default_scene_path = File.join(dir, "default_scene.rb")
+        rehearsal_scene_path = File.join(dir, "rehearsal_scene.rb")
+        File.write(
+          default_scene_path,
+          <<~RUBY
+            Vizcore.define do
+              scene :default do
+                layer :default_layer do
+                  type :geometry
+                end
+              end
+            end
+          RUBY
+        )
+        File.write(
+          rehearsal_scene_path,
+          <<~RUBY
+            Vizcore.define do
+              scene :rehearsal do
+                layer :rehearsal_layer do
+                  type :geometry
+                end
+              end
+            end
+          RUBY
+        )
+        File.write(
+          manifest_path,
+          <<~YAML
+            scene: #{File.basename(default_scene_path)}
+            profiles:
+              rehearsal:
+                scene: #{File.basename(rehearsal_scene_path)}
+          YAML
+        )
+
+        manifest = Vizcore::ProjectManifest.load(manifest_path)
+        profile_config = Vizcore::Config.new(
+          scene_file: default_scene_path,
+          host: "127.0.0.1",
+          port: 4567,
+          reload: false
+        )
+        runner = described_class.new(profile_config, manifest: manifest)
+        broadcaster = instance_double(
+          Vizcore::Server::FrameBroadcaster,
+          update_transition_definition: nil,
+          update_analysis_settings: nil,
+          update_scene: nil
+        )
+        allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+
+        runner.send(:switch_profile, "rehearsal", broadcaster)
+
+        expect(runner.send(:active_profile_for_api)).to eq("rehearsal")
+        expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+          type: "config_update",
+          payload: hash_including(
+            active_profile: "rehearsal",
+            available_profiles: ["default", "rehearsal"],
+            scene: hash_including(name: :rehearsal)
+          )
+        )
+        expect(broadcaster).to have_received(:update_scene).with(
+          scene_name: :rehearsal,
+          scene_layers: [hash_including(name: :rehearsal_layer)]
+        )
+      end
+    end
+
+    it "reports an error for unknown profile runtime switch requests" do
+      Dir.mktmpdir("vizcore-runner-profile-switch-unknown") do |_dir|
+        config = Vizcore::Config.new(scene_file: scene_file.to_s, host: "127.0.0.1", port: 4567, reload: false)
+        runner = described_class.new(config)
+        broadcaster = instance_double(Vizcore::Server::FrameBroadcaster)
+        allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+
+        runner.send(:switch_profile, "missing", broadcaster)
+
+        expect(runner.send(:active_profile_for_api)).to eq("default")
+        expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+          type: "runtime_error",
+          payload: hash_including(event: "unknown_profile", context: "Unknown profile: missing")
+        )
+      end
+    end
+
+    it "reports an error when the target profile scene file is missing" do
+      Dir.mktmpdir("vizcore-runner-profile-switch-missing") do |dir|
+        manifest_path = File.join(dir, "vizcore.yml")
+        File.write(
+          manifest_path,
+          <<~YAML
+            scene: basic.rb
+            profiles:
+              rehearsal:
+                scene: missing.rb
+          YAML
+        )
+        missing_scene = File.join(dir, "basic.rb")
+        File.write(
+          missing_scene,
+          <<~RUBY
+            Vizcore.define do
+              scene :default do
+                layer :default_layer do
+                  type :geometry
+                end
+              end
+            end
+          RUBY
+        )
+
+        manifest = Vizcore::ProjectManifest.load(manifest_path)
+        config = Vizcore::Config.new(scene_file: missing_scene.to_s, host: "127.0.0.1", port: 4567, reload: false)
+        runner = described_class.new(config, manifest: manifest)
+        broadcaster = instance_double(Vizcore::Server::FrameBroadcaster)
+        allow(Vizcore::Server::WebSocketHandler).to receive(:broadcast)
+
+        runner.send(:switch_profile, "rehearsal", broadcaster)
+
+        expect(Vizcore::Server::WebSocketHandler).to have_received(:broadcast).with(
+          type: "runtime_error",
+          payload: hash_including(event: "profile_scene_missing", context: "Profile scene file missing")
+        )
+        expect(runner.send(:active_profile_for_api)).to eq("default")
+      end
+    end
+
+    it "handles profile switch messages from websocket client controls" do
+      runner = described_class.new(config, output: output)
+      broadcaster = instance_double(
+        Vizcore::Server::FrameBroadcaster,
+        update_transition_definition: nil,
+        update_analysis_settings: nil,
+        update_scene: nil
+      )
+      allow(runner).to receive(:switch_profile)
+
+      runner.send(
+        :handle_client_message,
+        { "type" => "switch_profile", "payload" => { "profile" => "rehearsal" } },
+        broadcaster
+      )
+
+      expect(runner).to have_received(:switch_profile).with("rehearsal", broadcaster)
     end
 
     it "switches scene from client websocket message" do

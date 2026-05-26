@@ -69,6 +69,24 @@ RSpec.describe Vizcore::Server::RackApp do
     expect(payload.dig("runtime", "metrics", "server_frame_ms")).to eq(1.25)
   end
 
+  it "exposes profile metadata from runtime status" do
+    runtime_app = described_class.new(
+      frontend_root: Vizcore.frontend_root,
+      runtime_status_provider: lambda do
+        {
+          active_profile: "rehearsal",
+          available_profiles: ["default", "rehearsal", "show"],
+          current_scene: :build
+        }
+      end
+    )
+
+    payload = JSON.parse(Rack::MockRequest.new(runtime_app).get("/runtime").body)
+
+    expect(payload.dig("runtime", "active_profile")).to eq("rehearsal")
+    expect(payload.dig("runtime", "available_profiles")).to eq(["default", "rehearsal", "show"])
+  end
+
   it "serves projector output without operator UI by default" do
     response = Rack::MockRequest.new(app).get("/projector")
 
