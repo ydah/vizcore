@@ -147,6 +147,47 @@ RSpec.describe Vizcore::Server::WebSocketHandler do
     expect(parsed_messages.length).to eq(2)
   end
 
+  it "allows monitor sockets to send latency probes" do
+    monitor_socket = FakeSocket.new([])
+    handled_messages = []
+    described_class.on_message { |message| handled_messages << message }
+    described_class.send(:register, monitor_socket, role: described_class::MONITOR_ROLE)
+
+    described_class.send(:handle_message, monitor_socket, JSON.generate(type: "latency_probe", payload: {}))
+
+    expect(handled_messages).to eq([{ "type" => "latency_probe", "payload" => {} }])
+  end
+
+  it "blocks monitor sockets from scene control messages" do
+    monitor_socket = FakeSocket.new([])
+    handled_messages = []
+    described_class.on_message { |message| handled_messages << message }
+    described_class.send(:register, monitor_socket, role: described_class::MONITOR_ROLE)
+
+    described_class.send(
+      :handle_message,
+      monitor_socket,
+      JSON.generate(type: "switch_scene", payload: { scene: "build" })
+    )
+
+    expect(handled_messages).to be_empty
+  end
+
+  it "blocks projector sockets from scene control messages" do
+    projector_socket = FakeSocket.new([])
+    handled_messages = []
+    described_class.on_message { |message| handled_messages << message }
+    described_class.send(:register, projector_socket, role: described_class::PROJECTOR_ROLE)
+
+    described_class.send(
+      :handle_message,
+      projector_socket,
+      JSON.generate(type: "switch_scene", payload: { scene: "build" })
+    )
+
+    expect(handled_messages).to be_empty
+  end
+
   it "keeps backpressure metrics client role field updated" do
     projector_socket = FakeSocket.new([])
     described_class.send(:register, projector_socket, role: described_class::PROJECTOR_ROLE)

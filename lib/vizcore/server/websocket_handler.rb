@@ -17,6 +17,8 @@ module Vizcore
       CONTROL_ROLE = "control".freeze
       PROJECTOR_ROLE = "projector".freeze
       MONITOR_ROLE = "monitor".freeze
+      READ_ONLY_ROLES = Set[PROJECTOR_ROLE, MONITOR_ROLE].freeze
+      READ_ONLY_ALLOWED_MESSAGE_TYPES = Set["latency_probe", "client_runtime_error"].freeze
       LOW_BANDWIDTH_ROLES = Set[CONTROL_ROLE, MONITOR_ROLE].freeze
       CONTROL_AUDIO_FRAME_INTERVAL = 4
 
@@ -404,10 +406,20 @@ module Vizcore
           return unless handler
           return unless message.is_a?(Hash)
 
+          type = message["type"] || message[:type]
+          role = socket_role(socket)
+          return unless client_message_allowed?(role: role, type: type)
+
           handler.call(message, socket)
         rescue StandardError => e
           set_last_error(e)
           nil
+        end
+
+        def client_message_allowed?(role:, type:)
+          return true unless READ_ONLY_ROLES.include?(role.to_s)
+
+          READ_ONLY_ALLOWED_MESSAGE_TYPES.include?(type.to_s)
         end
 
         def text_headers
