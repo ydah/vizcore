@@ -499,7 +499,6 @@ module Vizcore
           return [0.0, :idle] if params[:release] <= 0.0
 
           elapsed = now - state[:phase_started_at]
-          target = 0.0
           if elapsed >= params[:release]
             state[:phase_started_at] = now
             state[:phase_start_value] = 0.0
@@ -516,7 +515,6 @@ module Vizcore
 
           state[:phase_started_at] = now
           state[:phase_start_value] = 0.0
-          state[:peak] = state[:peak]
           return [0.0, :attack]
         end
 
