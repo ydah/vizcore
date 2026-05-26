@@ -28,6 +28,8 @@ jobs:
           bundler-cache: true
       - name: Run RSpec
         run: bundle exec rspec
+      - name: Run installed gem smoke
+        run: bundle exec rake ci:installed_gem_smoke
 
   rubocop:
     if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}

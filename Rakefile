@@ -42,6 +42,11 @@ namespace :ci do
   task :browser_smoke do
     sh "npm --prefix frontend run test:browser"
   end
+
+  desc "Smoke test a built gem via install and execute CLI"
+  task :installed_gem_smoke do
+    sh "bundle exec rspec spec/vizcore/installed_gem_smoke_spec.rb"
+  end
 end
 
 namespace :release do
