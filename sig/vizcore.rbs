@@ -252,7 +252,7 @@ module Vizcore::DSL
   type style = { name: Symbol, params: Hash[Symbol, untyped] }
   type theme = { name: Symbol, params: Hash[Symbol, untyped] }
   type mapping_preset = { name: Symbol, mappings: Array[mapping] }
-  type timeline_entry = { at: Float, unit: Symbol, scene: Symbol }
+  type timeline_entry = { at: Float, unit: Symbol, scene: Symbol, ?cue: Symbol }
   type key_action = { type: Symbol, ?scene: String, ?control: Symbol }
   type key_mapping = { key: String, action: key_action }
 

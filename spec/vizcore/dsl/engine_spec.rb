@@ -1408,6 +1408,30 @@ RSpec.describe Vizcore::DSL::Engine do
       expect(controller.next_transition(scene_name: :intro, audio: {}, frame_count: 90)).to include(to: :drop)
     end
 
+    it "stores timeline marker cues" do
+      definition = described_class.define do
+        scene(:intro) { layer(:a) { type :geometry } }
+        scene(:build) { layer(:b) { type :geometry } }
+        scene(:drop) { layer(:c) { type :geometry } }
+
+        timeline do
+          at 0, scene: :intro, cue: :prelude
+          at seconds(1), scene: :build, cue: :lift
+          at beats(8), scene: :drop
+        end
+      end
+
+      expect(definition[:timelines]).to eq(
+        [
+          [
+            { at: 0.0, unit: :seconds, scene: :intro, cue: :prelude },
+            { at: 1.0, unit: :seconds, scene: :build, cue: :lift },
+            { at: 8.0, unit: :beats, scene: :drop }
+          ]
+        ]
+      )
+    end
+
     it "allows mixed timeline units with fixed bpm" do
       definition = described_class.define do
         bpm 120

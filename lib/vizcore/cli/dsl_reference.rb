@@ -20,7 +20,7 @@ module Vizcore
         Entry.new(syntax: "mapping :name { ... }", description: "Define reusable layer mapping groups."),
         Entry.new(syntax: "scene :name, extends: :base { ... }", description: "Define a scene and optional inherited layers."),
         Entry.new(syntax: "section :intro, bars: 8 { ... }", description: "Define beat-counted scenes and generated transitions."),
-        Entry.new(syntax: "timeline { at beats(0), scene: :intro }", description: "Define ordered scene markers."),
+        Entry.new(syntax: "timeline { at beats(0), scene: :intro, cue: :prelude }", description: "Define ordered scene markers with optional cue metadata."),
         Entry.new(syntax: "transition from: :intro, to: :drop { ... }", description: "Define explicit scene transitions."),
         Entry.new(syntax: "midi_map cc: 1, channel: 1, deadband: 2, smooth: 0.25, allow_multiple: true { ... }", description: "Map MIDI events to runtime actions."),
         Entry.new(syntax: "key \"d\" { switch_scene :drop }", description: "Map browser keyboard shortcuts to runtime actions.")

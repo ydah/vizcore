@@ -29,14 +29,16 @@ module Vizcore
       #
       # @param position [Numeric, Point] seconds by default, or a value from `seconds`, `beats`, or `bars`
       # @param scene [Symbol, String] scene to activate at the position
+      # @param cue [Symbol, String, nil] optional cue identifier for marker metadata
       # @return [Hash]
-      def at(position, scene:)
+      def at(position, scene:, cue: nil)
         point = normalize_position(position)
         entry = {
           at: point.value,
           unit: point.unit,
           scene: scene.to_sym
         }
+        entry[:cue] = cue.to_sym if cue
         @entries << entry
         entry
       end
