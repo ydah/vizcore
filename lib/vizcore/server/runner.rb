@@ -1027,14 +1027,7 @@ module Vizcore
       end
 
       def deep_dup(value)
-        case value
-        when Hash
-          value.each_with_object({}) { |(entry_key, entry_value), output| output[entry_key] = deep_dup(entry_value) }
-        when Array
-          value.map { |entry| deep_dup(entry) }
-        else
-          value
-        end
+        Vizcore::DeepCopy.copy(value)
       end
 
       def find_scene_catalog_scene(name)

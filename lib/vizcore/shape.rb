@@ -110,14 +110,7 @@ module Vizcore
       end
 
       def deep_dup(value)
-        case value
-        when Hash
-          value.each_with_object({}) { |(key, entry), output| output[key] = deep_dup(entry) }
-        when Array
-          value.map { |entry| deep_dup(entry) }
-        else
-          value
-        end
+        Vizcore::DeepCopy.copy(value)
       end
 
       def shape_definition(renderer)
@@ -726,14 +719,7 @@ module Vizcore
       end
 
       def deep_dup(value)
-        case value
-        when Hash
-          value.each_with_object({}) { |(key, entry), output| output[key] = deep_dup(entry) }
-        when Array
-          value.map { |entry| deep_dup(entry) }
-        else
-          value
-        end
+        Vizcore::DeepCopy.copy(value)
       end
     end
   end
