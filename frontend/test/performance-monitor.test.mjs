@@ -30,11 +30,21 @@ test("recordRenderFrame tracks frame time and rolling fps", () => {
 test("recordSocketFrame measures websocket latency from server timestamp", () => {
   const state = recordSocketFrame(
     createPerformanceMonitorState(),
-    { timestamp: 10, metrics: { audio_capture_ms: 0.25, audio_analysis_ms: 1.5 } },
+    {
+      timestamp: 10,
+      metrics: {
+        audio_capture_ms: 0.25,
+        audio_analysis_ms: 1.5,
+        scene_build_ms: 6.25,
+      },
+    },
     10_024,
   );
 
   assert.equal(state.audioLatencyMs, 1.75);
+  assert.equal(state.audioCaptureMs, 0.25);
+  assert.equal(state.audioAnalysisMs, 1.5);
+  assert.equal(state.sceneBuildMs, 6.25);
   assert.equal(state.wsLatencyMs, 24);
   assert.equal(state.lastSocketTimestampMs, 10_000);
 });
@@ -110,6 +120,9 @@ test("renderer capability and safe mode metrics are tracked", () => {
 test("formatPerformanceMonitorText produces stable HUD copy", () => {
   const state = {
     audioLatencyMs: 1.2,
+    audioCaptureMs: 0.25,
+    audioAnalysisMs: 1.5,
+    sceneBuildMs: 6.25,
     droppedFrames: 3,
     fps: 59.94,
     frameMs: 16.72,
@@ -128,7 +141,7 @@ test("formatPerformanceMonitorText produces stable HUD copy", () => {
 
   assert.equal(
     formatPerformanceMonitorText(state),
-    "Perf: 59.9 FPS | Frame 16.7ms | WS 12ms | RTT 8ms | Clock -2ms | Drop 3 | BDrop 4 | WSLag 2.5f | Audio 1.2ms | Shader 3.4ms | DPR 1.50x | MaxTex 8192 | Safe on | Backpressure 1024B | Reconnect 1",
+    "Perf: 59.9 FPS | Frame 16.7ms | WS 12ms | RTT 8ms | Clock -2ms | Drop 3 | BDrop 4 | WSLag 2.5f | Audio 1.2ms | Capture 0.3ms | Analyze 1.5ms | Build 6.3ms | Shader 3.4ms | DPR 1.50x | MaxTex 8192 | Safe on | Backpressure 1024B | Reconnect 1",
   );
 });
 

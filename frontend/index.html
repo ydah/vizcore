@@ -468,7 +468,7 @@
         <button id="freeze-toggle" type="button" aria-pressed="false">Freeze</button>
         <p id="live-control-status" class="live-controls__status">Live: output</p>
       </div>
-      <p id="performance-monitor" class="performance-monitor">Perf: -- FPS | Frame -- | WS -- | RTT -- | Clock -- | Drop 0 | Audio -- | Shader -- | Reconnect 0</p>
+      <p id="performance-monitor" class="performance-monitor">Perf: -- FPS | Frame -- | WS -- | RTT -- | Clock -- | Drop 0 | BDrop 0 | WSLag --f | Audio -- | Capture -- | Analyze -- | Build -- | Shader -- | DPR -- | MaxTex -- | Safe off | Backpressure -- | Reconnect 0</p>
       <div class="audio-inspector" aria-label="Audio inspector">
         <div class="audio-inspector__header">
           <span>Audio</span>
@@ -502,6 +502,7 @@
         <div id="fft-preview" class="fft-preview" aria-label="FFT preview"></div>
       </div>
       <p id="audio-source-status">Audio Source: unknown</p>
+      <p id="audio-health-status">Audio Health: unknown</p>
       <p id="audio-track-status">Track: none</p>
       <p id="audio-playback-status">Playback: unavailable</p>
       <div class="reactivity-controls" aria-label="Visual reactivity controls">
@@ -565,6 +566,7 @@
         var bpmStatus = document.getElementById("bpm-status");
         var beatStatus = document.getElementById("beat-status");
         var audioSourceStatus = document.getElementById("audio-source-status");
+        var audioHealthStatus = document.getElementById("audio-health-status");
         var peakStatus = document.getElementById("inspector-peak");
         var ampValue = document.getElementById("inspector-amplitude-value");
         var ampFill = document.getElementById("inspector-amplitude-fill");
@@ -587,6 +589,20 @@
           .then(function (runtime) {
             if (runtime && audioSourceStatus) {
               audioSourceStatus.textContent = "Audio Source: " + runtime.audio_source;
+            }
+            if (runtime && audioHealthStatus) {
+              var input = runtime.input || {};
+              var ringBuffer = input.ring_buffer || {};
+              var sampleRate = Number(input.sample_rate || 0);
+              var requestedRate = Number(input.requested_sample_rate || 0);
+              var frameSize = Number(input.frame_size || 0);
+              var overrun = Number(ringBuffer.overrun_count || 0);
+              var underrun = Number(ringBuffer.underrun_count || 0);
+              var mismatch = input.sample_rate_mismatch ? " mismatched" : "";
+              var rateText = "Rate: " + (sampleRate > 0 ? sampleRate : "--") + "Hz" + (requestedRate > 0 && requestedRate !== sampleRate ? " (req " + requestedRate + "Hz)" : "");
+              var frameText = "Frame: " + (frameSize > 0 ? frameSize : "--");
+              var healthText = "Ring: " + overrun + "/" + underrun + " over/under";
+              audioHealthStatus.textContent = "Audio Health: " + rateText + ", " + frameText + mismatch + ", " + healthText;
             }
           })
           .catch(function () {});

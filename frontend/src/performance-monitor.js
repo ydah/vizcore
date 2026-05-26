@@ -3,6 +3,9 @@ const FPS_WINDOW_MS = 500;
 
 export const createPerformanceMonitorState = () => ({
   audioLatencyMs: null,
+  audioCaptureMs: null,
+  audioAnalysisMs: null,
+  sceneBuildMs: null,
   clockOffsetMs: null,
   droppedFrames: 0,
   wsDroppedFrames: 0,
@@ -76,12 +79,18 @@ export const recordSocketFrame = (
   const frameGapMs = previousTimestamp === null ? 0 : Math.max(0, timestampMs - previousTimestamp);
   const droppedFrames = Number(state?.droppedFrames || 0) + estimateDroppedFrames(frameGapMs, expectedFrameMs);
   const audioLatencyMs = audioLatencyFromMetrics(frame?.metrics, state?.audioLatencyMs);
+  const audioCaptureMs = audioCaptureFromMetrics(frame?.metrics, state?.audioCaptureMs);
+  const audioAnalysisMs = audioAnalysisFromMetrics(frame?.metrics, state?.audioAnalysisMs);
+  const sceneBuildMs = sceneBuildFromMetrics(frame?.metrics, state?.sceneBuildMs);
   const clockOffsetMs = Number.isFinite(state?.clockOffsetMs) ? Number(state.clockOffsetMs) : 0;
   const browserTimestampMs = timestampMs - clockOffsetMs;
 
   return {
     ...state,
     audioLatencyMs,
+    audioCaptureMs,
+    audioAnalysisMs,
+    sceneBuildMs,
     droppedFrames,
     lastSocketTimestampMs: timestampMs,
     wsLatencyMs: Math.max(0, Math.round(receivedAt - browserTimestampMs)),
@@ -181,6 +190,9 @@ export const formatPerformanceMonitorText = (state) => {
   const rtt = Number.isFinite(state?.rttMs) ? `${Math.round(state.rttMs)}ms` : "--";
   const clockOffset = Number.isFinite(state?.clockOffsetMs) ? `${formatSignedInteger(state.clockOffsetMs)}ms` : "--";
   const audioLatency = Number.isFinite(state?.audioLatencyMs) ? `${Number(state.audioLatencyMs).toFixed(1)}ms` : "--";
+  const audioCaptureMs = Number.isFinite(state?.audioCaptureMs) ? `${Number(state.audioCaptureMs).toFixed(1)}ms` : "--";
+  const audioAnalysisMs = Number.isFinite(state?.audioAnalysisMs) ? `${Number(state.audioAnalysisMs).toFixed(1)}ms` : "--";
+  const sceneBuildMs = Number.isFinite(state?.sceneBuildMs) ? `${Number(state.sceneBuildMs).toFixed(1)}ms` : "--";
   const shaderCompile = Number.isFinite(state?.shaderCompileMs) ? `${Number(state.shaderCompileMs).toFixed(1)}ms` : "--";
   const rendererDpr = Number.isFinite(state?.rendererDpr) ? `${Number(state.rendererDpr).toFixed(2)}x` : "--";
   const maxTexture = Number.isFinite(state?.rendererMaxTextureSize) ? Math.round(state.rendererMaxTextureSize) : "--";
@@ -191,7 +203,7 @@ export const formatPerformanceMonitorText = (state) => {
   const reconnects = Math.max(0, Number(state?.reconnects || 0));
   const wsAvgPayload = Number.isFinite(state?.wsAvgPayloadBytes) ? `${Math.round(state.wsAvgPayloadBytes)}B` : "--";
 
-  return `Perf: ${fps} FPS | Frame ${frameMs} | WS ${wsLatency} | RTT ${rtt} | Clock ${clockOffset} | Drop ${droppedFrames} | BDrop ${wsDroppedFrames} | WSLag ${wsEstimatedLagFrames.toFixed(1)}f | Audio ${audioLatency} | Shader ${shaderCompile} | DPR ${rendererDpr} | MaxTex ${maxTexture} | Safe ${safeMode} | Backpressure ${wsAvgPayload} | Reconnect ${reconnects}`;
+  return `Perf: ${fps} FPS | Frame ${frameMs} | WS ${wsLatency} | RTT ${rtt} | Clock ${clockOffset} | Drop ${droppedFrames} | BDrop ${wsDroppedFrames} | WSLag ${wsEstimatedLagFrames.toFixed(1)}f | Audio ${audioLatency} | Capture ${audioCaptureMs} | Analyze ${audioAnalysisMs} | Build ${sceneBuildMs} | Shader ${shaderCompile} | DPR ${rendererDpr} | MaxTex ${maxTexture} | Safe ${safeMode} | Backpressure ${wsAvgPayload} | Reconnect ${reconnects}`;
 };
 
 export const estimateDroppedFrames = (frameGapMs, expectedFrameMs = DEFAULT_EXPECTED_FRAME_MS) => {
@@ -212,6 +224,21 @@ const audioLatencyFromMetrics = (metrics, fallback) => {
   }
 
   return (captureMs || 0) + (analysisMs || 0);
+};
+
+const audioCaptureFromMetrics = (metrics, fallback) => {
+  const captureMs = coerceMetric(metrics?.audio_capture_ms);
+  return captureMs ?? fallback ?? null;
+};
+
+const audioAnalysisFromMetrics = (metrics, fallback) => {
+  const analysisMs = coerceMetric(metrics?.audio_analysis_ms);
+  return analysisMs ?? fallback ?? null;
+};
+
+const sceneBuildFromMetrics = (metrics, fallback) => {
+  const buildMs = coerceMetric(metrics?.scene_build_ms);
+  return buildMs ?? fallback ?? null;
 };
 
 const coerceMetric = (value) => {

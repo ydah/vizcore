@@ -94,6 +94,7 @@ const inspectorBandElements = Object.fromEntries(
 );
 const fftPreviewElement = document.querySelector("#fft-preview");
 const audioSourceStatusElement = document.querySelector("#audio-source-status");
+const audioHealthStatusElement = document.querySelector("#audio-health-status");
 const audioTrackStatusElement = document.querySelector("#audio-track-status");
 const audioPlaybackStatusElement = document.querySelector("#audio-playback-status");
 const sceneSwitcherElement = document.querySelector("#scene-switcher");
@@ -347,6 +348,7 @@ function applyRuntime(runtime) {
 
   const fileName = runtime?.audio_file_name;
   const fileUrl = runtime?.audio_file_url;
+  applyRuntimeAudioInputHealth(runtime?.input);
   if (!fileUrl) {
     engine.setMediaElement(null);
     audioTrackStatusElement.textContent = "Track: none";
@@ -357,6 +359,33 @@ function applyRuntime(runtime) {
 
   audioTrackStatusElement.textContent = `Track: ${String(fileName || "source file")}`;
   setupAudioPlayback(fileUrl);
+}
+
+function applyRuntimeAudioInputHealth(input) {
+  if (!audioHealthStatusElement) {
+    return;
+  }
+
+  const source = String(input?.source || "unknown");
+  const sampleRate = Number(input?.sample_rate);
+  const requestedSampleRate = Number(input?.requested_sample_rate);
+  const frameSize = Number(input?.frame_size);
+  const ringBuffer = input?.ring_buffer || {};
+  const overrun = Number(ringBuffer?.overrun_count || 0);
+  const underrun = Number(ringBuffer?.underrun_count || 0);
+  const sampleRateText = Number.isFinite(sampleRate) && sampleRate > 0
+    ? `${Math.round(sampleRate)}Hz`
+    : "--";
+  const requestedSampleRateText = Number.isFinite(requestedSampleRate) &&
+      requestedSampleRate > 0 &&
+      requestedSampleRate !== sampleRate
+    ? ` (${Math.round(requestedSampleRate)}Hz requested)`
+    : "";
+  const frameText = Number.isFinite(frameSize) && frameSize > 0
+    ? ` | Frame ${Math.round(frameSize)}`
+    : "";
+
+  audioHealthStatusElement.textContent = `Input: ${source} | Sample ${sampleRateText}${requestedSampleRateText} | ${frameText} | Overrun ${Math.max(0, overrun)} | Underrun ${Math.max(0, underrun)}`;
 }
 
 function applyRuntimeGlobals(globals) {
