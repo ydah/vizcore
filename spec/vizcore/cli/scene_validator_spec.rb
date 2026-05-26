@@ -213,6 +213,56 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
     end
   end
 
+  it "flags overlapping MIDI mappings unless all mappings allow_multiple" do
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :known do
+          layer :shape do
+            type :shape
+          end
+        end
+
+        midi_map note: 36 do
+          switch_scene :known
+        end
+
+        midi_map note: 36, channel: 1 do
+          switch_scene :known
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+
+      expect(result).not_to be_valid
+      expect(result.issues.map(&:code)).to include("E_DUPLICATE_MIDI_MAPPING")
+      expect(result.issues.map(&:message).join("\n")).to include("duplicate MIDI mapping: note:36")
+    end
+  end
+
+  it "allows overlapping MIDI mappings when allow_multiple is enabled on all mappings" do
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :known do
+          layer :shape do
+            type :shape
+          end
+        end
+
+        midi_map note: 36, allow_multiple: true do
+          switch_scene :known
+        end
+
+        midi_map note: 36, channel: 1, allow_multiple: true do
+          switch_scene :known
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+
+      expect(result).to be_valid
+    end
+  end
+
   it "accepts added shader presets" do
     with_scene_file(<<~RUBY) do |scene_path|
       Vizcore.define do

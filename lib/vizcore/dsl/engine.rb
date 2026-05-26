@@ -273,7 +273,7 @@ module Vizcore
       # @yield Action block executed by midi runtime
       # @raise [ArgumentError] when no trigger is supplied
       # @return [void]
-      def midi_map(note: nil, cc: nil, pc: nil, channel: nil, relative: false, deadband: nil, smooth: nil, pickup: nil, &block)
+      def midi_map(note: nil, cc: nil, pc: nil, channel: nil, relative: false, deadband: nil, smooth: nil, pickup: nil, allow_multiple: false, &block)
         trigger = {}
         trigger[:note] = Integer(note) unless note.nil?
         trigger[:cc] = Integer(cc) unless cc.nil?
@@ -284,6 +284,7 @@ module Vizcore
         trigger[:deadband] = non_negative_float(deadband, "midi deadband") unless deadband.nil?
         trigger[:smooth] = normalize_midi_smooth(smooth) unless smooth.nil? || smooth == false
         trigger[:pickup] = pickup if trigger.key?(:cc) && trigger[:cc].between?(0, 127) && !!pickup
+        trigger[:allow_multiple] = !!allow_multiple
 
         @midi_mappings << {
           trigger: trigger,

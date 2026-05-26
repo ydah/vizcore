@@ -389,8 +389,14 @@ module Vizcore
       end
 
       def validate_midi_maps(mappings, scenes, issues)
-        duplicate_values(mappings.filter_map { |mapping| midi_trigger_key(mapping[:trigger] || mapping["trigger"]) }).each do |trigger|
-          issues << error("duplicate MIDI mapping: #{trigger}", code: "E_DUPLICATE_MIDI_MAPPING")
+        deduped = Set.new
+        midi_trigger_conflicts(Array(mappings)).each do |conflict|
+          label = midi_trigger_signature_label(conflict)
+          next if midi_trigger_conflicts_allow_multiple?(conflict)
+          next if deduped.include?(label)
+
+          deduped << label
+          issues << error("duplicate MIDI mapping: #{label}", code: "E_DUPLICATE_MIDI_MAPPING")
         end
         mappings.each do |mapping|
           validate_midi_trigger(Hash(mapping[:trigger] || mapping["trigger"] || {}), issues)
@@ -430,17 +436,87 @@ module Vizcore
         end
       end
 
-      def midi_trigger_key(trigger)
-        values = Hash(trigger || {})
-        channel = values[:channel] || values["channel"]
-        channel_part = channel.nil? ? "" : ":ch#{channel}"
+      def midi_trigger_conflicts(mappings)
+        entries = indexed_midi_triggers(Array(mappings))
+        grouped = entries.group_by { |entry| [entry[:kind], entry[:value]] }
+        conflicts = []
+
+        grouped.each_value do |group|
+          by_channel = group.group_by { |entry| entry[:channel] }
+          wildcard = by_channel.delete(nil) || []
+          explicit = by_channel.values.flatten
+
+          conflicts << (wildcard + explicit) if wildcard.any? && explicit.any?
+          conflicts << wildcard if wildcard.length > 1
+          by_channel.each_value do |channel_entries|
+            conflicts << channel_entries if channel_entries.length > 1
+          end
+        end
+
+        conflicts.select { |entries| entries.length > 1 }
+      end
+
+      def indexed_midi_triggers(mappings)
+        Array(mappings).each_with_index.filter_map do |mapping, index|
+          values = Hash(mapping[:trigger] || mapping["trigger"] || {})
+          spec = midi_trigger_spec(values)
+          next if spec.nil?
+
+          channel = midi_trigger_channel(values)
+          next if channel == :invalid
+
+          kind, value = spec
+          {
+            index: index,
+            kind: kind,
+            value: value,
+            channel: channel == :any ? nil : channel,
+            allow_multiple: !!(values[:allow_multiple] || values["allow_multiple"])
+          }
+        end
+      end
+
+      def midi_trigger_conflicts_allow_multiple?(entries)
+        entries.all? { |entry| entry[:allow_multiple] }
+      end
+
+      def midi_trigger_channel(values)
+        raw_channel = values[:channel]
+        raw_channel = values["channel"] if raw_channel.nil?
+        return :any if raw_channel.nil?
+
+        Integer(raw_channel)
+      rescue StandardError
+        :invalid
+      end
+
+      def midi_trigger_spec(values)
         %i[note cc pc].each do |key|
-          value = values[key] || values[key.to_s]
-          return "#{key}:#{value}#{channel_part}" unless value.nil?
+          raw = values[key]
+          raw = values[key.to_s] if raw.nil?
+          next if raw.nil?
+
+          return [key, Integer(raw)]
         end
         nil
       rescue StandardError
         nil
+      end
+
+      def midi_trigger_signature_label(entries)
+        first = entries.first
+        return "MIDI mapping" if first.nil?
+
+        channels = entries.map { |entry| entry[:channel] }.uniq
+        explicit_channels = channels.compact
+        return midi_trigger_signature(kind: first[:kind], value: first[:value], channel: nil) if channels.include?(nil) || explicit_channels.length != 1
+
+        midi_trigger_signature(kind: first[:kind], value: first[:value], channel: explicit_channels.first)
+      end
+
+      def midi_trigger_signature(kind:, value:, channel:)
+        channel_part = channel.nil? ? "" : ":ch#{channel}"
+        "#{kind}:#{value}#{channel_part}"
       end
 
       def validate_midi_trigger(trigger, issues)
