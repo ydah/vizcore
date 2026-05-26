@@ -471,16 +471,109 @@ module Vizcore
 
       def validate_mapping_target(target, layer, scene_name, layer_name, issues)
         value = target.to_s
-        match = /\Ashapes\.(\d+)\./.match(value)
-        return unless match
+        return unless value.start_with?("shapes.")
 
-        index = Integer(match[1])
-        shapes = Array(shape_value(Hash(layer[:params] || {}), :shapes))
-        return if index >= 0 && index < shapes.length
-
-        issues << error("scene #{scene_name} layer #{layer_name} mapping #{target} references missing shape index", code: "E_MAPPING_TARGET")
+        validate_shape_mapping_target(value, layer, scene_name, layer_name, issues)
       rescue StandardError
         issues << error("scene #{scene_name} layer #{layer_name} mapping #{target} has invalid target", code: "E_MAPPING_TARGET")
+      end
+
+      def validate_shape_mapping_target(target, layer, scene_name, layer_name, issues)
+        parts = target.split(".")
+        return unless parts.length >= 2
+
+        shape_index = parse_shape_index(parts[1])
+        if shape_index.nil?
+          issues << error("scene #{scene_name} layer #{layer_name} mapping #{target} has non-numeric shape index", code: "E_MAPPING_TARGET")
+          return
+        end
+
+        shapes = Array(shape_value(Hash(layer[:params] || {}), :shapes))
+        unless shape_index.between?(0, shapes.length - 1)
+          issues << error("scene #{scene_name} layer #{layer_name} mapping #{target} references missing shape index", code: "E_MAPPING_TARGET")
+          return
+        end
+
+        validate_nested_shape_path(parts[2..], shapes[shape_index], target, scene_name, layer_name, issues)
+      end
+
+      def validate_nested_shape_path(parts, container, target, scene_name, layer_name, issues)
+        return if parts.empty?
+
+        current_part = parts.first
+        next_part = parts[1]
+        remaining = parts.drop(1)
+        current_is_array = container.is_a?(Array)
+
+        if current_is_array && integer_key?(current_part)
+          array_index = parse_shape_index(current_part)
+          if array_index.nil?
+            issues << error("scene #{scene_name} layer #{layer_name} mapping #{target} has invalid array index", code: "E_MAPPING_TARGET")
+            return
+          end
+
+          if remaining.empty?
+            return
+          end
+
+          unless validate_array_index(container, array_index, target, scene_name, layer_name, issues)
+            return
+          end
+
+          next_container = Array(container)[array_index]
+          if next_container.is_a?(Hash) || next_container.is_a?(Array)
+            validate_nested_shape_path(remaining, next_container, target, scene_name, layer_name, issues)
+          else
+            issues << error("scene #{scene_name} layer #{layer_name} mapping #{target} references non-container segment #{current_part}", code: "E_MAPPING_TARGET")
+          end
+
+          return
+        end
+
+        unless container.is_a?(Hash)
+          issues << error("scene #{scene_name} layer #{layer_name} mapping #{target} references non-container segment #{current_part}", code: "E_MAPPING_TARGET")
+          return
+        end
+
+        key = current_part.to_sym
+        if container.key?(key)
+          validate_nested_shape_path(remaining, container[key], target, scene_name, layer_name, issues)
+          return
+        end
+
+        if container.key?(current_part)
+          validate_nested_shape_path(remaining, container[current_part], target, scene_name, layer_name, issues)
+          return
+        end
+
+        return if remaining.empty?
+
+        # Missing key is valid for simple nested hashes; continue by simulating
+        # the runtime container creation used by MappingResolver.
+        simulate_container = integer_key?(next_part) ? [] : {}
+        validate_nested_shape_path(remaining, simulate_container, target, scene_name, layer_name, issues)
+      end
+
+      def validate_array_index(container, index, target, scene_name, layer_name, issues)
+        unless container.is_a?(Array)
+          issues << error("scene #{scene_name} layer #{layer_name} mapping #{target} references array index on non-array", code: "E_MAPPING_TARGET")
+          return false
+        end
+
+        return true if index.between?(0, container.length - 1)
+
+        issues << error("scene #{scene_name} layer #{layer_name} mapping #{target} references missing array index #{index}", code: "E_MAPPING_TARGET")
+        false
+      end
+
+      def parse_shape_index(value)
+        Integer(value)
+      rescue ArgumentError, TypeError
+        nil
+      end
+
+      def integer_key?(value)
+        value.to_s.match?(%r{\A\d+\z})
       end
 
       def scene_names(scenes)

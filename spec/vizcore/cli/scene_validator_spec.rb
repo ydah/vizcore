@@ -326,6 +326,93 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
     end
   end
 
+  it "validates nested shape mapping targets through existing nested containers" do
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :nested_shape_mapping do
+          layer :rings do
+            type :shape
+            shapes [
+              {
+                kind: :circle,
+                points: [
+                  [0.0, 0.0],
+                  [1.0, 1.0]
+                ]
+              }
+            ]
+
+            map amplitude => :"shapes.0.points.1.0"
+            map frequency_band(:low) => :"shapes.0.transform.scale.x"
+          end
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+
+      expect(result).to be_valid
+      expect(result.issues).to be_empty
+    end
+  end
+
+  it "reports invalid nested array indices in shape mapping targets" do
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :bad_nested_shape_mapping do
+          layer :rings do
+            type :shape
+            shapes [
+              {
+                kind: :circle,
+                points: [
+                  [0.0, 0.0],
+                  [1.0, 1.0]
+                ]
+              }
+            ]
+
+            map amplitude => :"shapes.0.points.9.x"
+          end
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+      messages = result.issues.map(&:message)
+
+      expect(result).not_to be_valid
+      expect(result.errors.map(&:code)).to include("E_MAPPING_TARGET")
+      expect(messages.join("\n")).to include("references missing array index 9")
+    end
+  end
+
+  it "accepts terminal array index assignments for shape mapping targets" do
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :array_tail_target do
+          layer :rings do
+            type :shape
+            shapes [
+              {
+                kind: :circle,
+                points: [
+                  [0.0, 0.0],
+                  [1.0, 1.0]
+                ]
+              }
+            ]
+
+            map amplitude => :"shapes.0.points.9"
+          end
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+
+      expect(result).to be_valid
+      expect(result.issues).to be_empty
+    end
+  end
+
   it "uses layer capability metadata for supported type aliases" do
     with_scene_file(<<~RUBY) do |scene_path|
       Vizcore.define do
