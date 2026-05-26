@@ -82,6 +82,20 @@ module Vizcore
         }
       end
 
+      # @return [Float, nil] current transport position seconds for file sources
+      def transport_position_seconds
+        return @input.transport_position_seconds if @input.respond_to?(:transport_position_seconds)
+
+        nil
+      end
+
+      # @return [Float, nil] input track duration seconds for file sources
+      def track_duration_seconds
+        return @input.track_duration_seconds if @input.respond_to?(:track_duration_seconds)
+
+        nil
+      end
+
       # @param frame_rate [Numeric]
       # @return [Integer] approximate real-time sample count to ingest per render tick
       def realtime_capture_size(frame_rate)

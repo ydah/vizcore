@@ -64,6 +64,21 @@ RSpec.describe Vizcore::Audio::InputManager do
     end
   end
 
+  describe "#transport_position_seconds" do
+    it "delegates transport position and track duration for file input" do
+      manager = described_class.new(source: :file, file_path: fixture_path, frame_size: 8)
+      manager.start
+
+      expect(manager.transport_position_seconds).to be >= 0.0
+      expect(manager.track_duration_seconds).to be > 0.0
+      manager.sync_transport(playing: true, position_seconds: 0.0005)
+
+      expect(manager.transport_position_seconds).to be_within(0.0001).of(0.0005)
+    ensure
+      manager&.stop
+    end
+  end
+
   describe "#status" do
     it "reports input and ring buffer health" do
       manager = described_class.new(source: :dummy, frame_size: 4, ring_buffer_size: 4)

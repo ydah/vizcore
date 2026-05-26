@@ -67,6 +67,34 @@ module Vizcore
         self
       end
 
+      # @return [Float] current playback position in seconds (looped)
+      def transport_position_seconds
+        @state_mutex.synchronize do
+          return 0.0 if @samples.empty?
+
+          rate = @stream_sample_rate.to_f.positive? ? @stream_sample_rate.to_f : sample_rate.to_f
+          return 0.0 if rate <= 0
+
+          @cursor.to_f / rate
+        end
+      rescue StandardError
+        0.0
+      end
+
+      # @return [Float] looped track duration in seconds
+      def track_duration_seconds
+        @state_mutex.synchronize do
+          return 0.0 if @samples.empty?
+
+          rate = @stream_sample_rate.to_f.positive? ? @stream_sample_rate.to_f : sample_rate.to_f
+          return 0.0 if rate <= 0
+
+          @samples.length.to_f / rate
+        end
+      rescue StandardError
+        0.0
+      end
+
       private
 
       def load_samples

@@ -97,6 +97,10 @@ module Vizcore
         @custom_shape_param_overrides = {}
         @layer_param_overrides = {}
         @custom_shape_param_mutex = Mutex.new
+        @transport_reference_position = nil
+        @transport_reference_wall_seconds = nil
+        @transport_drift_seconds = 0.0
+        @transport_drift_threshold_seconds = 0.08
         @transport_playing = initial_transport_playing_state
         reset_transition_trigger_counters!
         @tap_tempo = Vizcore::Analysis::TapTempo.new
@@ -149,6 +153,7 @@ module Vizcore
           frame_size: input_manager_value(:frame_size),
           input: input_manager_status,
           transport_playing: @scene_mutex.synchronize { @transport_playing },
+          transport_drift: transport_drift_status,
           websocket_clients: WebSocketHandler.connection_count,
           dropped_frames: WebSocketHandler.dropped_frame_count,
           websocket_backpressure: WebSocketHandler.backpressure_status,
@@ -163,9 +168,14 @@ module Vizcore
       # @param position_seconds [Numeric]
       # @return [void]
       def sync_transport(playing:, position_seconds:)
+        position = finite_float(position_seconds)
         @scene_mutex.synchronize do
           @transport_playing = !!playing
-          reset_transition_trigger_counters! if transport_position_reset?(position_seconds)
+          reset_transition_trigger_counters! if transport_position_reset?(position)
+          if file_transport_source?
+            @transport_reference_position = position
+            @transport_reference_wall_seconds = wall_clock_seconds
+          end
         end
         return unless @input_manager.respond_to?(:sync_transport)
 
@@ -310,6 +320,7 @@ module Vizcore
       # @return [Hash]
       def build_frame(elapsed_seconds, samples = nil)
         started_at_ms = monotonic_ms
+        apply_transport_drift_correction if file_transport_source?
         audio_samples, audio_capture_ms = capture_or_use_samples(samples)
         sync_last_scene_state_with_connections
         analyzed, audio_analysis_ms = measure_ms { @analysis_pipeline.call(audio_samples) }
@@ -395,6 +406,114 @@ module Vizcore
 
       def monotonic_ms
         Process.clock_gettime(Process::CLOCK_MONOTONIC, :float_millisecond)
+      end
+
+      def wall_clock_seconds
+        Time.now.to_f
+      end
+
+      def apply_transport_drift_correction
+        reference_position = @scene_mutex.synchronize { finite_float(@transport_reference_position) }
+        return if reference_position.nil?
+
+        reference_wall_seconds = @scene_mutex.synchronize { finite_float(@transport_reference_wall_seconds) }
+        return if reference_wall_seconds.nil?
+
+        current_position = transport_input_position_seconds
+        duration = transport_track_duration_seconds
+        return unless current_position && duration&.positive?
+
+        expected_position = file_transport_expected_position(
+          reference_position: reference_position,
+          duration: duration,
+          elapsed_wall_seconds: (wall_clock_seconds - reference_wall_seconds),
+          is_playing: transport_playing?
+        )
+        drift_seconds = circular_difference(expected_position, current_position, duration)
+        drift_seconds = 0.0 if drift_seconds.nil?
+
+        @scene_mutex.synchronize do
+          @transport_drift_seconds = drift_seconds
+        end
+
+        return unless drift_seconds.abs > @transport_drift_threshold_seconds
+
+        drifted_position = wrap_transport_position(current_position + drift_seconds, duration)
+        sync_transport_input_position(
+          playing: @scene_mutex.synchronize { @transport_playing },
+          position_seconds: drifted_position
+        )
+      end
+
+      def transport_drift_status
+        status = @scene_mutex.synchronize do
+          {
+            drift_seconds: @transport_drift_seconds,
+            threshold_seconds: @transport_drift_threshold_seconds,
+            reference_position: @transport_reference_position,
+            reference_wall_seconds: @transport_reference_wall_seconds
+          }
+        end
+        status.compact
+      rescue StandardError
+        {}
+      end
+
+      def transport_input_position_seconds
+        return nil unless @input_manager.respond_to?(:transport_position_seconds)
+        return nil if @input_manager.nil?
+
+        @input_manager.transport_position_seconds
+      rescue StandardError
+        nil
+      end
+
+      def transport_track_duration_seconds
+        return nil unless @input_manager.respond_to?(:track_duration_seconds)
+        return nil if @input_manager.nil?
+
+        @input_manager.track_duration_seconds
+      rescue StandardError
+        nil
+      end
+
+      def sync_transport_input_position(playing:, position_seconds:)
+        return unless @input_manager.respond_to?(:sync_transport)
+
+        @input_manager.sync_transport(playing: playing, position_seconds: position_seconds)
+      rescue StandardError
+        nil
+      end
+
+      def file_transport_expected_position(reference_position:, duration:, elapsed_wall_seconds:, is_playing:)
+        return nil unless duration.positive?
+
+        additional_position = finite_float(elapsed_wall_seconds)
+        return nil if additional_position.nil?
+
+        playback_position = reference_position + (is_playing ? additional_position : 0.0)
+        wrap_transport_position(playback_position, duration)
+      end
+
+      def circular_difference(expected, actual, duration)
+        return nil if expected.nil? || actual.nil? || !duration.positive?
+
+        diff = expected - actual
+        modulo = duration
+        return diff if modulo.zero?
+
+        ((diff + modulo / 2.0) % modulo) - modulo / 2.0
+      end
+
+      def wrap_transport_position(position, duration)
+        return 0.0 unless duration.positive?
+
+        wrapped = position % duration
+        wrapped.negative? ? wrapped + duration : wrapped
+      end
+
+      def transport_playing?
+        @scene_mutex.synchronize { @transport_playing }
       end
 
       def capture_samples

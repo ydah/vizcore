@@ -192,6 +192,101 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
       expect(status[:metrics]).to include(:server_frame_ms)
     end
 
+    it "corrects file transport drift when playback diverges" do
+      sync_calls = []
+      analysis_position = 0.0
+      input_manager = instance_double(
+        Vizcore::Audio::InputManager,
+        frame_size: 1024,
+        sample_rate: 44_100,
+        start: nil,
+        stop: nil,
+        realtime_capture_size: 735,
+        capture_frame: Array.new(1024, 0.0),
+        latest_samples: Array.new(1024, 0.0),
+        track_duration_seconds: 2.0
+      )
+      allow(input_manager).to receive(:transport_position_seconds) { analysis_position }
+      allow(input_manager).to receive(:sync_transport) do |playing:, position_seconds:|
+        sync_calls << [playing, position_seconds]
+        analysis_position = position_seconds
+      end
+      pipeline = instance_double(
+        Vizcore::Analysis::Pipeline,
+        call: {
+          amplitude: 0.2,
+          bands: { sub: 0.0, low: 0.2, mid: 0.3, high: 0.4 },
+          fft: Array.new(32, 0.12),
+          beat: false,
+          beat_count: 7,
+          bpm: 120.0
+        }
+      )
+      broadcaster = described_class.new(
+        scene_name: "intro",
+        input_manager: input_manager,
+        analysis_pipeline: pipeline
+      )
+      allow(broadcaster).to receive(:file_transport_source?).and_return(true)
+      allow(broadcaster).to receive(:wall_clock_seconds).and_return(0.0, 0.2)
+
+      broadcaster.sync_transport(playing: true, position_seconds: 0.0)
+      analysis_position = 1.0
+      broadcaster.build_frame(0.2)
+
+      expect(sync_calls.size).to eq(2)
+      expect(sync_calls.last).to satisfy do |entry|
+        playing, position_seconds = entry
+        playing == true && (position_seconds - 0.2).abs < 0.001
+      end
+      expect(broadcaster.runtime_status[:transport_drift]).to include(:drift_seconds)
+      expect(broadcaster.runtime_status[:transport_drift][:drift_seconds].abs).to be > 0.0
+    end
+
+    it "keeps file transport drift within threshold and does not correct" do
+      input_manager = instance_double(
+        Vizcore::Audio::InputManager,
+        frame_size: 1024,
+        sample_rate: 44_100,
+        start: nil,
+        stop: nil,
+        realtime_capture_size: 735,
+        capture_frame: Array.new(1024, 0.0),
+        latest_samples: Array.new(1024, 0.0),
+        track_duration_seconds: 2.0
+      )
+      allow(input_manager).to receive(:transport_position_seconds) { 0.19 }
+      allow(input_manager).to receive(:sync_transport)
+      pipeline = instance_double(
+        Vizcore::Analysis::Pipeline,
+        call: {
+          amplitude: 0.2,
+          bands: { sub: 0.0, low: 0.2, mid: 0.3, high: 0.4 },
+          fft: Array.new(32, 0.12),
+          beat: false,
+          beat_count: 7,
+          bpm: 120.0
+        }
+      )
+      broadcaster = described_class.new(
+        scene_name: "intro",
+        input_manager: input_manager,
+        analysis_pipeline: pipeline
+      )
+      allow(broadcaster).to receive(:file_transport_source?).and_return(true)
+      allow(broadcaster).to receive(:wall_clock_seconds).and_return(0.0, 0.2)
+
+      broadcaster.sync_transport(playing: true, position_seconds: 0.0)
+      broadcaster.build_frame(0.2)
+
+      expect(input_manager).to have_received(:sync_transport).with(
+        hash_including(playing: true, position_seconds: 0.0)
+      ).once
+      expect(broadcaster.runtime_status[:transport_drift]).to include(
+        drift_seconds: be_within(0.01).of(0.01)
+      )
+    end
+
     it "builds scene layers from DSL definitions and mapping sources" do
       input_manager = instance_double(
         Vizcore::Audio::InputManager,

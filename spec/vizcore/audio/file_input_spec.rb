@@ -102,4 +102,16 @@ RSpec.describe Vizcore::Audio::FileInput do
 
     expect(input.stream_sample_rate).to eq(8000)
   end
+
+  it "exposes transport position and track duration in seconds" do
+    input = described_class.new(path: fixture_path, sample_rate: 44_100)
+    input.start
+
+    expect(input.track_duration_seconds).to be > 0.0
+    expect(input.transport_position_seconds).to eq(0.0)
+    input.sync_transport(playing: true, position_seconds: 0.0005)
+    expect(input.transport_position_seconds).to be_within(1e-6).of(0.0005)
+  ensure
+    input&.stop
+  end
 end
