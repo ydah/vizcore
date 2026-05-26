@@ -352,10 +352,47 @@ module Vizcore
         preset = values.is_a?(Hash) ? values : {}
         visual_settings = preset[:visual_settings] || preset["visual_settings"] || preset[:visualSettings] || preset["visualSettings"]
         midi_learn_bindings = preset[:midi_learn_bindings] || preset["midi_learn_bindings"] || preset[:midiLearnBindings] || preset["midiLearnBindings"]
+        scene_overrides = preset[:scene_overrides] || preset["scene_overrides"] || preset[:sceneOverrides] || preset["sceneOverrides"]
 
         {}.tap do |payload|
           payload["visual_settings"] = visual_settings if visual_settings.is_a?(Hash)
           payload["midi_learn_bindings"] = midi_learn_bindings if midi_learn_bindings.is_a?(Hash)
+          normalized_scene_overrides = normalize_scene_overrides(scene_overrides)
+          payload["scene_overrides"] = normalized_scene_overrides if normalized_scene_overrides
+        end
+      rescue StandardError
+        {}
+      end
+
+      def normalize_scene_overrides(values)
+        return nil unless values
+
+        raw_overrides = values.is_a?(Hash) ? values : {}
+        normalized = {}
+
+        raw_overrides.each do |raw_scene, raw_override|
+          scene_name = raw_scene.to_s.strip
+          next if scene_name.empty?
+
+          scene_override = normalize_scene_override(raw_override)
+          next if scene_override.empty?
+
+          normalized[scene_name] = scene_override
+        end
+
+        normalized.empty? ? nil : normalized
+      rescue StandardError
+        nil
+      end
+
+      def normalize_scene_override(value)
+        input = value.is_a?(Hash) ? value : {}
+
+        {
+          visual_settings: input[:visual_settings] || input["visual_settings"] || input[:visualSettings] || input["visualSettings"],
+          midi_learn_bindings: input[:midi_learn_bindings] || input["midi_learn_bindings"] || input[:midiLearnBindings] || input["midiLearnBindings"] || input[:midi] || input["midi"]
+        }.each_with_object({}) do |(key, value), output|
+          output[key.to_s] = value if value.is_a?(Hash)
         end
       rescue StandardError
         {}

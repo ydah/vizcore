@@ -50,11 +50,40 @@ module Vizcore
       input = value.is_a?(Hash) ? value : {}
       visual_settings = hash_value(input, "visual_settings", "visualSettings", "settings")
       midi_learn_bindings = hash_value(input, "midi_learn_bindings", "midiLearnBindings", "midi")
+      scene_overrides = hash_value(input, "scene_overrides", "sceneOverrides")
 
       {}.tap do |payload|
         payload["visual_settings"] = visual_settings if visual_settings
         payload["midi_learn_bindings"] = midi_learn_bindings if midi_learn_bindings
+        normalized_scene_overrides = normalize_scene_overrides(scene_overrides)
+        payload["scene_overrides"] = normalized_scene_overrides if normalized_scene_overrides
       end
+    end
+
+    def normalize_scene_overrides(value)
+      return nil unless value
+      raw_overrides = value.is_a?(Hash) ? value : {}
+      normalized = {}
+
+      raw_overrides.each do |raw_scene, raw_override|
+        scene_name = raw_scene.to_s.strip
+        next if scene_name.empty?
+
+        scene_override = normalize_scene_override(raw_override)
+        next if scene_override.empty?
+
+        normalized[scene_name] = scene_override
+      end
+
+      normalized.empty? ? nil : normalized
+    end
+
+    def normalize_scene_override(value)
+      input = value.is_a?(Hash) ? value : {}
+      {
+        "visual_settings" => hash_value(input, "visual_settings", "visualSettings"),
+        "midi_learn_bindings" => hash_value(input, "midi_learn_bindings", "midiLearnBindings", "midi")
+      }.select { |_, entry| entry }
     end
 
     def hash_value(input, *keys)

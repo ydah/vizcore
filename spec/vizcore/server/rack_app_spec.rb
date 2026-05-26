@@ -152,7 +152,13 @@ RSpec.describe Vizcore::Server::RackApp do
       frontend_root: Vizcore.frontend_root,
       control_preset: {
         visual_settings: { visualGain: 3.25 },
-        midi_learn_bindings: { "cc:1:7" => { type: "live_control", control: "freeze" } }
+        midi_learn_bindings: { "cc:1:7" => { type: "live_control", control: "freeze" } },
+        scene_overrides: {
+          build: {
+            visual_settings: { bassBoost: 1.8 },
+            midi_learn_bindings: { "cc:1:5" => { type: "live_control", control: "blackout" } }
+          }
+        }
       }
     )
 
@@ -161,6 +167,7 @@ RSpec.describe Vizcore::Server::RackApp do
     expect(response.status).to eq(200)
     expect(response.body).to include("\"visual_settings\":{\"visualGain\":3.25}")
     expect(response.body).to include("\"midi_learn_bindings\":{\"cc:1:7\":{\"type\":\"live_control\",\"control\":\"freeze\"}}")
+    expect(response.body).to include("\"scene_overrides\":{\"build\":{\"visual_settings\":{\"bassBoost\":1.8},\"midi_learn_bindings\":{\"cc:1:5\":{\"type\":\"live_control\",\"control\":\"blackout\"}}}}")
   end
 
   it "persists writable control presets" do
@@ -186,6 +193,39 @@ RSpec.describe Vizcore::Server::RackApp do
       expect(JSON.parse(preset_path.read)).to include("visual_settings", "midi_learn_bindings")
       expect(runtime.body).to include("\"control_preset_writable\":true")
       expect(runtime.body).to include("\"visual_settings\":{\"visualGain\":4.2}")
+    end
+  end
+
+  it "persists runtime control preset scene overrides" do
+    Dir.mktmpdir("vizcore-control-preset-rack-overrides") do |dir|
+      preset_path = Pathname.new(dir).join("controls", "live.json")
+      runtime_app = described_class.new(
+        frontend_root: Vizcore.frontend_root,
+        control_preset_path: preset_path
+      )
+      body = JSON.generate(
+        visual_settings: { visualGain: 4.2 },
+        scene_overrides: {
+          build: {
+            visual_settings: { bassBoost: 2.2 },
+            midi_learn_bindings: { "note:1:36" => { type: "switch_scene", scene: "drop" } }
+          }
+        }
+      )
+
+      response = Rack::MockRequest.new(runtime_app).post(
+        "/control-preset",
+        "CONTENT_TYPE" => "application/json",
+        input: body
+      )
+      runtime = Rack::MockRequest.new(runtime_app).get("/runtime")
+
+      expect(response.status).to eq(200)
+      saved = JSON.parse(preset_path.read)
+      expect(saved).to include("visual_settings", "scene_overrides")
+      expect(saved.fetch("scene_overrides").keys).to include("build")
+      expect(saved.dig("scene_overrides", "build", "visual_settings", "bassBoost")).to eq(2.2)
+      expect(runtime.body).to include("\"scene_overrides\":{\"build\":{\"visual_settings\":{\"bassBoost\":2.2},\"midi_learn_bindings\":{\"note:1:36\":{\"type\":\"switch_scene\",\"scene\":\"drop\"}}}}")
     end
   end
 

@@ -141,6 +141,10 @@ let pendingSceneRequestedAt = 0;
 let tapTempoKey = null;
 let runtimeGlobalsReceived = false;
 let runtimeControlPresetApplied = false;
+let runtimeControlPresetSceneApplied = null;
+let runtimeControlPresetSceneOverrides = {};
+let runtimeControlPresetVisualBase = null;
+let runtimeControlPresetMidiBase = null;
 let controlPresetSaveUrl = null;
 let shaderParamOverrides = {};
 let scenePayload = null;
@@ -225,6 +229,7 @@ const client = new WebSocketClient(websocketUrl, {
       pendingSceneName = null;
       pendingSceneRequestedAt = 0;
     }
+    applyRuntimeControlPresetForScene(sceneName);
     updateSceneControls(scene);
     const amplitude = Number(frame?.audio?.amplitude || 0).toFixed(4);
     const bpm = Number(frame?.audio?.bpm || 0);
@@ -248,6 +253,7 @@ const client = new WebSocketClient(websocketUrl, {
     pendingSceneRequestedAt = 0;
     currentSceneName = to;
     sceneStatusElement.textContent = `Scene: ${to}`;
+    applyRuntimeControlPresetForScene(to, { force: true });
     transitionStatusElement.textContent = `Transition: ${from} -> ${to}`;
     renderSceneButtons();
   },
@@ -256,6 +262,7 @@ const client = new WebSocketClient(websocketUrl, {
     const sceneName = payload?.scene?.name;
     if (sceneName) {
       scenePayload = applyScenePayload(payload.scene);
+      applyRuntimeControlPresetForScene(sceneName, { force: true });
       updateSceneControls(scenePayload, { forceReset: true });
     }
     if (Object.prototype.hasOwnProperty.call(payload || {}, "tap_tempo_key")) {
@@ -401,28 +408,205 @@ function updateControlPresetPersistence(runtime) {
 }
 
 function applyRuntimeControlPreset(value) {
-  if (runtimeControlPresetApplied) {
+  if (!value || runtimeControlPresetApplied) {
     return;
   }
 
   const preset = normalizeRuntimeControlPreset(value);
-  let applied = false;
-  if (preset.visualSettings) {
-    const imported = importVisualSettingsPreset({ visual_settings: preset.visualSettings }, { fallback: visualSettings });
-    Object.assign(visualSettings, saveVisualSettingsPreset(browserStorage(), imported));
+  const hasVisual = Boolean(preset.visualSettings);
+  const hasMidi = Boolean(preset.midiLearnBindings);
+  const hasSceneOverrides = preset.sceneOverrides && Object.keys(preset.sceneOverrides).length > 0;
+  if (!hasVisual && !hasMidi && !hasSceneOverrides) {
+    return;
+  }
+
+  if (hasVisual) {
+    const imported = importVisualSettingsPreset(
+      { visual_settings: preset.visualSettings },
+      { fallback: visualSettings }
+    );
+    Object.assign(visualSettings, imported);
+    runtimeControlPresetVisualBase = cloneRuntimeValue(visualSettings);
+    saveVisualSettingsPreset(browserStorage(), visualSettings);
     syncVisualControls();
     engine.setVisualSettings(visualSettings);
     renderReactivityStatus("Project preset");
-    applied = true;
+  } else {
+    runtimeControlPresetVisualBase = cloneRuntimeValue(visualSettings);
   }
 
-  if (preset.midiLearnBindings) {
-    midiLearnBindings = saveMidiLearnBindings(browserStorage(), preset.midiLearnBindings);
+  if (hasMidi) {
+    midiLearnBindings = cloneRuntimeValue(preset.midiLearnBindings);
+    runtimeControlPresetMidiBase = cloneRuntimeValue(midiLearnBindings);
+    saveMidiLearnBindings(browserStorage(), midiLearnBindings);
     renderMidiLearnStatus();
-    applied = true;
+  } else {
+    runtimeControlPresetMidiBase = cloneRuntimeValue(midiLearnBindings);
   }
 
-  runtimeControlPresetApplied = applied;
+  runtimeControlPresetSceneOverrides = cloneRuntimeValue(preset.sceneOverrides || {});
+  runtimeControlPresetApplied = true;
+  runtimeControlPresetSceneApplied = null;
+  applyRuntimeControlPresetForScene(currentSceneName, { force: true });
+}
+
+function applyRuntimeControlPresetForScene(sceneName, { force = false } = {}) {
+  if (!runtimeControlPresetApplied) {
+    return;
+  }
+
+  const normalizedScene = normalizeSceneName(sceneName || currentSceneName);
+  if (!force && runtimeControlPresetSceneApplied === normalizedScene) {
+    return;
+  }
+  runtimeControlPresetSceneApplied = normalizedScene;
+
+  const override = normalizeRuntimeSceneOverride(runtimeControlPresetSceneOverrides[normalizedScene]) || {};
+  const nextVisual = deriveSceneVisualSettings(runtimeControlPresetVisualBase, override.visualSettings);
+  if (nextVisual) {
+    const hasVisualChanges = hasVisualSettingsChanges(visualSettings, nextVisual);
+    if (hasVisualChanges) {
+      Object.assign(visualSettings, nextVisual);
+      syncVisualControls();
+      engine.setVisualSettings(visualSettings);
+      renderReactivityStatus("Project preset");
+    }
+  }
+
+  const nextBindings = deriveSceneMidiBindings(runtimeControlPresetMidiBase, override.midiLearnBindings);
+  if (nextBindings && hasMidiLearnBindingChanges(midiLearnBindings, nextBindings)) {
+    midiLearnBindings = nextBindings;
+    renderMidiLearnStatus();
+  }
+}
+
+function deriveSceneVisualSettings(baseSettings, sceneVisualSettings) {
+  const base = baseSettings && typeof baseSettings === "object" ? cloneRuntimeValue(baseSettings) : {};
+  if (sceneVisualSettings) {
+    return Object.assign(base, cloneRuntimeValue(sceneVisualSettings));
+  }
+  return Object.keys(base).length ? base : null;
+}
+
+function deriveSceneMidiBindings(baseBindings, sceneMidiBindings) {
+  const base = baseBindings && typeof baseBindings === "object" ? cloneRuntimeValue(baseBindings) : {};
+  if (sceneMidiBindings) {
+    return Object.assign(base, cloneRuntimeValue(sceneMidiBindings));
+  }
+  return Object.keys(base).length ? base : null;
+}
+
+function normalizeRuntimeSceneOverride(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const input = value && typeof value === "object" ? value : {};
+  const output = {};
+  const visualSettings = objectValue(input.visualSettings) || objectValue(input.visual_settings);
+  const midiLearnBindings = objectValue(input.midiLearnBindings) || objectValue(input.midi_learn_bindings);
+  if (visualSettings) {
+    output.visualSettings = visualSettings;
+  }
+  if (midiLearnBindings) {
+    output.midiLearnBindings = midiLearnBindings;
+  }
+  return Object.keys(output).length ? output : null;
+}
+
+function syncRuntimeControlPresetSceneVisualSetting(key, value) {
+  if (!runtimeControlPresetApplied) {
+    return;
+  }
+
+  const sceneName = normalizeSceneName(currentSceneName);
+  const override = runtimeControlPresetSceneOverrides[sceneName];
+  if (override && typeof override === "object") {
+    const normalizedSceneOverride = normalizeRuntimeSceneOverride(override) || {};
+    const currentOverride = cloneRuntimeValue(normalizedSceneOverride);
+    currentOverride.visualSettings ||= {};
+    currentOverride.visualSettings[key] = value;
+    runtimeControlPresetSceneOverrides[sceneName] = currentOverride;
+    applyRuntimeControlPresetForScene(sceneName, { force: true });
+    return;
+  }
+
+  runtimeControlPresetVisualBase = runtimeControlPresetVisualBase || cloneRuntimeValue(visualSettings);
+  runtimeControlPresetVisualBase[key] = value;
+}
+
+function syncRuntimeControlPresetMidiBindings(nextBindings) {
+  if (!runtimeControlPresetApplied) {
+    return;
+  }
+
+  const sceneName = normalizeSceneName(currentSceneName);
+  const normalizedBindings = objectValue(nextBindings) ? cloneRuntimeValue(nextBindings) : {};
+  const override = runtimeControlPresetSceneOverrides[sceneName];
+  if (override && typeof override === "object") {
+    const normalizedSceneOverride = normalizeRuntimeSceneOverride(override) || {};
+    const currentOverride = cloneRuntimeValue(normalizedSceneOverride);
+    currentOverride.midiLearnBindings = normalizedBindings;
+    runtimeControlPresetSceneOverrides[sceneName] = currentOverride;
+    applyRuntimeControlPresetForScene(sceneName, { force: true });
+    return;
+  }
+
+  runtimeControlPresetMidiBase = normalizedBindings;
+}
+
+function syncRuntimeControlPresetBaseWithRuntime(nextVisualSettings = visualSettings) {
+  if (!runtimeControlPresetApplied) {
+    return;
+  }
+
+  runtimeControlPresetVisualBase = cloneRuntimeValue(nextVisualSettings);
+}
+
+function hasVisualSettingsChanges(currentValue, nextValue) {
+  return (
+    currentValue.visualGain !== nextValue.visualGain ||
+    currentValue.bassBoost !== nextValue.bassBoost ||
+    currentValue.smoothing !== nextValue.smoothing ||
+    currentValue.beatHoldMs !== nextValue.beatHoldMs ||
+    currentValue.wobbleAmount !== nextValue.wobbleAmount
+  );
+}
+
+function hasMidiLearnBindingChanges(currentBindings, nextBindings) {
+  if (!nextBindings) {
+    return false;
+  }
+  const currentKeys = Object.keys(currentBindings || {});
+  const nextKeys = Object.keys(nextBindings);
+  if (currentKeys.length !== nextKeys.length) {
+    return true;
+  }
+  for (const signature of nextKeys) {
+    if (!Object.prototype.hasOwnProperty.call(currentBindings, signature)) {
+      return true;
+    }
+    if (JSON.stringify(currentBindings[signature]) !== JSON.stringify(nextBindings[signature])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function normalizeSceneName(sceneName) {
+  return String(sceneName || "").trim() || "unknown";
+}
+
+function objectValue(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+}
+
+function cloneRuntimeValue(value) {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  return JSON.parse(JSON.stringify(value));
 }
 
 function updateAvailableScenes(sceneValues) {
@@ -1159,6 +1343,7 @@ function bindVisualControl(control, key, parser = Number) {
     visualSettings[key] = parser(control.value);
     engine.setVisualSettings(visualSettings);
     renderReactivityStatus();
+    syncRuntimeControlPresetSceneVisualSetting(key, visualSettings[key]);
   });
 }
 
@@ -1166,6 +1351,7 @@ function bindVisualPresetControls() {
   if (reactivitySaveButton) {
     reactivitySaveButton.addEventListener("click", () => {
       Object.assign(visualSettings, saveVisualSettingsPreset(browserStorage(), visualSettings));
+      syncRuntimeControlPresetBaseWithRuntime(visualSettings);
       renderReactivityStatus("Saved");
     });
   }
@@ -1175,6 +1361,7 @@ function bindVisualPresetControls() {
       Object.assign(visualSettings, loadVisualSettingsPreset(browserStorage(), { fallback: visualSettings }));
       syncVisualControls();
       engine.setVisualSettings(visualSettings);
+      syncRuntimeControlPresetBaseWithRuntime(visualSettings);
       renderReactivityStatus("Loaded");
     });
   }
@@ -1219,6 +1406,7 @@ function bindVisualPresetControls() {
       Object.assign(visualSettings, saveVisualSettingsPreset(browserStorage(), visualSettings));
       syncVisualControls();
       engine.setVisualSettings(visualSettings);
+      syncRuntimeControlPresetBaseWithRuntime(visualSettings);
       renderReactivityStatus("Imported");
     });
   }
@@ -1232,6 +1420,7 @@ async function saveProjectControlPreset() {
       body: JSON.stringify({
         visual_settings: visualSettings,
         midi_learn_bindings: midiLearnBindings,
+        scene_overrides: runtimeControlPresetSceneOverrides,
       }),
     });
     return response.ok;
@@ -1316,6 +1505,7 @@ function handleMidiMessage(event) {
   if (pendingMidiLearnAction && midiMessageActive(event?.data)) {
     midiLearnBindings = upsertMidiLearnBinding(midiLearnBindings, signature, pendingMidiLearnAction);
     midiLearnBindings = saveMidiLearnBindings(browserStorage(), midiLearnBindings);
+    syncRuntimeControlPresetMidiBindings(midiLearnBindings);
     renderMidiLearnStatus(`Learned ${midiSignatureLabel(signature)} -> ${midiLearnActionLabel(pendingMidiLearnAction)}`);
     pendingMidiLearnAction = null;
     return;
@@ -1334,6 +1524,7 @@ function applyMidiLearnAction(action, unitValue, active) {
     visualSettings[action.key] = visualSettingFromUnit(action.key, unitValue, visualSettings[action.key]);
     syncVisualControls();
     engine.setVisualSettings(visualSettings);
+    syncRuntimeControlPresetSceneVisualSetting(action.key, visualSettings[action.key]);
     renderReactivityStatus("MIDI");
     return;
   }
