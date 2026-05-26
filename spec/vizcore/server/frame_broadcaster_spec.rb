@@ -834,6 +834,108 @@ RSpec.describe Vizcore::Server::FrameBroadcaster do
       expect(broadcaster.current_scene_snapshot[:name]).to eq("drop")
     end
 
+    it "uses initial timeline seconds offset for scene-local transition elapsed time" do
+      input_manager = instance_double(
+        Vizcore::Audio::InputManager,
+        frame_size: 1024,
+        sample_rate: 44_100,
+        start: nil,
+        stop: nil
+      )
+      pipeline = instance_double(
+        Vizcore::Analysis::Pipeline,
+        call: {
+          amplitude: 0.4,
+          bands: { sub: 0.0, low: 0.3, mid: 0.2, high: 0.1 },
+          fft: Array.new(32, 0.02),
+          beat: true,
+          beat_count: 1,
+          bpm: 128.0
+        }
+      )
+
+      broadcaster = described_class.new(
+        scene_name: "intro",
+        scene_layers: [{ name: :intro_layer, type: :geometry, params: {} }],
+        scene_catalog: [
+          { name: :intro, layers: [{ name: :intro_layer, type: :geometry, params: {} }] },
+          { name: :drop, layers: [{ name: :drop_layer, type: :shader, params: {} }] }
+        ],
+        transitions: [
+          {
+            from: :intro,
+            to: :drop,
+            trigger: proc { seconds >= 2.0 }
+          }
+        ],
+        input_manager: input_manager,
+        analysis_pipeline: pipeline,
+        initial_timeline_entry: { unit: :seconds, at: 5.0, scene: :intro }
+      )
+
+      broadcaster.tick(5.5, Array.new(1024, 0.0))
+      expect(broadcaster.current_scene_snapshot[:name]).to eq("intro")
+
+      broadcaster.tick(7.2, Array.new(1024, 0.0))
+      expect(broadcaster.current_scene_snapshot[:name]).to eq("drop")
+    end
+
+    it "uses initial timeline beats offset for scene-local transition beat count" do
+      input_manager = instance_double(
+        Vizcore::Audio::InputManager,
+        frame_size: 1024,
+        sample_rate: 44_100,
+        start: nil,
+        stop: nil
+      )
+      pipeline = instance_double(
+        Vizcore::Analysis::Pipeline,
+        call: {
+          amplitude: 0.4,
+          bands: { sub: 0.0, low: 0.3, mid: 0.2, high: 0.1 },
+          fft: Array.new(32, 0.02),
+          beat: false,
+          beat_count: 5,
+          bpm: 128.0
+        }
+      )
+
+      broadcaster = described_class.new(
+        scene_name: "intro",
+        scene_layers: [{ name: :intro_layer, type: :geometry, params: {} }],
+        scene_catalog: [
+          { name: :intro, layers: [{ name: :intro_layer, type: :geometry, params: {} }] },
+          { name: :drop, layers: [{ name: :drop_layer, type: :shader, params: {} }] }
+        ],
+        transitions: [
+          {
+            from: :intro,
+            to: :drop,
+            trigger: proc { beat_count >= 4 }
+          }
+        ],
+        input_manager: input_manager,
+        analysis_pipeline: pipeline,
+        initial_timeline_entry: { unit: :beats, at: 3, scene: :intro }
+      )
+
+      broadcaster.tick(0.1, Array.new(1024, 0.0))
+      expect(broadcaster.current_scene_snapshot[:name]).to eq("intro")
+
+      allow(pipeline).to receive(:call).and_return(
+        {
+          amplitude: 0.4,
+          bands: { sub: 0.0, low: 0.3, mid: 0.2, high: 0.1 },
+          fft: Array.new(32, 0.02),
+          beat: false,
+          beat_count: 7,
+          bpm: 128.0
+        }
+      )
+      broadcaster.tick(0.2, Array.new(1024, 0.0))
+      expect(broadcaster.current_scene_snapshot[:name]).to eq("drop")
+    end
+
     it "does not evaluate transitions for file transport until playback starts" do
       input_manager = instance_double(
         Vizcore::Audio::InputManager,

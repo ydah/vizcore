@@ -90,6 +90,67 @@ RSpec.describe Vizcore::Server::Runner do
       expect(broadcaster).to have_received(:stop)
     end
 
+    it "starts from the timeline first entry scene when configured" do
+      Dir.mktmpdir("vizcore-runner-timeline") do |dir|
+        scene_path = File.join(dir, "timeline_scene.rb")
+        File.write(
+          scene_path,
+          <<~RUBY
+            Vizcore.define do
+              scene :intro do
+                layer :intro_layer do
+                  type :geometry
+                end
+              end
+
+              scene :drop do
+                layer :drop_layer do
+                  type :geometry
+                end
+              end
+
+              timeline do
+                at seconds(4.0), scene: :drop
+              end
+            end
+          RUBY
+        )
+
+        timeline_config = Vizcore::Config.new(
+          scene_file: scene_path,
+          host: "127.0.0.1",
+          port: 4567
+        )
+        timeline_broadcaster = instance_double(
+          Vizcore::Server::FrameBroadcaster,
+          start: nil,
+          sync_transport: nil,
+          stop: nil,
+          update_scene: nil,
+          update_transition_definition: nil,
+          update_analysis_settings: nil,
+          current_scene_snapshot: { name: "drop", layers: [] }
+        )
+        allow(Vizcore::Server::RackApp).to receive(:new).and_return(rack_app)
+        allow(Puma::Server).to receive(:new).and_return(puma_server)
+        allow(Vizcore::Audio::InputManager).to receive(:new).and_return(input_manager)
+        allow(Vizcore::Server::FrameBroadcaster).to receive(:new).and_return(timeline_broadcaster)
+
+        runner = described_class.new(timeline_config, output: output)
+        allow(runner).to receive(:wait_for_interrupt)
+
+        runner.run
+
+        expect(Vizcore::Server::FrameBroadcaster).to have_received(:new).with(
+          hash_including(
+            scene_name: "drop",
+            scene_layers: [hash_including(name: :drop_layer, type: :geometry)],
+            initial_timeline_entry: hash_including(unit: :seconds, scene: :drop, at: 4.0)
+          )
+        )
+      end
+    end
+
     it "warns when requested sample rate differs from input stream sample rate" do
       allow(Vizcore::Server::RackApp).to receive(:new).and_return(rack_app)
       allow(Puma::Server).to receive(:new).and_return(puma_server)
