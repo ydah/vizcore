@@ -107,6 +107,25 @@ RSpec.describe Vizcore::DSL::MidiMapExecutor do
     expect(values).to eq([10, 15.0, -60])
   end
 
+  it "supports MIDI CC soft takeover (pickup) before applying values" do
+    values = []
+    executor = described_class.new(
+      midi_maps: [
+        { trigger: { cc: 1, pickup: true }, action: proc { |value| values << value } },
+        { trigger: { cc: 2 }, action: proc { |value| values << value } }
+      ],
+      scenes: [],
+      globals: {}
+    )
+
+    executor.handle_event(midi_event(type: :control_change, data1: 1, data2: 20))
+    executor.handle_event(midi_event(type: :control_change, data1: 1, data2: 40))
+    executor.handle_event(midi_event(type: :control_change, data1: 1, data2: 21))
+    executor.handle_event(midi_event(type: :control_change, data1: 2, data2: 30))
+
+    expect(values).to eq([21, 30])
+  end
+
   it "emits live control actions" do
     executor = described_class.new(
       midi_maps: [

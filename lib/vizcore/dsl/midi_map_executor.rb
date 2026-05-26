@@ -120,6 +120,7 @@ module Vizcore
         raw = event.data2.to_i.clamp(0, 127)
         state = (@cc_state[state_key(trigger)] ||= {})
         value = trigger[:relative] ? relative_cc_delta(raw) : raw
+        return nil if pickup_blocked?(raw, state, trigger)
         return nil if within_deadband?(value, state, trigger)
 
         value = smooth_value(value, state, trigger)
@@ -133,6 +134,29 @@ module Vizcore
         return raw - 128 if raw.between?(65, 127)
 
         0
+      end
+
+      def pickup_blocked?(raw, state, trigger)
+        return false unless trigger[:pickup]
+        return false unless trigger.key?(:cc)
+        return false if state[:pickup_synced]
+
+        return false if trigger[:relative]
+
+        reference = state[:pickup_reference_raw]
+        unless reference
+          state[:pickup_reference_raw] = raw
+          return true
+        end
+
+        tolerance = trigger[:deadband] || 1
+        if (raw - reference).abs <= tolerance
+          state[:pickup_synced] = true
+          state[:pickup_reference_raw] = nil
+          return false
+        end
+
+        true
       end
 
       def within_deadband?(value, state, trigger)

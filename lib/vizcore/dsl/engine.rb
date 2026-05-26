@@ -269,10 +269,11 @@ module Vizcore
       # @param relative [Boolean] true when CC values should be treated as relative encoder deltas
       # @param deadband [Numeric, nil] minimum CC value change required to emit an action
       # @param smooth [Numeric, Boolean, nil] optional CC smoothing alpha
+      # @param pickup [Boolean, nil] when true, waits for CC to reach local pickup point before emitting updates
       # @yield Action block executed by midi runtime
       # @raise [ArgumentError] when no trigger is supplied
       # @return [void]
-      def midi_map(note: nil, cc: nil, pc: nil, channel: nil, relative: false, deadband: nil, smooth: nil, &block)
+      def midi_map(note: nil, cc: nil, pc: nil, channel: nil, relative: false, deadband: nil, smooth: nil, pickup: nil, &block)
         trigger = {}
         trigger[:note] = Integer(note) unless note.nil?
         trigger[:cc] = Integer(cc) unless cc.nil?
@@ -282,6 +283,7 @@ module Vizcore
         trigger[:relative] = true if relative && trigger.key?(:cc)
         trigger[:deadband] = non_negative_float(deadband, "midi deadband") unless deadband.nil?
         trigger[:smooth] = normalize_midi_smooth(smooth) unless smooth.nil? || smooth == false
+        trigger[:pickup] = pickup if trigger.key?(:cc) && trigger[:cc].between?(0, 127) && !!pickup
 
         @midi_mappings << {
           trigger: trigger,
