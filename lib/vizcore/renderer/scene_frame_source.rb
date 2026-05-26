@@ -31,10 +31,12 @@ module Vizcore
           end
         )
         @mapping_resolver = Vizcore::DSL::MappingResolver.new
-        @input_manager = build_input_manager
-        @input_manager.start
-        @capture_size = capture_size
-        @pipeline = build_pipeline
+        unless feature_replay?
+          @input_manager = build_input_manager
+          @input_manager.start
+          @capture_size = capture_size
+        end
+        @pipeline = replay_pipeline || build_pipeline
         @frame_count = 0
         @scene_frame_base = 0
         @scene_elapsed_base = 0.0
@@ -47,7 +49,11 @@ module Vizcore
       def capture
         ensure_started!
 
-        audio = @pipeline.call(@input_manager.capture_frame(@capture_size))
+        audio = if feature_replay?
+                  @pipeline.call
+                else
+                  @pipeline.call(@input_manager.capture_frame(@capture_size))
+                end
         @frame_count += 1
         scene = @scene
         layers = @mapping_resolver.resolve_layers(
@@ -193,6 +199,16 @@ module Vizcore
         )
       end
 
+      def replay_pipeline
+        return unless feature_replay?
+
+        Vizcore::Analysis::FeatureReplay.new(path: @config.feature_file)
+      end
+
+      def feature_replay?
+        !!@config.feature_file
+      end
+
       def capture_size
         return @input_manager.frame_size unless @frame_rate
 
@@ -272,7 +288,7 @@ module Vizcore
       end
 
       def ensure_started!
-        return if @input_manager && @pipeline && @scene
+        return if @pipeline && @scene && (!feature_replay? || @input_manager.nil? || @input_manager.running?)
 
         raise RuntimeError, "scene frame source has not been started"
       end

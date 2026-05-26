@@ -516,6 +516,65 @@ RSpec.describe Vizcore::CLI do
       )
     end
 
+    it "reuses feature cache when rendering from a file input" do
+      Dir.mktmpdir("vizcore-cli-render-feature-cache") do |dir|
+        audio_file = Vizcore.root.join("spec", "fixtures", "audio", "kick_120bpm.wav")
+        scene_path = File.join(dir, "scene.rb")
+        cache_root = File.join(dir, "feature_cache")
+        File.write(scene_path, "Vizcore.define { scene(:basic) { layer(:core) { type :geometry } } }")
+
+        cache_recorder = Vizcore::Analysis::FeatureRecorder.new(
+          audio_file: audio_file,
+          frames: 2,
+          fps: 30,
+          noise_gate: Vizcore::Config::DEFAULT_NOISE_GATE,
+          cache_root: cache_root
+        )
+        cache_path = cache_recorder.cache_path
+        cache_recorder.write(out: cache_path)
+
+        sequence = instance_double(
+          Vizcore::Renderer::RenderSequence,
+          write: {
+            path: Pathname.new("frames").expand_path,
+            format: :png_sequence,
+            scene: "basic",
+            frames: 2,
+            fps: 30.0,
+            width: 160,
+            height: 90
+          }
+        )
+        allow(Vizcore::Renderer::RenderSequence).to receive(:new).and_return(sequence)
+        expect(Vizcore::Audio::FileInput).not_to receive(:new)
+
+        described_class.start(
+          [
+            "render",
+            scene_path,
+            "--audio-source",
+            "file",
+            "--audio-file",
+            audio_file.to_s,
+            "--frames",
+            "2",
+            "--fps",
+            "30",
+            "--feature-cache-dir",
+            cache_root,
+            "--width",
+            "160",
+            "--height",
+            "90"
+          ]
+        )
+
+        expect(Vizcore::Renderer::RenderSequence).to have_received(:new) do |args|
+          expect(args[:config].feature_file).to eq(cache_path)
+        end
+      end
+    end
+
     it "records audio features to JSON" do
       Dir.mktmpdir("vizcore-cli-features") do |dir|
         audio_file = Vizcore.root.join("spec", "fixtures", "audio", "kick_120bpm.wav")

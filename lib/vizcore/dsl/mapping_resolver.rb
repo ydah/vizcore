@@ -472,7 +472,7 @@ module Vizcore
         value
       end
 
-      def apply_one_shot(value, transform, state_key:)
+      def apply_one_shot(value, _transform, state_key:)
         key = [:one_shot, state_key]
 
         active = value.to_f > 0.0

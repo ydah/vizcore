@@ -206,6 +206,75 @@ RSpec.describe Vizcore::Renderer::Snapshot do
     end
   end
 
+  it "replays cached feature frames during offline rendering" do
+    Dir.mktmpdir("vizcore-frame-source-feature-cache") do |dir|
+      scene_path = File.join(dir, "scene.rb")
+      audio_file = Vizcore.root.join("spec", "fixtures", "audio", "kick_120bpm.wav")
+      feature_file = File.join(dir, "features.json")
+      File.write(
+        scene_path,
+        "Vizcore.define { scene(:basic) { layer(:core) { type :geometry } } }"
+      )
+      File.write(
+        feature_file,
+        JSON.generate(
+          {
+            "version" => Vizcore::Analysis::FeatureRecorder::VERSION,
+            "metadata" => {
+              "frames" => 2,
+              "fps" => 30.0,
+              "sample_rate" => 30_720,
+              "capture_size" => 1024
+            },
+            "features" => [
+              {
+                "index" => 0,
+                "time" => 0.0,
+                "audio" => {
+                  "amplitude" => 0.2,
+                  "bands" => {},
+                  "beat" => false,
+                  "beat_count" => 1
+                }
+              },
+              {
+                "index" => 1,
+                "time" => 0.033,
+                "audio" => {
+                  "amplitude" => 0.4,
+                  "bands" => {},
+                  "beat" => true,
+                  "beat_count" => 2
+                }
+              }
+            ]
+          }
+        )
+      )
+
+      config = Vizcore::Config.new(
+        scene_file: scene_path,
+        audio_source: :file,
+        audio_file: audio_file,
+        feature_file: feature_file
+      )
+      frame_source = Vizcore::Renderer::SceneFrameSource.new(config: config, frame_rate: 30)
+      frame_source.start
+
+      first = frame_source.capture
+      second = frame_source.capture
+
+      expect(first[:audio][:amplitude]).to eq(0.2)
+      expect(second[:audio][:amplitude]).to eq(0.4)
+      expect(first[:audio][:beat_count]).to eq(1)
+      expect(second[:audio][:beat_count]).to eq(2)
+      expect(first[:scene_name]).to eq("basic")
+      expect(second[:scene_name]).to eq("basic")
+    ensure
+      frame_source&.stop
+    end
+  end
+
   def png_scanlines(png)
     offset = Vizcore::Renderer::PngWriter::SIGNATURE.bytesize
     idat = +"".b

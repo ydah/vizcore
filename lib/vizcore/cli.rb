@@ -572,6 +572,8 @@ module Vizcore
     option :seed, type: :numeric, desc: "Deterministic random seed for render"
     option :transparent, type: :boolean, default: false, desc: "Render transparent PNG frames"
     option :progress, type: :boolean, default: false, desc: "Print render progress for long renders"
+    option :feature_cache, type: :boolean, default: true, desc: "Reuse and write cached feature analysis for file-based renders"
+    option :feature_cache_dir, type: :string, desc: "Directory used to cache recorded analysis features"
     option :codec, type: :string, desc: "ffmpeg video codec for MP4 output"
     option :bitrate, type: :string, desc: "ffmpeg video bitrate for MP4 output"
     option :crf, type: :string, desc: "ffmpeg CRF value for MP4 output"
@@ -586,6 +588,7 @@ module Vizcore
     # @raise [Thor::Error] when scene loading or frame writing fails
     # @return [void]
     def render(scene_file)
+      feature_file = resolve_render_feature_cache if feature_cache_enabled?(scene_file: scene_file)
       config = Config.new(
         scene_file: scene_file,
         audio_source: options.fetch(:audio_source),
@@ -593,7 +596,8 @@ module Vizcore
         audio_device: options[:audio_device],
         noise_gate: options.fetch(:noise_gate),
         bpm: options[:bpm],
-        bpm_lock: options.fetch(:bpm_lock)
+        bpm_lock: options.fetch(:bpm_lock),
+        feature_file: feature_file
       )
       validate_snapshot_config!(config)
       warn_untrusted_scene(config.scene_file) unless options.fetch(:trust)
@@ -635,6 +639,8 @@ module Vizcore
     option :audio_normalize, type: :boolean, default: false, desc: "Apply adaptive feature normalization"
     option :bpm, type: :numeric, desc: "Fixed BPM value used with --bpm-lock"
     option :bpm_lock, type: :boolean, default: false, desc: "Lock analysis BPM output to --bpm"
+    option :cache, type: :boolean, default: true, desc: "Store and reuse recorded feature cache"
+    option :cache_dir, type: :string, desc: "Directory for feature cache storage"
     # Analyze an audio file and persist feature frames as JSON.
     #
     # @param audio_file [String] path to WAV/MP3/FLAC audio file
@@ -648,7 +654,8 @@ module Vizcore
         noise_gate: options.fetch(:noise_gate),
         audio_normalize: feature_audio_normalize_setting,
         bpm: options[:bpm],
-        bpm_lock: options.fetch(:bpm_lock)
+        bpm_lock: options.fetch(:bpm_lock),
+        cache_root: feature_record_cache_root
       ).write(out: options.fetch(:out))
       say(
         "Features written: #{result[:path]} " \
@@ -659,6 +666,57 @@ module Vizcore
     end
 
     private
+
+    def feature_cache_enabled?(scene_file:)
+      return false unless options.fetch(:audio_source) == "file"
+      return false unless options[:audio_file]
+      return false unless options.fetch(:feature_cache)
+
+      Pathname.new(scene_file).expand_path.file?
+    end
+
+    def resolve_render_feature_cache
+      cache_recorder = Vizcore::Analysis::FeatureRecorder.new(
+        audio_file: options[:audio_file],
+        frames: rendered_frame_count,
+        fps: options.fetch(:fps),
+        noise_gate: options.fetch(:noise_gate),
+        audio_normalize: nil,
+        bpm: options[:bpm],
+        bpm_lock: options.fetch(:bpm_lock),
+        cache_root: render_feature_cache_root
+      )
+      cache_path = cache_recorder.cache_path
+      return nil unless cache_path
+
+      cache_recorder.write(out: cache_path.to_s)
+      cache_path
+    end
+
+    def render_feature_cache_root
+      options[:feature_cache_dir] || default_feature_cache_root
+    end
+
+    def feature_record_cache_root
+      return nil unless options.fetch(:cache)
+
+      options[:cache_dir] || default_feature_cache_root
+    end
+
+    def default_feature_cache_root
+      base_path = if (value = ENV["XDG_CACHE_HOME"])
+                    Pathname.new(value)
+                  else
+                    Pathname.new(Dir.home).join(".cache")
+                  end
+      base_path.join("vizcore", "features")
+    end
+
+    def rendered_frame_count
+      return (Float(options[:duration]) * Float(options.fetch(:fps))).ceil if options[:duration]
+
+      Integer(options.fetch(:frames))
+    end
 
     def status_label(status)
       case status

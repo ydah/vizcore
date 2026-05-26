@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "digest"
 require "json"
 require "pathname"
 require_relative "../audio/file_input"
@@ -22,7 +23,8 @@ module Vizcore
         noise_gate: Pipeline::DEFAULT_NOISE_GATE,
         audio_normalize: nil,
         bpm: nil,
-        bpm_lock: false
+        bpm_lock: false,
+        cache_root: nil
       )
         @audio_file = Pathname.new(audio_file.to_s).expand_path
         @frames = normalize_frame_count(frames)
@@ -31,6 +33,16 @@ module Vizcore
         @audio_normalize = audio_normalize
         @bpm = bpm
         @bpm_lock = bpm_lock
+        @cache_root = normalize_cache_root(cache_root)
+      end
+
+      # Absolute cache file path for current recorder settings.
+      #
+      # @return [Pathname, nil]
+      def cache_path
+        return nil unless @cache_root
+
+        @cache_root.join("#{cache_key}.json")
       end
 
       # @param out [String, Pathname] JSON output path
@@ -38,17 +50,115 @@ module Vizcore
       def write(out:)
         output_path = Pathname.new(out.to_s).expand_path
         FileUtils.mkdir_p(output_path.dirname)
-        payload = record
-        output_path.write("#{JSON.pretty_generate(payload)}\n")
-        {
-          path: output_path,
+
+        if cache_path
+          cached_payload = load_cached_payload(cache_path)
+          output_payload = cached_payload if cached_payload
+        end
+
+        output_payload ||= record
+        output_path.write("#{JSON.pretty_generate(output_payload)}\n")
+        write_cached_output(output_payload) if cache_path && cache_path != output_path
+
+        metadata_from_payload(output_payload, path: output_path)
+      end
+
+      # Stable hash key for this recorder configuration.
+      #
+      # @return [String]
+      def cache_key
+        self.class.cache_key(
+          version: VERSION,
+          audio_file: @audio_file,
           frames: @frames,
           fps: @fps,
-          sample_rate: payload.fetch("metadata").fetch("sample_rate")
-        }
+          noise_gate: @noise_gate,
+          audio_normalize: @audio_normalize,
+          bpm: @bpm,
+          bpm_lock: @bpm_lock
+        )
+      end
+
+      # @return [Hash] recorder metadata
+      def self.cache_key(version:, audio_file:, frames:, fps:, noise_gate:, audio_normalize:, bpm:, bpm_lock:)
+        audio_path = Pathname.new(audio_file.to_s).expand_path
+        Digest::SHA256.hexdigest(
+          JSON.generate(
+            {
+              version: version,
+              audio_file: audio_path.to_s,
+              audio_file_size: audio_file_size(audio_path),
+              audio_file_mtime: audio_file_mtime(audio_path),
+              frames: frames,
+              fps: fps,
+              noise_gate: noise_gate,
+              audio_normalize: audio_normalize,
+              bpm: bpm,
+              bpm_lock: bpm_lock
+            }
+          )
+        )
+      end
+
+      def self.audio_file_size(path)
+        file_stat_value(path, :size)
+      end
+
+      def self.audio_file_mtime(path)
+        file_stat_value(path, :mtime).to_i
+      rescue StandardError
+        0
+      end
+
+      def self.file_stat_value(path, name)
+        stat = Pathname.new(path).stat
+        stat.send(name)
+      rescue StandardError
+        0
       end
 
       private
+
+      def load_cached_payload(path)
+        payload = JSON.parse(Pathname.new(path).read)
+        return unless payload.is_a?(Hash)
+
+        payload if valid_cached_payload?(payload)
+      rescue StandardError
+        nil
+      end
+
+      def valid_cached_payload?(payload)
+        payload.fetch("version", nil) == VERSION &&
+          payload.fetch("metadata", {}).fetch("frames", nil) == @frames &&
+          (Float(payload.fetch("metadata", {}).fetch("fps", nil)) - @fps).abs < Float::EPSILON &&
+          payload.fetch("features", nil).is_a?(Array) &&
+          !payload.fetch("features", []).empty?
+      end
+
+      def write_cached_output(payload)
+        cache = cache_path
+        return unless cache
+
+        FileUtils.mkdir_p(cache.dirname)
+        cache.write("#{JSON.pretty_generate(payload)}\n")
+      end
+
+      def metadata_from_payload(payload, path:)
+        metadata = payload.fetch("metadata", {})
+        {
+          path: path,
+          frames: metadata.fetch("frames"),
+          fps: metadata.fetch("fps"),
+          sample_rate: metadata.fetch("sample_rate")
+        }
+      end
+
+      def normalize_cache_root(value)
+        return nil if value.nil?
+
+        Pathname.new(value.to_s).expand_path
+      end
 
       def record
         validate_audio_file!
