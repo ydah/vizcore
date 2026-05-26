@@ -8,9 +8,11 @@ module Vizcore
 
       Point = Struct.new(:value, :unit, keyword_init: true)
 
-      def initialize(beats_per_bar: DEFAULT_BEATS_PER_BAR)
+      # @param bpm [Numeric, nil] fixed BPM for mixed-unit timeline conversion
+      def initialize(beats_per_bar: DEFAULT_BEATS_PER_BAR, bpm: nil)
         @beats_per_bar = positive_integer(beats_per_bar, "beats_per_bar")
         @entries = []
+        @bpm = positive_float(bpm, "timeline bpm") unless bpm.nil?
       end
 
       # Evaluate a timeline block.
@@ -66,12 +68,13 @@ module Vizcore
 
       # @return [Array<Hash>] generated scene transitions
       def transitions
+        return [] if @entries.length < 2
+
         @entries.each_cons(2).map do |from_entry, to_entry|
-          delta = to_entry.fetch(:at) - from_entry.fetch(:at)
           {
             from: from_entry.fetch(:scene),
             to: to_entry.fetch(:scene),
-            trigger: trigger_for(delta, from_entry.fetch(:unit))
+            trigger: trigger_for(from_entry, to_entry)
           }
         end
       end
@@ -84,8 +87,15 @@ module Vizcore
         seconds(position)
       end
 
-      def trigger_for(delta, unit)
-        case unit
+      def trigger_for(from_entry, to_entry)
+        return trigger_for_same_unit(from_entry, to_entry) unless mixed_units?(from_entry.fetch(:unit), to_entry.fetch(:unit))
+
+        trigger_for_mixed_units(from_entry, to_entry)
+      end
+
+      def trigger_for_same_unit(from_entry, to_entry)
+        delta = to_entry.fetch(:at) - from_entry.fetch(:at)
+        case from_entry.fetch(:unit)
         when :seconds
           proc { seconds >= delta }
         when :beats
@@ -95,16 +105,78 @@ module Vizcore
         end
       end
 
+      def trigger_for_mixed_units(from_entry, to_entry)
+        fixed_bpm = @bpm
+
+        if fixed_bpm
+          from_position = marker_position_seconds(from_entry, fixed_bpm: fixed_bpm)
+          to_position = marker_position_seconds(to_entry, fixed_bpm: fixed_bpm)
+          if from_position && to_position
+            return proc { seconds >= (to_position - from_position) }
+          end
+        end
+
+        convert_position = lambda do |entry, bpm|
+          value = entry.fetch(:at)
+          case entry.fetch(:unit)
+          when :seconds
+            value
+          when :beats
+            return nil unless bpm.to_f.positive?
+
+            value * 60.0 / Float(bpm)
+          else
+            nil
+          end
+        end
+
+        proc do
+          used_bpm = fixed_bpm || bpm
+          from_position = convert_position.call(from_entry, used_bpm)
+          to_position = convert_position.call(to_entry, used_bpm)
+          return false unless from_position && to_position
+
+          seconds >= (to_position - from_position)
+        end
+      end
+
       def validate_entries!
         return if @entries.length < 2
 
-        unit = @entries.first.fetch(:unit)
         @entries.each_cons(2) do |from_entry, to_entry|
-          raise ArgumentError, "timeline entries must use the same unit" unless to_entry.fetch(:unit) == unit
+          if mixed_units?(from_entry.fetch(:unit), to_entry.fetch(:unit))
+            if @bpm
+              from_position = marker_position_seconds(from_entry, fixed_bpm: @bpm)
+              to_position = marker_position_seconds(to_entry, fixed_bpm: @bpm)
+              raise ArgumentError, "timeline entries must increase when converted to seconds" if to_position.nil? || from_position.nil? || to_position <= from_position
+            end
+
+            next
+          end
+
+          raise ArgumentError, "timeline entries must use the same unit" unless to_entry.fetch(:unit) == from_entry.fetch(:unit)
 
           from_position = from_entry.fetch(:at)
           to_position = to_entry.fetch(:at)
           raise ArgumentError, "timeline positions must increase" unless to_position > from_position
+        end
+      end
+
+      def mixed_units?(left_unit, right_unit)
+        left_unit != right_unit
+      end
+
+      def marker_position_seconds(entry, fixed_bpm:)
+        value = entry.fetch(:at)
+        case entry.fetch(:unit)
+        when :seconds
+          value
+        when :beats
+          return nil unless fixed_bpm.to_f.positive?
+
+          value * 60.0 / Float(fixed_bpm)
+        else
+          nil
         end
       end
 
@@ -132,6 +204,15 @@ module Vizcore
         Integer(value)
       rescue ArgumentError, TypeError
         raise ArgumentError, "#{name} must be an integer"
+      end
+
+      def positive_float(value, name)
+        numeric = Float(value)
+        raise ArgumentError, "#{name} must be positive" unless numeric.positive?
+
+        numeric
+      rescue ArgumentError, TypeError
+        raise ArgumentError, "#{name} must be numeric"
       end
     end
   end

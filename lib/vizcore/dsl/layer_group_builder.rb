@@ -8,11 +8,13 @@ module Vizcore
     class LayerGroupBuilder
       # @param name [Symbol, String] group identifier stored on nested layer params
       # @param styles [Hash] reusable layer parameter styles
+      # @param mapping_presets [Hash] reusable layer mapping presets
       # @param defaults [Hash] scene defaults already applied before group params
       # @param strict [Boolean] true when unknown layer params should fail
-      def initialize(name:, styles: {}, defaults: {}, strict: false)
+      def initialize(name:, styles: {}, defaults: {}, mapping_presets: {}, strict: false)
         @name = name.to_sym
         @styles = styles
+        @mapping_presets = mapping_presets
         @strict = !!strict
         @params = deep_dup(defaults)
         @layers = []
@@ -33,7 +35,7 @@ module Vizcore
       # @yield Layer definition block
       # @return [void]
       def layer(name, &block)
-        builder = LayerBuilder.new(name: name, styles: @styles, defaults: layer_defaults, strict: @strict)
+        builder = LayerBuilder.new(name: name, styles: @styles, mapping_presets: @mapping_presets, defaults: layer_defaults, strict: @strict)
         builder.evaluate(&block)
         @layers << builder.to_h
       end

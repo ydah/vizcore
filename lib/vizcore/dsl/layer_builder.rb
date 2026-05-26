@@ -60,9 +60,11 @@ module Vizcore
       # @param styles [Hash] reusable layer parameter styles
       # @param defaults [Hash] default params applied before layer-specific values
       # @param strict [Boolean] true when unknown layer params should fail
-      def initialize(name:, styles: {}, defaults: {}, strict: false)
+      # @param mapping_presets [Hash] reusable mapping presets
+      def initialize(name:, styles: {}, defaults: {}, mapping_presets: {}, strict: false)
         @name = name.to_sym
         @styles = styles
+        @mapping_presets = mapping_presets
         @strict = !!strict
         @type = nil
         @shader = nil
@@ -648,6 +650,17 @@ module Vizcore
           transform = normalize_transform(**evaluate_transform_block(transform, &block)) if block
           @mappings << build_mapping(source: normalize_source(source), target: target_name, transform: transform)
         end
+      end
+
+      # Apply a named mapping preset to this layer.
+      #
+      # @param name [Symbol, String] mapping preset identifier
+      # @raise [ArgumentError] when the preset is unknown
+      # @return [void]
+      def use_mapping(name)
+        preset_name = name.to_sym
+        preset = @mapping_presets.fetch(preset_name) { raise ArgumentError, "unknown mapping preset: #{preset_name}" }
+        preset.each { |mapping| @mappings << deep_dup(mapping) }
       end
 
       # High-level mapping DSL for describing audio reactions inside a layer.

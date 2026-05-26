@@ -12,12 +12,14 @@ module Vizcore
       # @param name [Symbol, String] scene identifier
       # @param styles [Hash] reusable layer parameter styles
       # @param themes [Hash] reusable scene-wide layer parameter themes
+      # @param mapping_presets [Hash] reusable mapping presets
       # @param layers [Array<Hash>] initial layer definitions
       # @param strict [Boolean] true when unknown layer params should fail
-      def initialize(name:, styles: {}, themes: {}, layers: [], strict: false)
+      def initialize(name:, styles: {}, themes: {}, mapping_presets: {}, layers: [], strict: false)
         @name = name.to_sym
         @styles = styles
         @themes = themes
+        @mapping_presets = mapping_presets
         @strict = !!strict
         @theme_name = nil
         @theme_params = {}
@@ -39,7 +41,7 @@ module Vizcore
       # @yield Layer definition block
       # @return [void]
       def layer(name, &block)
-        builder = LayerBuilder.new(name: name, styles: @styles, defaults: @theme_params, strict: @strict)
+        builder = LayerBuilder.new(name: name, styles: @styles, mapping_presets: @mapping_presets, defaults: @theme_params, strict: @strict)
         builder.evaluate(&block)
         @layers << builder.to_h
       end
@@ -78,7 +80,13 @@ module Vizcore
       # @return [Hash] replacement layer definition
       def replace_layer(name, &block)
         index = layer_index!(name)
-        builder = LayerBuilder.new(name: name, styles: @styles, defaults: @theme_params, strict: @strict)
+        builder = LayerBuilder.new(
+          name: name,
+          styles: @styles,
+          mapping_presets: @mapping_presets,
+          defaults: @theme_params,
+          strict: @strict
+        )
         builder.evaluate(&block)
         @layers[index] = builder.to_h
       end
@@ -109,7 +117,7 @@ module Vizcore
       # @yield Layer group definition block
       # @return [void]
       def group(name, &block)
-        builder = LayerGroupBuilder.new(name: name, styles: @styles, defaults: @theme_params, strict: @strict)
+        builder = LayerGroupBuilder.new(name: name, styles: @styles, mapping_presets: @mapping_presets, defaults: @theme_params, strict: @strict)
         builder.evaluate(&block)
         @layers.concat(builder.to_a)
       end

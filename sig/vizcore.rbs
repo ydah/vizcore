@@ -251,6 +251,7 @@ module Vizcore::DSL
   type scene = { name: Symbol, layers: Array[layer], ?theme: Symbol }
   type style = { name: Symbol, params: Hash[Symbol, untyped] }
   type theme = { name: Symbol, params: Hash[Symbol, untyped] }
+  type mapping_preset = { name: Symbol, mappings: Array[mapping] }
   type timeline_entry = { at: Float, unit: Symbol, scene: Symbol }
   type key_action = { type: Symbol, ?scene: String, ?control: Symbol }
   type key_mapping = { key: String, action: key_action }
@@ -263,6 +264,7 @@ module Vizcore::DSL
     def audio: (Symbol | String name, **untyped options) -> Array[Hash[Symbol, untyped]]
     def style: (Symbol | String name) { () -> void } -> void
     def theme: (Symbol | String name) { () -> void } -> void
+    def mapping: (Symbol | String name) { () -> void } -> void
     def midi: (Symbol | String name, **untyped options) -> Array[Hash[Symbol, untyped]]
     def audio_normalize: (?mode: Symbol | String mode, **untyped options) -> Hash[Symbol, untyped]
     def audio_analysis: (**untyped options) -> Hash[Symbol, untyped]
@@ -329,6 +331,7 @@ module Vizcore::DSL
       name: Symbol | String name,
       ?styles: Hash[Symbol, Hash[Symbol, untyped]] styles,
       ?themes: Hash[Symbol, Hash[Symbol, untyped]] themes,
+      ?mapping_presets: Hash[Symbol, Array[mapping]] mapping_presets,
       ?layers: Array[layer] layers
     ) -> void
     def evaluate: () ?{ () -> void } -> SceneBuilder
@@ -342,6 +345,7 @@ module Vizcore::DSL
     def initialize: (
       name: Symbol | String name,
       ?styles: Hash[Symbol, Hash[Symbol, untyped]] styles,
+      ?mapping_presets: Hash[Symbol, Array[mapping]] mapping_presets,
       ?defaults: Hash[Symbol, untyped] defaults
     ) -> void
     def evaluate: () ?{ () -> void } -> LayerGroupBuilder
@@ -372,6 +376,7 @@ module Vizcore::DSL
     def initialize: (
       name: Symbol | String name,
       ?styles: Hash[Symbol, Hash[Symbol, untyped]] styles,
+      ?mapping_presets: Hash[Symbol, Array[mapping]] mapping_presets,
       ?defaults: Hash[Symbol, untyped] defaults
     ) -> void
     def evaluate: () ?{ () -> void } -> LayerBuilder
@@ -412,6 +417,7 @@ module Vizcore::DSL
     def color_shift: (Numeric value) -> Float
     def palette: (*untyped colors) -> Array[String]
     def use_style: (Symbol | String name) -> Hash[Symbol, untyped]
+    def use_mapping: (Symbol | String name) -> void
     def param: (
       Symbol | String name,
       ?default: Numeric? default,
@@ -482,6 +488,12 @@ module Vizcore::DSL
     def deadzone: (Numeric value) -> Numeric
     def smooth: (?attack: Numeric? attack, ?release: Numeric? release) -> Hash[Symbol, untyped]
     def to_h: () -> Hash[Symbol, untyped]
+  end
+
+  class MappingPresetBuilder
+    def initialize: (name: Symbol | String name, ?strict: bool strict) -> void
+    def evaluate: () ?{ () -> void } -> MappingPresetBuilder
+    def to_h: () -> mapping_preset
   end
 
   class MappingResolver

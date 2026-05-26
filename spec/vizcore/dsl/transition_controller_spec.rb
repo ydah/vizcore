@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "vizcore/dsl/transition_controller"
+require "vizcore/dsl/timeline_builder"
 
 RSpec.describe Vizcore::DSL::TransitionController do
   describe "#next_transition" do
@@ -111,6 +112,28 @@ RSpec.describe Vizcore::DSL::TransitionController do
       ).to be_nil
       expect(
         controller.next_transition(scene_name: :intro, audio: {}, frame_count: 1, elapsed_seconds: 2.5)
+      ).to include(from: :intro, to: :drop)
+    end
+
+    it "supports mixed timeline triggers with runtime bpm conversion" do
+      builder = Vizcore::DSL::TimelineBuilder.new.evaluate do
+        at 0, scene: :intro
+        at beats(1), scene: :drop
+      end
+
+      controller = described_class.new(
+        scenes: [
+          { name: :intro, layers: [] },
+          { name: :drop, layers: [] }
+        ],
+        transitions: builder.transitions
+      )
+
+      expect(
+        controller.next_transition(scene_name: :intro, audio: { bpm: 120, beat_count: 100 }, elapsed_seconds: 0.49)
+      ).to be_nil
+      expect(
+        controller.next_transition(scene_name: :intro, audio: { bpm: 120, beat_count: 100 }, elapsed_seconds: 0.5)
       ).to include(from: :intro, to: :drop)
     end
 

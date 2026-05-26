@@ -298,6 +298,55 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "reuses mapping presets across layers" do
+      definition = described_class.define do
+        mapping :punchy_kick do
+          map bass, to: :scale, range: 0.8..1.2
+          react_to kick do
+            trigger :burst, cooldown: 0.2, one_shot: true
+          end
+        end
+
+        scene :main do
+          layer :front do
+            type :geometry
+            use_mapping :punchy_kick
+          end
+
+          layer :back do
+            type :geometry
+            use_mapping :punchy_kick
+            map amplitude, to: :intensity, min: 0.0, max: 1.0
+          end
+        end
+      end
+
+      expect(definition[:mapping_presets]).to eq(
+        [
+          {
+            name: :punchy_kick,
+            mappings: [
+              { source: { kind: :frequency_band, band: :low }, target: :scale, transform: { min: 0.8, max: 1.2 } },
+              { source: { kind: :kick }, target: :burst, transform: { as: :trigger, cooldown: 0.2, one_shot: true } }
+            ]
+          }
+        ]
+      )
+
+      front_mappings = definition[:scenes].first[:layers][0][:mappings]
+      back_mappings = definition[:scenes].first[:layers][1][:mappings]
+
+      expect(front_mappings).to include(
+        { source: { kind: :frequency_band, band: :low }, target: :scale, transform: { min: 0.8, max: 1.2 } },
+        { source: { kind: :kick }, target: :burst, transform: { as: :trigger, cooldown: 0.2, one_shot: true } }
+      )
+      expect(back_mappings).to include(
+        { source: { kind: :frequency_band, band: :low }, target: :scale, transform: { min: 0.8, max: 1.2 } },
+        { source: { kind: :kick }, target: :burst, transform: { as: :trigger, cooldown: 0.2, one_shot: true } },
+        { source: { kind: :amplitude }, target: :intensity, transform: { min: 0.0, max: 1.0 } }
+      )
+    end
+
     it "applies scene themes as layer defaults" do
       definition = described_class.define do
         theme :ruby_night do
@@ -1359,15 +1408,50 @@ RSpec.describe Vizcore::DSL::Engine do
       expect(controller.next_transition(scene_name: :intro, audio: {}, frame_count: 90)).to include(to: :drop)
     end
 
-    it "rejects mixed timeline units" do
-      expect do
-        described_class.define do
-          timeline do
-            at seconds(0), scene: :intro
-            at beats(4), scene: :drop
-          end
+    it "allows mixed timeline units with fixed bpm" do
+      definition = described_class.define do
+        bpm 120
+
+        scene(:intro) { layer(:a) { type :geometry } }
+        scene(:build) { layer(:b) { type :geometry } }
+        scene(:drop) { layer(:c) { type :geometry } }
+
+        timeline do
+          at seconds(0), scene: :intro
+          at beats(60), scene: :build
+          at seconds(61), scene: :drop
         end
-      end.to raise_error(ArgumentError, /same unit/)
+      end
+
+      controller = Vizcore::DSL::TransitionController.new(
+        scenes: definition[:scenes],
+        transitions: definition[:transitions]
+      )
+
+      expect(controller.next_transition(scene_name: :intro, audio: {}, frame_count: 1799)).to be_nil
+      expect(controller.next_transition(scene_name: :intro, audio: {}, frame_count: 1800)).to include(to: :build)
+      expect(controller.next_transition(scene_name: :build, audio: {}, frame_count: 1859)).to be_nil
+      expect(controller.next_transition(scene_name: :build, audio: {}, frame_count: 1860)).to include(to: :drop)
+    end
+
+    it "allows mixed timeline units with estimated bpm" do
+      definition = described_class.define do
+        scene(:intro) { layer(:a) { type :geometry } }
+        scene(:drop) { layer(:b) { type :geometry } }
+
+        timeline do
+          at 0, scene: :intro
+          at beats(1), scene: :drop
+        end
+      end
+
+      controller = Vizcore::DSL::TransitionController.new(
+        scenes: definition[:scenes],
+        transitions: definition[:transitions]
+      )
+
+      expect(controller.next_transition(scene_name: :intro, audio: { bpm: 120 }, elapsed_seconds: 0.49)).to be_nil
+      expect(controller.next_transition(scene_name: :intro, audio: { bpm: 120 }, elapsed_seconds: 0.5)).to include(to: :drop)
     end
 
     it "rejects non-increasing timeline positions" do
@@ -1421,6 +1505,18 @@ RSpec.describe Vizcore::DSL::Engine do
           scene :drop, extends: :missing
         end
       end.to raise_error(ArgumentError, /unknown base scene: missing/)
+    end
+
+    it "rejects unknown mapping presets" do
+      expect do
+        described_class.define do
+          scene :invalid do
+            layer :title do
+              use_mapping :missing
+            end
+          end
+        end
+      end.to raise_error(ArgumentError, /unknown mapping preset: missing/)
     end
   end
 

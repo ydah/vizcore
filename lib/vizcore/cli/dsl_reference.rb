@@ -17,6 +17,7 @@ module Vizcore
         Entry.new(syntax: "tap_tempo key: :space", description: "Enable browser tap tempo events."),
         Entry.new(syntax: "set :global_intensity, 0.8", description: "Set a runtime global exposed to shaders."),
         Entry.new(syntax: "style :name { ... } / theme :name { ... }", description: "Define reusable layer params or scene defaults."),
+        Entry.new(syntax: "mapping :name { ... }", description: "Define reusable layer mapping groups."),
         Entry.new(syntax: "scene :name, extends: :base { ... }", description: "Define a scene and optional inherited layers."),
         Entry.new(syntax: "section :intro, bars: 8 { ... }", description: "Define beat-counted scenes and generated transitions."),
         Entry.new(syntax: "timeline { at beats(0), scene: :intro }", description: "Define ordered scene markers."),
@@ -27,6 +28,7 @@ module Vizcore
 
       SCENE = [
         Entry.new(syntax: "use_theme :name", description: "Apply scene-wide layer defaults."),
+        Entry.new(syntax: "use_mapping :name", description: "Apply a reusable mapping group to a layer."),
         Entry.new(syntax: "group :foreground { layer :name { ... } }", description: "Apply shared params to a related layer group."),
         Entry.new(syntax: "layer :name { ... }", description: "Append a render layer to the scene.")
       ].freeze

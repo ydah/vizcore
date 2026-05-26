@@ -77,6 +77,7 @@ module Vizcore
         @midi_mappings = []
         @key_mappings = []
         @global_params = {}
+        @mapping_presets = {}
         @analysis_settings = {}
         @section_tail = nil
         @timelines = []
@@ -125,6 +126,17 @@ module Vizcore
         builder = StyleBuilder.new(name: name, kind: "theme")
         theme_definition = builder.evaluate(&block).to_h
         @themes[theme_definition[:name]] = deep_dup(theme_definition[:params])
+      end
+
+      # Register reusable mapping behavior for layer-level targets.
+      #
+      # @param name [Symbol, String] mapping preset identifier
+      # @yield Mapping preset block
+      # @return [void]
+      def mapping(name, &block)
+        builder = MappingPresetBuilder.new(name: name, strict: @strict)
+        preset_definition = builder.evaluate(&block).to_h
+        @mapping_presets[preset_definition[:name]] = deep_dup(preset_definition[:mappings])
       end
 
       # Register a MIDI input definition.
@@ -206,7 +218,7 @@ module Vizcore
       # @yield Scene definition block
       # @return [void]
       def scene(name, extends: nil, &block)
-        builder = SceneBuilder.new(name: name, styles: @styles, themes: @themes, layers: inherited_layers(extends), strict: @strict)
+        builder = SceneBuilder.new(name: name, styles: @styles, themes: @themes, mapping_presets: @mapping_presets, layers: inherited_layers(extends), strict: @strict)
         builder.evaluate(&block)
         scene_definition = builder.to_h
         @scenes << scene_definition
@@ -238,7 +250,7 @@ module Vizcore
       def timeline(beats_per_bar: TimelineBuilder::DEFAULT_BEATS_PER_BAR, &block)
         raise ArgumentError, "timeline requires a block" unless block
 
-        builder = TimelineBuilder.new(beats_per_bar: beats_per_bar).evaluate(&block)
+        builder = TimelineBuilder.new(beats_per_bar: beats_per_bar, bpm: @analysis_settings[:bpm]).evaluate(&block)
         entries = builder.to_h
         @timelines << entries unless entries.empty?
         @transitions.concat(builder.transitions)
@@ -329,6 +341,7 @@ module Vizcore
           transitions: @transitions.map { |transition| deep_dup(transition) },
           midi_maps: @midi_mappings.map { |mapping| deep_dup(mapping) },
           key_mappings: @key_mappings.map { |mapping| deep_dup(mapping) },
+          mapping_presets: @mapping_presets.map { |name, mappings| { name: name, mappings: deep_dup(mappings) } },
           globals: deep_dup(@global_params),
           analysis: deep_dup(@analysis_settings),
           styles: @styles.map { |name, params| { name: name, params: deep_dup(params) } },
