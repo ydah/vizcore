@@ -52,6 +52,32 @@ RSpec.describe Vizcore::Renderer::Snapshot do
     expect(png.bytesize).to be > 128
   end
 
+  describe "palette_color" do
+    it "interpolates between neighboring palette entries" do
+      renderer = Vizcore::Renderer::SnapshotRenderer.new(width: 8, height: 8)
+      params = { palette: ["#000000", "#ffffff", "#ff0000"] }
+
+      expect(renderer.send(:palette_color, params, 0)).to eq("#000000")
+      expect(renderer.send(:palette_color, params, 1)).to eq("#ffffff")
+      expect(renderer.send(:palette_color, params, 0.5)).to eq("#808080")
+      expect(renderer.send(:palette_color, params, 2.25)).to eq("#bf0000")
+    end
+
+    it "resolves explicit gradient colors in layer params" do
+      renderer = Vizcore::Renderer::SnapshotRenderer.new(width: 8, height: 8)
+      params = {
+        color: {
+          gradient: {
+            colors: ["#000000", "#ffffff"],
+            position: 0.5
+          }
+        }
+      }
+
+    expect(renderer.send(:configured_color, params)).to eq("#808080")
+  end
+end
+
   it "can render a transparent PNG background" do
     png = Vizcore::Renderer::SnapshotRenderer.new(width: 8, height: 8, transparent: true).render(
       scene: { layers: [{ name: :empty_shape, type: :shape, params: { shapes: [] } }] },

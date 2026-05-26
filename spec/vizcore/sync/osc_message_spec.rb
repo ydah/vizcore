@@ -50,6 +50,35 @@ RSpec.describe Vizcore::Sync::OscMessage do
     expect(described_class.parse("not osc")).to be_nil
   end
 
+  it "ignores malformed bundle entries and keeps valid messages" do
+    valid = osc_string("/vizcore/scene") +
+            osc_string(",s") +
+            osc_string("drop")
+    malformed_size = [16_777_216].pack("N")
+    bundle = osc_string("#bundle") +
+             [0].pack("Q>") +
+             [valid.bytesize].pack("N") +
+             valid +
+             malformed_size +
+             "\x00\x00\x00"
+
+    messages = described_class.parse(bundle)
+
+    expect(messages).to be_an(Array)
+    expect(messages.size).to eq(1)
+    expect(messages.first.address).to eq("/vizcore/scene")
+  end
+
+  it "supports unknown typetags without raising" do
+    payload = osc_string("/vizcore/live") +
+              osc_string(",z")
+
+    message = described_class.parse(payload)
+
+    expect(message).to be_a(described_class)
+    expect(message.arguments).to eq([nil])
+  end
+
   def osc_string(value)
     bytes = value.to_s.b + "\0"
     bytes << "\0" while (bytes.bytesize % 4).positive?

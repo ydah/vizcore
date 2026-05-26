@@ -5,6 +5,8 @@ require_relative "reaction_builder"
 require_relative "../deep_copy"
 require_relative "../layer_catalog"
 require_relative "../shape"
+require_relative "color_helpers"
+require_relative "layout_helpers"
 
 module Vizcore
   module DSL
@@ -75,6 +77,9 @@ module Vizcore
         @shape_index_by_id = {}
         @shape_group_stack = [{}]
       end
+
+      include ColorHelpers
+      include LayoutHelpers
 
       # Evaluate a layer block.
       #

@@ -82,6 +82,44 @@ test("resolveLayerCssColor prefers explicit color then palette", () => {
   assert.equal(resolveLayerCssColor({}, "#fallback"), "#fallback");
 });
 
+test("resolveLayerCssColor interpolates between palette stops", () => {
+  assert.equal(resolveLayerCssColor({ palette: ["#000000", "#ffffff"] }, "#fallback", 0), "#000000");
+  assert.equal(resolveLayerCssColor({ palette: ["#000000", "#ffffff"] }, "#fallback", 1), "#ffffff");
+  assert.equal(resolveLayerCssColor({ palette: ["#000000", "#ffffff"] }, "#fallback", 0.5), "#808080");
+  assert.equal(resolveLayerCssColor({ palette: ["#000000", "#ffffff", "#000000"] }, "#fallback", 1.5), "#808080");
+});
+
+test("resolveLayerCssColor resolves explicit gradient descriptors", () => {
+  assert.equal(
+    resolveLayerCssColor({
+      color: {
+        gradient: {
+          type: "linear",
+          colors: ["#000000", "#ffffff"],
+          position: 0.5,
+        },
+      },
+    },
+    "#fallback",
+    0,
+  ), "#808080");
+
+  assert.equal(
+    resolveLayerCssColor({
+      color: {
+        gradient: {
+          type: "linear",
+          colors: ["#000000", "#7f7f7f", "#ffffff"],
+          stops: [0.0, 0.6, 1.0],
+          position: 0.75,
+        },
+      },
+    },
+    "#fallback",
+    0,
+  ), "#afafaf");
+});
+
 test("resolveLayerRgbColor parses palette colors and falls back for non-hex colors", () => {
   assert.deepEqual(resolveLayerRgbColor({ palette: ["#000", "#ffffff"] }, null, 1), [1, 1, 1]);
   assert.deepEqual(resolveLayerRgbColor({ color: "red" }, [0.1, 0.2, 0.3]), [0.1, 0.2, 0.3]);

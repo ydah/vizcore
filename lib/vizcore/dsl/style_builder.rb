@@ -1,9 +1,12 @@
 # frozen_string_literal: true
+require_relative "color_helpers"
 
 module Vizcore
   module DSL
     # Collects reusable layer parameter presets for the `style` DSL.
     class StyleBuilder
+      include ColorHelpers
+
       # @param name [Symbol, String] style identifier
       # @param kind [String] user-facing DSL kind for error messages
       def initialize(name:, kind: "style")

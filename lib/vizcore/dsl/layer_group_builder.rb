@@ -1,11 +1,14 @@
 # frozen_string_literal: true
 
 require_relative "layer_builder"
+require_relative "color_helpers"
 
 module Vizcore
   module DSL
     # Collects related layers and applies shared layer parameters.
     class LayerGroupBuilder
+      include ColorHelpers
+
       # @param name [Symbol, String] group identifier stored on nested layer params
       # @param styles [Hash] reusable layer parameter styles
       # @param mapping_presets [Hash] reusable layer mapping presets

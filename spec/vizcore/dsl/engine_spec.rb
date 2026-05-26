@@ -499,6 +499,118 @@ RSpec.describe Vizcore::DSL::Engine do
       )
     end
 
+    it "supports HSL/HSV color helper methods" do
+      definition = described_class.define do
+        style :palette_like do
+          color hsl(240, 100, 50)
+        end
+
+        scene :palette_show do
+          layer :sparks do
+            type :particle_field
+            palette hsv(0, 100, 100), "#00ff00"
+          end
+
+          layer :title do
+            type :text
+            use_style :palette_like
+            fill hsl(120, 100, 50)
+            shadow color: hsl(0, 100, 50), blur: 8
+          end
+        end
+      end
+
+      style_params = definition[:styles].find { |entry| entry[:name] == :palette_like }[:params]
+      expect(style_params).to include(color: "#0000ff")
+
+      sparks_params = definition[:scenes].first[:layers][0][:params]
+      expect(sparks_params[:palette]).to eq(%w[#ff0000 #00ff00])
+
+      title_params = definition[:scenes].first[:layers][1][:params]
+      expect(title_params).to include(color: "#00ff00")
+      expect(title_params).to include(shadow_color: "#ff0000")
+    end
+
+    it "supports gradient color helper methods" do
+      definition = described_class.define do
+        style :palette_like do
+          color gradient(type: :linear, colors: ["#000000", "#ffffff"])
+        end
+
+        scene :gradient_show do
+          layer :overlay do
+            type :geometry
+            color gradient(type: :radial, colors: ["#ff0000", "#0000ff"], position: 0.25)
+          end
+
+          layer :title do
+            type :text
+            use_style :palette_like
+          end
+        end
+      end
+
+      overlay_params = definition[:scenes].first[:layers][0][:params]
+      expect(overlay_params[:color]).to eq(
+        {
+          gradient: {
+            type: "radial",
+            colors: ["#ff0000", "#0000ff"],
+            position: 0.25
+          }
+        }
+      )
+
+      style_params = definition[:styles].first[:params]
+      expect(style_params).to eq(
+        {
+          color: {
+            gradient: {
+              type: "linear",
+              colors: ["#000000", "#ffffff"]
+            }
+          }
+        }
+      )
+
+      expect(style_params[:color][:gradient][:colors]).to include("#000000", "#ffffff")
+      expect(overlay_params[:color][:gradient][:position]).to eq(0.25)
+    end
+
+    it "supports layout helper methods" do
+      definition = described_class.define do
+        scene :layout_show do
+          layer :generated do
+            type :shape
+
+            polygon :grid_points, points: grid(count: 4, columns: 2, rows: 2, spacing: 2.0, center: false, origin: [1, -1])
+            polygon :radial_points, points: radial(count: 4, radius: 2, start_angle: 0, span: 360, seed: 0)
+            polygon :spiral_points, points: spiral(count: 3, radius: 6, turns: 1, start_radius: 2, start_angle: 0)
+            polygon :circle_pack_points, points: circle_pack(count: 5, radius: 4)
+            polygon :scatter_points, points: scatter(count: 6, width: 200.0, height: 100.0, seed: 12)
+          end
+        end
+      end
+
+      shapes = definition[:scenes].first[:layers].first[:params][:shapes]
+      grid_points = shapes.find { |shape| shape[:id] == :grid_points }[:points]
+      radial_points = shapes.find { |shape| shape[:id] == :radial_points }[:points]
+      spiral_points = shapes.find { |shape| shape[:id] == :spiral_points }[:points]
+      circle_pack_points = shapes.find { |shape| shape[:id] == :circle_pack_points }[:points]
+      scatter_points = shapes.find { |shape| shape[:id] == :scatter_points }[:points]
+
+      expect(grid_points).to eq([[1.0, -1.0], [3.0, -1.0], [1.0, 1.0], [3.0, 1.0]])
+      expect(radial_points).to eq([[2.0, 0.0], [0.0, 2.0], [-2.0, 0.0], [0.0, -2.0]])
+      expect(spiral_points).to eq([[2.0, 0.0], [-4.0, 0.0], [6.0, -0.0]])
+      expect(circle_pack_points.length).to eq(5)
+      expect(circle_pack_points.first).to eq([0.0, 0.0])
+      expect(scatter_points.length).to eq(6)
+      scatter_points.each do |point|
+        expect(point[0]).to be_between(-100.0, 100.0)
+        expect(point[1]).to be_between(-50.0, 50.0)
+      end
+    end
+
     it "stores asset file params for svg layers" do
       definition = described_class.define do
         scene :logo_scene do

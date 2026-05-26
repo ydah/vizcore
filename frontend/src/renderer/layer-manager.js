@@ -183,10 +183,119 @@ export const parseHexColor = (value) => {
   return [0, 2, 4].map((offset) => parseInt(hex.slice(offset, offset + 2), 16) / 255);
 };
 
+const normalizePalettePosition = (value, paletteLength) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || !paletteLength) {
+    return 0;
+  }
+
+  const remainder = numeric % paletteLength;
+  return remainder >= 0 ? remainder : remainder + paletteLength;
+};
+
+const interpolatePaletteColor = (left, right, blend) => {
+  const ratio = clamp(blend, 0, 1);
+  const rgb = left.map((value, index) => {
+    const next = right[index];
+    return Math.round(clamp(value + (next - value) * ratio, 0, 1) * 255);
+  });
+  return `#${rgb.map((value) => value.toString(16).padStart(2, "0")).join("")}`;
+};
+
+const normalizeGradientStops = (stops, count) => {
+  if (!Array.isArray(stops)) {
+    return null;
+  }
+
+  const values = stops.map((value) => Number(value)).filter((value) => Number.isFinite(value));
+  if (values.length !== count) {
+    return null;
+  }
+
+  return values.map((value) => clamp(value, 0, 1)).sort((left, right) => left - right);
+};
+
+const resolveGradientColor = (value, paletteIndex = 0) => {
+  const gradient = value?.gradient || value;
+  if (!gradient || typeof gradient !== "object") {
+    return null;
+  }
+
+  const colors = normalizePaletteColors(gradient?.colors || gradient?.palette);
+  if (colors.length === 0) {
+    return null;
+  }
+
+  if (colors.length === 1) {
+    return colors[0];
+  }
+
+  const stops = normalizeGradientStops(gradient?.stops || gradient?.stopsPercent, colors.length);
+  const basePosition = Number.isFinite(Number(gradient?.position)) ? Number(gradient.position) : Number(paletteIndex);
+
+  let position;
+  if (stops) {
+    position = Number.isFinite(basePosition) ? clamp(basePosition, 0, 1) : 0;
+  } else {
+    const fractional = Number.isFinite(basePosition) ? basePosition - Math.floor(basePosition) : 0;
+    position = clamp(fractional, 0, 1);
+  }
+
+  if (position <= 0) {
+    return colors[0];
+  }
+  if (position >= 1) {
+    return colors[colors.length - 1];
+  }
+
+  if (!stops) {
+    const segmentLength = 1 / (colors.length - 1);
+    const segment = Math.min(Math.floor(position / segmentLength), colors.length - 2);
+    const blendBase = segment * segmentLength;
+    const blend = (position - blendBase) / segmentLength;
+    const left = parseHexColor(colors[segment]);
+    const right = parseHexColor(colors[segment + 1]);
+    if (!left || !right) {
+      return colors[segment];
+    }
+
+    return interpolatePaletteColor(left, right, blend);
+  }
+
+  const segment = Array.from({ length: colors.length - 1 }, (_, index) => index)
+    .find((index) => position <= stops[index + 1]);
+
+  if (segment === undefined) {
+    return colors[colors.length - 1];
+  }
+
+  if (segment <= 0 && position <= stops[0]) {
+    return colors[0];
+  }
+
+  const start = stops[segment];
+  const stop = stops[segment + 1];
+  const width = Math.max(stop - start, Number.EPSILON);
+  const blend = clamp((position - start) / width, 0, 1);
+  const left = parseHexColor(colors[segment]);
+  const right = parseHexColor(colors[segment + 1]);
+  if (!left || !right) {
+    return colors[segment];
+  }
+
+  return interpolatePaletteColor(left, right, blend);
+};
+
 export const resolveLayerCssColor = (params = {}, fallback = "#e5f3ff", paletteIndex = 0) => {
-  const explicitColor = String(params?.color || "").trim();
-  if (explicitColor) {
-    return explicitColor;
+  const explicitColor = params?.color;
+  const explicitHex = typeof explicitColor === "string" ? String(explicitColor || "").trim() : "";
+  if (explicitHex) {
+    return explicitHex;
+  }
+
+  const gradientColor = resolveGradientColor(explicitColor, paletteIndex);
+  if (gradientColor) {
+    return gradientColor;
   }
 
   const palette = normalizePaletteColors(params?.palette);
@@ -194,7 +303,24 @@ export const resolveLayerCssColor = (params = {}, fallback = "#e5f3ff", paletteI
     return fallback;
   }
 
-  return palette[Math.abs(Number(paletteIndex) || 0) % palette.length];
+  if (palette.length === 1) {
+    return palette[0];
+  }
+
+  const position = normalizePalettePosition(paletteIndex, palette.length);
+  const lowerIndex = Math.floor(position);
+  const blend = position - lowerIndex;
+  if (blend <= 0 || !Number.isFinite(blend)) {
+    return palette[lowerIndex];
+  }
+
+  const leftColor = parseHexColor(palette[lowerIndex]);
+  const rightColor = parseHexColor(palette[(lowerIndex + 1) % palette.length]);
+  if (!leftColor || !rightColor) {
+    return palette[lowerIndex];
+  }
+
+  return interpolatePaletteColor(leftColor, rightColor, blend);
 };
 
 export const resolveLayerRgbColor = (params = {}, fallback = null, paletteIndex = 0) => {

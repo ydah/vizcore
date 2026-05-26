@@ -760,14 +760,115 @@ module Vizcore
       end
 
       def configured_color(params)
-        [params[:color], params["color"]].map { |value| value.to_s.strip }.find { |value| !value.empty? }
+        value = params[:color]
+        value = params["color"] unless value
+        resolved = resolve_color_value(value)
+        return resolved.to_s.strip unless resolved.to_s.strip.empty?
+
+        nil
+      end
+
+      def resolve_color_value(value)
+        return value if value.is_a?(String)
+        return resolve_gradient_color(value) if value.is_a?(Hash)
+
+        value
+      end
+
+      def resolve_gradient_color(value)
+        gradient = value[:gradient] || value["gradient"]
+        return nil unless gradient.is_a?(Hash)
+
+        colors = normalize_colors(gradient[:colors] || gradient["colors"])
+        return nil if colors.empty?
+
+        return colors[0] if colors.length == 1
+
+        position = normalize_position(gradient[:position] || gradient["position"])
+        stops = normalize_gradient_stops(gradient[:stops] || gradient["stops"], colors.length)
+
+        if stops
+          resolve_gradient_color_with_stops(colors, position, stops)
+        else
+          resolve_gradient_color_with_position(colors, position)
+        end
+      end
+
+      def normalize_gradient_stops(stops, color_count)
+        return nil unless stops
+
+        values = Array(stops).filter_map { |entry| Float(entry, exception: false) }
+        return nil if values.length != color_count
+
+        values.sort.map { |value| value.to_f.clamp(0.0, 1.0) }
+      end
+
+      def resolve_gradient_color_with_position(colors, position)
+        segment_length = 1.0 / (colors.length - 1)
+        segment = [(position / segment_length).floor, colors.length - 2].min
+        blend = (position % segment_length) / segment_length
+
+        left_color = parse_hex_color(colors[segment])
+        right_color = parse_hex_color(colors[segment + 1])
+        return colors[segment] if left_color.nil? || right_color.nil?
+
+        interpolate_hex_color(left_color, right_color, blend)
+      end
+
+      def resolve_gradient_color_with_stops(colors, position, stops)
+        index = Array.new(colors.length - 1) { |offset| offset }.index do |offset|
+          position <= stops[offset + 1]
+        end
+
+        return colors.last if index.nil?
+
+        return colors[0] if index == 0 && position <= stops[0]
+
+        left_index = [index, colors.length - 2].min
+        right_index = left_index + 1
+        start = stops[left_index]
+        stop = stops[right_index]
+        blend = ((position - start) / (stop - start)).clamp(0.0, 1.0)
+
+        left_color = parse_hex_color(colors[left_index])
+        right_color = parse_hex_color(colors[right_index])
+        return colors[left_index] if left_color.nil? || right_color.nil?
+
+        interpolate_hex_color(left_color, right_color, blend)
+      end
+
+      def normalize_colors(value)
+        Array(value).map { |entry| entry.to_s.strip }.reject(&:empty?)
+      end
+
+      def normalize_position(value)
+        position = Float(value)
+        position = 0.0 unless position.finite?
+
+        position % 1.0
+      rescue ArgumentError, TypeError
+        0.0
       end
 
       def palette_color(params, index)
         palette = Array(params[:palette] || params["palette"]).map { |color| color.to_s.strip }.reject(&:empty?)
         return nil if palette.empty?
 
-        palette[index % palette.length]
+        position = normalize_palette_position(index, palette.length)
+        return palette[0] if position.nil?
+
+        lower_index = position.floor
+        upper_index = (lower_index + 1) % palette.length
+        blend = position - lower_index
+
+        base_color = palette[lower_index]
+        return base_color unless blend.positive? && blend < 1.0
+
+        lower_rgb = parse_hex_color(base_color)
+        upper_rgb = parse_hex_color(palette[upper_index])
+        return base_color if lower_rgb.nil? || upper_rgb.nil?
+
+        interpolate_hex_color(lower_rgb, upper_rgb, blend)
       end
 
       def parse_hex_color(value)
@@ -777,6 +878,28 @@ module Vizcore
         hex = match[:hex]
         hex = hex.chars.map { |char| "#{char}#{char}" }.join if hex.length == 3
         [hex[0, 2], hex[2, 2], hex[4, 2]].map { |component| component.to_i(16) }
+      end
+
+      def normalize_palette_position(value, palette_length)
+        return nil unless palette_length.positive?
+
+        numeric = Float(value)
+        return nil unless numeric.finite?
+
+        position = numeric % palette_length
+        return nil if position.nan?
+
+        position
+      rescue StandardError
+        nil
+      end
+
+      def interpolate_hex_color(left_rgb, right_rgb, blend)
+        blend = blend.to_f.clamp(0.0, 1.0)
+        rgb = left_rgb.zip(right_rgb).map do |left, right|
+          (left + (right - left) * blend).round.clamp(0, 255)
+        end
+        format("##{rgb.map { |value| format('%02x', value) }.join}")
       end
 
       def default_layer

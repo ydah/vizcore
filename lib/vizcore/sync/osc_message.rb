@@ -62,10 +62,21 @@ module Vizcore
 
           until @offset >= @data.bytesize
             break if @offset + 4 > @data.bytesize
-            message_size = read_int32
+
+            begin
+              message_size = read_int32
+            rescue StandardError
+              break
+            end
+
             break if message_size <= 0
 
-            message_data = read_bytes(message_size)
+            begin
+              message_data = read_bytes(message_size)
+            rescue StandardError
+              break
+            end
+
             parsed = Parser.new(message_data).parse_packet(default_timetag: bundle_timetag)
             messages.concat(Array(parsed))
           end
