@@ -856,8 +856,36 @@ module Vizcore
         command << "--frame-timeout"
         command << frame_timeout.to_s
       end
-      success = Kernel.system(*command)
+
+      success = nil
+      with_frontend_node_modules do
+        success = Kernel.system(*command)
+      end
       raise Thor::Error, "browser capture failed" unless success
+    end
+
+    def with_frontend_node_modules
+      frontend_node_modules = Vizcore.frontend_root.join("node_modules").expand_path
+      previous_node_path = ENV["NODE_PATH"]
+      had_node_modules = frontend_node_modules.directory?
+
+      if had_node_modules
+        ENV["NODE_PATH"] = if previous_node_path.to_s.empty?
+          frontend_node_modules.to_s
+        else
+          [frontend_node_modules.to_s, previous_node_path].join(File::PATH_SEPARATOR)
+        end
+      end
+
+      yield
+    ensure
+      if had_node_modules
+        if previous_node_path
+          ENV["NODE_PATH"] = previous_node_path
+        else
+          ENV.delete("NODE_PATH")
+        end
+      end
     end
 
     def temporary_server_command(config)

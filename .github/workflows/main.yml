@@ -100,3 +100,29 @@ jobs:
           name: cross-platform-smoke-${{ matrix.os }}
           path: cross-platform-smoke-${{ matrix.os }}.json
           if-no-files-found: error
+
+  example-browser-smoke:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'release' }}
+    runs-on: ubuntu-latest
+    name: Example browser smoke
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
+      - name: Install Playwright browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Run example scene browser smoke
+        run: bundle exec rake ci:example_browser_smoke

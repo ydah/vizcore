@@ -43,6 +43,17 @@ namespace :ci do
     sh "npm --prefix frontend run test:browser"
   end
 
+  desc "Capture example scenes with browser smoke"
+  task :example_browser_smoke do
+    env = { "VIZCORE_BROWSER_SMOKE_REQUIRED" => "1" }
+    node_modules_path = File.expand_path("frontend/node_modules", __dir__)
+    if File.directory?(node_modules_path)
+      previous_node_path = ENV["NODE_PATH"]
+      env["NODE_PATH"] = previous_node_path.to_s.empty? ? node_modules_path : "#{node_modules_path}#{File::PATH_SEPARATOR}#{previous_node_path}"
+    end
+    sh env, "bundle exec rspec spec/vizcore/example_browser_smoke_spec.rb"
+  end
+
   desc "Smoke test a built gem via install and execute CLI"
   task :installed_gem_smoke do
     sh "bundle exec rspec spec/vizcore/installed_gem_smoke_spec.rb"
