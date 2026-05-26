@@ -79,6 +79,18 @@ module Vizcore
         @values[:decay] = value
       end
 
+      # @param seconds [Numeric]
+      # @return [Numeric]
+      def cooldown(seconds)
+        @values[:cooldown] = seconds
+      end
+
+      # @param enabled [Boolean, nil]
+      # @return [Boolean]
+      def one_shot(enabled = true)
+        @values[:one_shot] = !!enabled
+      end
+
       # @param attack [Numeric, nil]
       # @param release [Numeric, nil]
       # @return [Hash]

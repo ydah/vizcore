@@ -285,6 +285,62 @@ RSpec.describe Vizcore::DSL::MappingResolver do
       expect(third[0][:params][:flash]).to eq(1.0)
     end
 
+    it "suppresses trigger pulses during cooldown" do
+      resolver = described_class.new
+      scene_layers = [
+        {
+          name: :triggered,
+          params: {},
+          mappings: [
+            {
+              source: { kind: :beat },
+              target: :flash,
+              transform: { as: :trigger, cooldown: 0.05 }
+            }
+          ]
+        }
+      ]
+
+      fired = resolver.resolve_layers(scene_layers: scene_layers, audio: { beat: true, bands: {} }, frame: 0)
+      dropped = resolver.resolve_layers(scene_layers: scene_layers, audio: { beat: false, bands: {} }, frame: 1)
+      blocked = resolver.resolve_layers(scene_layers: scene_layers, audio: { beat: true, bands: {} }, frame: 2)
+      reset = resolver.resolve_layers(scene_layers: scene_layers, audio: { beat: false, bands: {} }, frame: 3)
+      fired_after = resolver.resolve_layers(scene_layers: scene_layers, audio: { beat: true, bands: {} }, frame: 4)
+
+      expect(fired[0][:params][:flash]).to eq(1.0)
+      expect(dropped[0][:params][:flash]).to eq(0.0)
+      expect(blocked[0][:params][:flash]).to eq(0.0)
+      expect(reset[0][:params][:flash]).to eq(0.0)
+      expect(fired_after[0][:params][:flash]).to eq(1.0)
+    end
+
+    it "emits only one shot when one_shot is enabled" do
+      resolver = described_class.new
+      scene_layers = [
+        {
+          name: :triggered,
+          params: {},
+          mappings: [
+            {
+              source: { kind: :beat },
+              target: :flash,
+              transform: { as: :trigger, one_shot: true }
+            }
+          ]
+        }
+      ]
+
+      first = resolver.resolve_layers(scene_layers: scene_layers, audio: { beat: true, bands: {} }, frame: 0)
+      second = resolver.resolve_layers(scene_layers: scene_layers, audio: { beat: false, bands: {} }, frame: 1)
+      third = resolver.resolve_layers(scene_layers: scene_layers, audio: { beat: true, bands: {} }, frame: 2)
+      fourth = resolver.resolve_layers(scene_layers: scene_layers, audio: { beat: true, bands: {} }, frame: 3)
+
+      expect(first[0][:params][:flash]).to eq(1.0)
+      expect(second[0][:params][:flash]).to eq(0.0)
+      expect(third[0][:params][:flash]).to eq(0.0)
+      expect(fourth[0][:params][:flash]).to eq(0.0)
+    end
+
     it "applies square curve after gain and before range clamping" do
       resolver = described_class.new
       scene_layers = [

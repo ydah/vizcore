@@ -1504,7 +1504,7 @@ module Vizcore
         raise ArgumentError, "param min must be less than or equal to max"
       end
 
-      def normalize_transform(gain: nil, range: nil, min: nil, max: nil, curve: nil, attack: nil, release: nil, deadzone: nil, threshold: nil, hysteresis: nil, hold: nil, decay: nil, as: nil)
+      def normalize_transform(gain: nil, range: nil, min: nil, max: nil, curve: nil, attack: nil, release: nil, deadzone: nil, threshold: nil, hysteresis: nil, hold: nil, decay: nil, cooldown: nil, one_shot: nil, as: nil)
         range_min, range_max = normalize_range(range, context: "mapping")
         min = range_min if min.nil?
         max = range_max if max.nil?
@@ -1522,6 +1522,8 @@ module Vizcore
         output[:release] = clamp(normalize_float(release, :release), 0.0, 1.0) unless release.nil?
         output[:hold] = normalize_non_negative_float(hold, :hold) unless hold.nil?
         output[:decay] = clamp(normalize_float(decay, :decay), 0.0, 1.0) unless decay.nil?
+        output[:cooldown] = normalize_non_negative_float(cooldown, :cooldown) unless cooldown.nil?
+        output[:one_shot] = !!one_shot unless one_shot.nil?
         output
       end
 

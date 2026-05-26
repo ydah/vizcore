@@ -147,6 +147,7 @@ RSpec.describe Vizcore::DSL::Engine do
             map frequency_band(:low) => { to: :warp, gain: 2.0, min: 0.2, max: 2.5 }
             map beat_pulse => { to: :flash, range: [0.0, 1.0], attack: 1.0, release: 0.2 }
             map spectral_flux, to: :spark, threshold: 0.4, hysteresis: 0.1, hold: 0.2, decay: 0.8, curve: :smoothstep
+            map beat, to: :gate, as: :trigger, cooldown: 0.5, one_shot: true
           end
         end
       end
@@ -173,6 +174,11 @@ RSpec.describe Vizcore::DSL::Engine do
           source: { kind: :spectral_flux },
           target: :spark,
           transform: { threshold: 0.4, hysteresis: 0.1, curve: :smoothstep, hold: 0.2, decay: 0.8 }
+        },
+        {
+          source: { kind: :beat },
+          target: :gate,
+          transform: { as: :trigger, cooldown: 0.5, one_shot: true }
         }
       )
     end
@@ -1086,6 +1092,8 @@ RSpec.describe Vizcore::DSL::Engine do
               curve :ease_out
               smooth attack: 0.2, release: 0.6
               deadzone 0.05
+              cooldown 0.2
+              one_shot true
             end
           end
         end
@@ -1099,6 +1107,8 @@ RSpec.describe Vizcore::DSL::Engine do
           target: :scale,
           transform: {
             deadzone: 0.05,
+            cooldown: 0.2,
+            one_shot: true,
             gain: 2.0,
             min: 0.8,
             max: 1.6,
@@ -1159,7 +1169,7 @@ RSpec.describe Vizcore::DSL::Engine do
             end
 
             react_to beat do
-              trigger :burst
+              trigger :burst, cooldown: 0.1, one_shot: true
             end
           end
         end
@@ -1173,7 +1183,11 @@ RSpec.describe Vizcore::DSL::Engine do
           target: :speed,
           transform: { gain: 2.5, min: 0.1, max: 4.0 }
         },
-        { source: { kind: :beat }, target: :burst, transform: { as: :trigger } }
+        {
+          source: { kind: :beat },
+          target: :burst,
+          transform: { as: :trigger, cooldown: 0.1, one_shot: true }
+        }
       )
     end
 

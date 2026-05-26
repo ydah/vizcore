@@ -445,9 +445,46 @@ module Vizcore
 
       def apply_event_shaping(value, transform, state_key:, frame:)
         shaped = value
+        shaped = apply_cooldown(shaped, transform, state_key: state_key, frame: frame) if transform.key?(:cooldown)
+        shaped = apply_one_shot(shaped, transform, state_key: state_key) if transform[:one_shot]
         shaped = apply_hold(shaped, transform, state_key: state_key, frame: frame) if transform.key?(:hold)
         shaped = apply_decay(shaped, transform, state_key: state_key) if transform.key?(:decay)
         shaped
+      end
+
+      def apply_cooldown(value, transform, state_key:, frame:)
+        cooldown_frames = (Float(transform[:cooldown]) * 60.0).ceil
+        return value unless cooldown_frames.positive?
+
+        key = [:cooldown, state_key]
+        state = @mapping_state[key] || { until_frame: 0 }
+        current_frame = Integer(frame)
+        return value unless value.to_f > 0.0
+
+        if current_frame >= state[:until_frame]
+          state[:until_frame] = current_frame + cooldown_frames
+          @mapping_state[key] = state
+          value
+        else
+          0.0
+        end
+      rescue StandardError
+        value
+      end
+
+      def apply_one_shot(value, transform, state_key:)
+        key = [:one_shot, state_key]
+
+        active = value.to_f > 0.0
+        return 0.0 unless active
+
+        fired = !!@mapping_state[key]
+        return 0.0 if fired
+
+        @mapping_state[key] = true
+        value
+      rescue StandardError
+        value
       end
 
       def apply_hold(value, transform, state_key:, frame:)
