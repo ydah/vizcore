@@ -42,6 +42,13 @@ test("normalizeLiveControlPayload parses blackout color array with alpha", () =>
   );
 });
 
+test("normalizeLiveControlPayload parses mixed-range blackout colors", () => {
+  assert.deepEqual(
+    normalizeLiveControlPayload({ value: true, color: [0.2, 0.4, 1, 128], fade: 0.25 }),
+    { enabled: true, fade: 0.25, color: [0.2, 0.4, 1, 0.5019607843137255] },
+  );
+});
+
 test("toggleLiveControl toggles known controls without mutating input", () => {
   const state = createLiveControlState();
   const next = toggleLiveControl(state, "blackout");

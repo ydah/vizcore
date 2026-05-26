@@ -42,8 +42,10 @@ const normalizeColorChannels = (value, hasAlpha = false) => {
     return null;
   }
 
-  const rgb = values.slice(0, 3).map(clamp01);
-  const alpha = values.length === 4 ? clamp01(values[3]) : null;
+  const rgbValues = values.slice(0, 3);
+  const shouldScaleRgbBy255 = rgbValues.some((channel) => channel > 1);
+  const rgb = rgbValues.map((channel) => (shouldScaleRgbBy255 ? clamp01(channel / 255) : clamp01(channel)));
+  const alpha = values.length === 4 ? clamp01(values[3] > 1 ? values[3] / 255 : values[3]) : null;
   if (rgb.includes(null) || (values.length === 4 && alpha === null)) {
     return null;
   }
@@ -64,10 +66,15 @@ const normalizeLiveControlColor = (value) => {
       return null;
     }
 
-    const normalized = channels.every((channel) => channel >= 0 && channel <= 1)
-      ? channels.map((channel) => clamp01(channel))
-      : channels.map((channel) => clamp01(channel / 255));
-    return normalizeColorChannels(normalized, channels.length >= 4);
+    const rgbValues = channels.slice(0, 3);
+    const alpha = channels.length === 4 ? clamp01(channels[3] > 1 ? channels[3] / 255 : channels[3]) : null;
+    if (channels.length === 4 && alpha === null) {
+      return null;
+    }
+
+    const shouldScaleRgbBy255 = rgbValues.some((channel) => channel > 1);
+    const normalizedRgb = rgbValues.map((channel) => (shouldScaleRgbBy255 ? clamp01(channel / 255) : clamp01(channel)));
+    return channels.length === 4 ? [...normalizedRgb, alpha] : normalizedRgb;
   }
 
   const parsed = parseHexColor(value);

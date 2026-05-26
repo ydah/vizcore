@@ -420,13 +420,14 @@ const normalizeLiveControlColor = (value) => {
       return null;
     }
 
-    const normalized = channels.every((channel) => channel >= 0 && channel <= 1)
-      ? channels.map((channel) => clamp(channel, 0, 1))
-      : channels.map((channel) => clamp(channel / 255, 0, 1));
-    if (normalized.length >= 4) {
-      return normalized.slice(0, 4);
-    }
-    return normalized;
+    const rgbValues = channels.slice(0, 3);
+    const alpha = channels[3];
+    const rgb = rgbValues.every((channel) => channel >= 0 && channel <= 1)
+      ? rgbValues.map((channel) => clamp(channel, 0, 1))
+      : rgbValues.map((channel) => clamp(channel / 255, 0, 1));
+    const normalizedAlpha = alpha == null ? null : (alpha > 1 ? clamp(alpha / 255, 0, 1) : clamp(alpha, 0, 1));
+
+    return channels.length === 3 ? rgb : [...rgb, normalizedAlpha];
   }
 
   const color = parseHexColor(String(value || ""));
