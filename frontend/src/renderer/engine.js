@@ -580,6 +580,7 @@ export const collectRendererCapabilities = (gl, {
     devicePixelRatio: roundDpr(devicePixelRatio),
     effectiveDevicePixelRatio: roundDpr(effectiveDevicePixelRatio),
     maxTextureSize: Number(safeGetParameter(gl, gl?.MAX_TEXTURE_SIZE) || 0),
+    maxDrawBuffers: Number(safeGetParameter(gl, gl?.MAX_DRAW_BUFFERS) || 0),
     maxRenderbufferSize: Number(safeGetParameter(gl, gl?.MAX_RENDERBUFFER_SIZE) || 0),
     maxViewportDims: Array.from(maxViewportDims).map((value) => Number(value || 0)),
     floatColorBuffer: !!safeGetExtension(gl, "EXT_color_buffer_float"),

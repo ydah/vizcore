@@ -114,11 +114,13 @@ test("renderer capability and safe mode metrics are tracked", () => {
   let state = createPerformanceMonitorState();
 
   state = recordRendererCapabilities(state, { effectiveDevicePixelRatio: 1.5, maxTextureSize: 8192 });
+  state = recordRendererCapabilities(state, { maxDrawBuffers: 4 });
   state = recordRendererSafeMode(state, { active: true, effectiveDevicePixelRatio: 1 });
   state = recordRendererCapabilities(state, { floatColorBuffer: true, textureFloat: false });
 
   assert.equal(state.rendererDpr, 1);
   assert.equal(state.rendererMaxTextureSize, 8192);
+  assert.equal(state.rendererMaxDrawBuffers, 4);
   assert.equal(state.rendererSafeMode, true);
   assert.equal(state.rendererFloatColorBuffer, true);
   assert.equal(state.rendererTextureFloat, false);
@@ -151,7 +153,7 @@ test("formatPerformanceMonitorText produces stable HUD copy", () => {
 
   assert.equal(
     formatPerformanceMonitorText(state),
-    "Perf: 59.9 FPS | Frame 16.7ms | WS 12ms | RTT 8ms | Probe max 50ms | Probe p95 50ms | Clock -2ms | Drop 3 | BDrop 4 | WSLag 2.5f | Audio 1.2ms | Capture 0.3ms | Analyze 1.5ms | Build 6.3ms | Shader 3.4ms | DPR 1.50x | MaxTex 8192 | floatColorBuffer no | textureFloat no | Safe on | Backpressure 1024B | Reconnect 1",
+    "Perf: 59.9 FPS | Frame 16.7ms | WS 12ms | RTT 8ms | Probe max 50ms | Probe p95 50ms | Clock -2ms | Drop 3 | BDrop 4 | WSLag 2.5f | Audio 1.2ms | Capture 0.3ms | Analyze 1.5ms | Build 6.3ms | Shader 3.4ms | DPR 1.50x | MaxTex 8192 | DrawBuf -- | floatColorBuffer no | textureFloat no | Safe on | Backpressure 1024B | Reconnect 1",
   );
 });
 

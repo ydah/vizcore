@@ -93,10 +93,12 @@ test("collectRendererCapabilities returns WebGL limits without throwing", () => 
     MAX_TEXTURE_SIZE: 1,
     MAX_RENDERBUFFER_SIZE: 2,
     MAX_VIEWPORT_DIMS: 3,
+    MAX_DRAW_BUFFERS: 4,
     getParameter(parameter) {
       if (parameter === 1) return 8192;
       if (parameter === 2) return 4096;
       if (parameter === 3) return new Int32Array([8192, 4096]);
+      if (parameter === 4) return 8;
       return null;
     },
     getExtension(name) {
@@ -114,6 +116,7 @@ test("collectRendererCapabilities returns WebGL limits without throwing", () => 
     maxTextureSize: 8192,
     maxRenderbufferSize: 4096,
     maxViewportDims: [8192, 4096],
+    maxDrawBuffers: 8,
     floatColorBuffer: true,
     textureFloat: false,
   });
