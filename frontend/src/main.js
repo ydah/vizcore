@@ -1511,5 +1511,6 @@ function setMeter(fill, valueElement, value, digits) {
 
 function buildWebSocketUrl() {
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-  return `${protocol}://${window.location.host}/ws`;
+  const role = projectorMode ? "projector" : "control";
+  return `${protocol}://${window.location.host}/ws?role=${encodeURIComponent(role)}`;
 }

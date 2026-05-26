@@ -8,6 +8,14 @@ RSpec.describe Vizcore::Server::WebSocketHandler do
     def send(message)
       messages << message
     end
+
+    def hash
+      object_id.hash
+    end
+
+    def eql?(other)
+      equal?(other)
+    end
   end
 
   before do
@@ -122,5 +130,45 @@ RSpec.describe Vizcore::Server::WebSocketHandler do
     described_class.send(:handle_message, socket, JSON.generate(type: "latency_probe", payload: {}))
 
     expect(handled).to eq([{ "type" => "latency_probe", "payload" => {} }, socket])
+  end
+
+  it "assigns client role from websocket query string on registration" do
+    socket = FakeSocket.new([])
+    role = described_class.send(:websocket_role_for_env, "QUERY_STRING" => "role=control")
+    described_class.send(:register, socket, role: role)
+
+    described_class.broadcast(type: "audio_frame", payload: { bpm: 120 })
+    described_class.broadcast(type: "audio_frame", payload: { bpm: 120 })
+    described_class.broadcast(type: "audio_frame", payload: { bpm: 120 })
+    described_class.broadcast(type: "audio_frame", payload: { bpm: 120 })
+
+    expect(role).to eq(described_class::CONTROL_ROLE)
+    parsed_messages = socket.messages.map { |message| JSON.parse(message) }
+    expect(parsed_messages.length).to eq(2)
+  end
+
+  it "keeps backpressure metrics client role field updated" do
+    projector_socket = FakeSocket.new([])
+    described_class.send(:register, projector_socket, role: described_class::PROJECTOR_ROLE)
+    control_socket = FakeSocket.new([])
+    described_class.send(:register, control_socket, role: described_class::CONTROL_ROLE)
+
+    described_class.broadcast(type: "scene_change", payload: { from: "intro", to: "drop" })
+    described_class.broadcast(type: "audio_frame", payload: { bpm: 120 })
+
+    status = described_class.backpressure_status
+    role_index = status[:clients].index { |entry| entry[:id] == control_socket.object_id.to_s }
+    projector_entry = status[:clients].find { |entry| entry[:id] == projector_socket.object_id.to_s }
+
+    expect(role_index).not_to be_nil
+    expect(status[:clients][role_index][:role]).to eq(described_class::CONTROL_ROLE)
+    expect(projector_entry[:role]).to eq(described_class::PROJECTOR_ROLE)
+    expect(status[:clients][role_index][:sent_frames]).to be >= 1
+  end
+
+  it "defaults invalid query role values to projector" do
+    role = described_class.send(:websocket_role_for_env, "QUERY_STRING" => "role=monitor")
+
+    expect(role).to eq(described_class::PROJECTOR_ROLE)
   end
 end

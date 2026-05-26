@@ -3,6 +3,7 @@
 require "json"
 require "set"
 require "thread"
+require "uri"
 require_relative "../errors"
 
 module Vizcore
@@ -12,6 +13,10 @@ module Vizcore
       PROTOCOL_VERSION = "vizcore.frame.v1"
       MAX_BUFFERED_FRAME_BYTES = 1_000_000
       DROPPABLE_MESSAGE_TYPES = Set["audio_frame"].freeze
+      VALID_CLIENT_ROLES = Set["projector", "control"].freeze
+      CONTROL_ROLE = "control".freeze
+      PROJECTOR_ROLE = "projector".freeze
+      CONTROL_AUDIO_FRAME_INTERVAL = 4
 
       class << self
         # Rack endpoint for WebSocket upgrade handling.
@@ -25,7 +30,7 @@ module Vizcore
 
           socket = websocket_klass.new(env, nil, ping: 15)
 
-          socket.on(:open) { register(socket) }
+          socket.on(:open) { register(socket, role: websocket_role_for_env(env)) }
           socket.on(:close) { unregister(socket) }
           socket.on(:message) { |event| handle_message(socket, event.data) }
 
@@ -125,6 +130,8 @@ module Vizcore
         end
 
         def send_message(socket, message, type:)
+          return unless should_send_to_socket?(socket, type: type)
+
           message_bytes = message.bytesize
           return if drop_for_backpressure?(socket, type, payload_bytes: message_bytes)
 
@@ -200,10 +207,13 @@ module Vizcore
           nil
         end
 
-        def register(socket)
+        def register(socket, role: PROJECTOR_ROLE)
           mutex.synchronize do
             sockets << socket
             socket_backpressure_metrics[socket_id(socket)] = default_backpressure_metrics
+            client_backpressure_metrics(socket)[:role] = normalize_client_role(role)
+            client_backpressure_metrics(socket)[:control_audio_frame_index] = 0
+            socket_backpressure_metrics[socket_id(socket)] = client_backpressure_metrics(socket)
           end
         end
 
@@ -240,6 +250,7 @@ module Vizcore
           metrics = client_backpressure_metrics(socket)
           {
             id: socket_id(socket).to_s,
+            role: metrics[:role],
             buffered_amount: metrics[:buffered_amount],
             peak_buffered_amount: metrics[:peak_buffered_amount],
             dropped_frames: metrics[:dropped_frames],
@@ -264,6 +275,28 @@ module Vizcore
           socket_backpressure_metrics.fetch(socket_id(socket)) do
             socket_backpressure_metrics[socket_id(socket)] = default_backpressure_metrics
           end
+        end
+
+        def socket_role(socket)
+          client_backpressure_metrics(socket)[:role]
+        end
+
+        def should_send_to_socket?(socket, type:)
+          return true unless socket_role(socket) == CONTROL_ROLE
+          return true unless type.to_s == "audio_frame"
+
+          control_audio_frame_due?(socket)
+        end
+
+        def control_audio_frame_due?(socket)
+          metrics = client_backpressure_metrics(socket)
+          metrics[:control_audio_frame_index] = (metrics[:control_audio_frame_index] || 0) + 1
+          count = metrics[:control_audio_frame_index]
+
+          return true if count == 1
+          return true if (count % CONTROL_AUDIO_FRAME_INTERVAL).zero?
+
+          false
         end
 
         def refresh_socket_backpressure_metrics(socket, buffered_amount: nil)
@@ -317,6 +350,8 @@ module Vizcore
 
         def default_backpressure_metrics
           {
+            role: PROJECTOR_ROLE,
+            control_audio_frame_index: 0,
             buffered_amount: 0,
             peak_buffered_amount: 0,
             dropped_frames: 0,
@@ -325,6 +360,29 @@ module Vizcore
             sent_payload_bytes: 0,
             last_payload_bytes: 0
           }
+        end
+
+        def websocket_role_for_env(env)
+          return PROJECTOR_ROLE unless env.is_a?(Hash)
+
+          role = query_param(String(env["QUERY_STRING"] || ""), "role")
+          normalize_client_role(role)
+        end
+
+        def query_param(query_string, key)
+          URI.decode_www_form(query_string).each do |entry_key, value|
+            return value if entry_key == key
+          end
+
+          nil
+        rescue StandardError
+          nil
+        end
+
+        def normalize_client_role(role)
+          return PROJECTOR_ROLE unless VALID_CLIENT_ROLES.include?(role.to_s)
+
+          role.to_s
         end
 
         def mutex
