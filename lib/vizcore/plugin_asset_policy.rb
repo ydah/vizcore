@@ -1,11 +1,13 @@
 # frozen_string_literal: true
 
 require "pathname"
+require "rack"
 
 module Vizcore
   # Validates browser-side plugin assets before they are served by the runtime.
   class PluginAssetPolicy
     ALLOWED_EXTENSIONS = %w[.js .mjs].freeze
+    ALLOWED_MIME_TYPES = %w[text/javascript application/javascript].freeze
 
     # @param path [String, Pathname]
     # @param root [String, Pathname, nil] optional sandbox root
@@ -20,6 +22,20 @@ module Vizcore
 
       unless ALLOWED_EXTENSIONS.include?(asset_path.extname.downcase)
         raise ArgumentError, "Unsupported plugin asset extension: #{asset_path.extname}. Use one of: #{ALLOWED_EXTENSIONS.join(', ')}"
+      end
+
+      extname = asset_path.extname.downcase
+      mime_type = Rack::Mime.mime_type(extname, "application/octet-stream")
+      mime_type = case extname
+      when ".mjs"
+        mime_type == "application/octet-stream" ? "application/javascript" : mime_type
+      when ".js"
+        mime_type == "application/octet-stream" ? "text/javascript" : mime_type
+      else
+        mime_type
+      end
+      unless ALLOWED_MIME_TYPES.include?(mime_type)
+        raise ArgumentError, "Unsupported plugin asset MIME type: #{mime_type}. Use one of: #{ALLOWED_MIME_TYPES.join(", ")}"
       end
 
       asset_path
