@@ -20,6 +20,8 @@ export const createPerformanceMonitorState = () => ({
   latencyProbeSamples: [],
   latencyProbeMaxMs: null,
   latencyProbeP95Ms: null,
+  rendererFloatColorBuffer: false,
+  rendererTextureFloat: false,
   reconnects: 0,
   rendererDpr: null,
   rendererMaxTextureSize: null,
@@ -169,6 +171,8 @@ export const recordRendererCapabilities = (state, detail) => {
     ...state,
     rendererDpr: effectiveDpr ?? state?.rendererDpr ?? null,
     rendererMaxTextureSize: maxTextureSize ?? state?.rendererMaxTextureSize ?? null,
+    rendererFloatColorBuffer: !!detail?.floatColorBuffer,
+    rendererTextureFloat: !!detail?.textureFloat,
   };
 };
 
@@ -211,6 +215,8 @@ export const formatPerformanceMonitorText = (state) => {
   const shaderCompile = Number.isFinite(state?.shaderCompileMs) ? `${Number(state.shaderCompileMs).toFixed(1)}ms` : "--";
   const rendererDpr = Number.isFinite(state?.rendererDpr) ? `${Number(state.rendererDpr).toFixed(2)}x` : "--";
   const maxTexture = Number.isFinite(state?.rendererMaxTextureSize) ? Math.round(state.rendererMaxTextureSize) : "--";
+  const floatColorBuffer = state?.rendererFloatColorBuffer ? "floatColorBuffer yes" : "floatColorBuffer no";
+  const textureFloat = state?.rendererTextureFloat ? "textureFloat yes" : "textureFloat no";
   const safeMode = state?.rendererSafeMode ? "on" : "off";
   const droppedFrames = Math.max(0, Number(state?.droppedFrames || 0));
   const wsDroppedFrames = Math.max(0, Number(state?.wsDroppedFrames || 0));
@@ -218,7 +224,7 @@ export const formatPerformanceMonitorText = (state) => {
   const reconnects = Math.max(0, Number(state?.reconnects || 0));
   const wsAvgPayload = Number.isFinite(state?.wsAvgPayloadBytes) ? `${Math.round(state.wsAvgPayloadBytes)}B` : "--";
 
-  return `Perf: ${fps} FPS | Frame ${frameMs} | WS ${wsLatency} | RTT ${rtt} | Probe max ${probeMax} | Probe p95 ${probeP95} | Clock ${clockOffset} | Drop ${droppedFrames} | BDrop ${wsDroppedFrames} | WSLag ${wsEstimatedLagFrames.toFixed(1)}f | Audio ${audioLatency} | Capture ${audioCaptureMs} | Analyze ${audioAnalysisMs} | Build ${sceneBuildMs} | Shader ${shaderCompile} | DPR ${rendererDpr} | MaxTex ${maxTexture} | Safe ${safeMode} | Backpressure ${wsAvgPayload} | Reconnect ${reconnects}`;
+  return `Perf: ${fps} FPS | Frame ${frameMs} | WS ${wsLatency} | RTT ${rtt} | Probe max ${probeMax} | Probe p95 ${probeP95} | Clock ${clockOffset} | Drop ${droppedFrames} | BDrop ${wsDroppedFrames} | WSLag ${wsEstimatedLagFrames.toFixed(1)}f | Audio ${audioLatency} | Capture ${audioCaptureMs} | Analyze ${audioAnalysisMs} | Build ${sceneBuildMs} | Shader ${shaderCompile} | DPR ${rendererDpr} | MaxTex ${maxTexture} | ${floatColorBuffer} | ${textureFloat} | Safe ${safeMode} | Backpressure ${wsAvgPayload} | Reconnect ${reconnects}`;
 };
 
 export const estimateDroppedFrames = (frameGapMs, expectedFrameMs = DEFAULT_EXPECTED_FRAME_MS) => {
