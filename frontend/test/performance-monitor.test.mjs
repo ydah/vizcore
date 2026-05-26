@@ -71,6 +71,10 @@ test("recordLatencyProbe estimates round trip time and clock offset", () => {
 
   assert.equal(state.rttMs, 30);
   assert.equal(state.clockOffsetMs, 50);
+  assert.equal(state.latencyProbeMaxMs, 30);
+  assert.equal(state.latencyProbeP95Ms, 30);
+  assert.equal(state.latencyProbeSamples.length, 1);
+  assert.equal(state.latencyProbeSamples[0], 30);
 });
 
 test("recordSocketFrame corrects websocket latency with measured clock offset", () => {
@@ -137,11 +141,14 @@ test("formatPerformanceMonitorText produces stable HUD copy", () => {
     wsEstimatedLagFrames: 2.5,
     wsAvgPayloadBytes: 1024,
     wsLatencyMs: 12.4,
+    latencyProbeSamples: [10, 40, 30, 20, 50],
+    latencyProbeMaxMs: 50,
+    latencyProbeP95Ms: 50,
   };
 
   assert.equal(
     formatPerformanceMonitorText(state),
-    "Perf: 59.9 FPS | Frame 16.7ms | WS 12ms | RTT 8ms | Clock -2ms | Drop 3 | BDrop 4 | WSLag 2.5f | Audio 1.2ms | Capture 0.3ms | Analyze 1.5ms | Build 6.3ms | Shader 3.4ms | DPR 1.50x | MaxTex 8192 | Safe on | Backpressure 1024B | Reconnect 1",
+    "Perf: 59.9 FPS | Frame 16.7ms | WS 12ms | RTT 8ms | Probe max 50ms | Probe p95 50ms | Clock -2ms | Drop 3 | BDrop 4 | WSLag 2.5f | Audio 1.2ms | Capture 0.3ms | Analyze 1.5ms | Build 6.3ms | Shader 3.4ms | DPR 1.50x | MaxTex 8192 | Safe on | Backpressure 1024B | Reconnect 1",
   );
 });
 

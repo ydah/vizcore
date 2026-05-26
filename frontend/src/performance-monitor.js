@@ -1,5 +1,6 @@
 const DEFAULT_EXPECTED_FRAME_MS = 1000 / 60;
 const FPS_WINDOW_MS = 500;
+const LATENCY_HISTORY_MAX = 120;
 
 export const createPerformanceMonitorState = () => ({
   audioLatencyMs: null,
@@ -16,6 +17,9 @@ export const createPerformanceMonitorState = () => ({
   frameMs: 0,
   lastRenderAtMs: null,
   lastSocketTimestampMs: null,
+  latencyProbeSamples: [],
+  latencyProbeMaxMs: null,
+  latencyProbeP95Ms: null,
   reconnects: 0,
   rendererDpr: null,
   rendererMaxTextureSize: null,
@@ -117,9 +121,18 @@ export const recordLatencyProbe = (state, payload, receivedAtMs) => {
   const serverProcessingMs = serverSentAtMs - serverReceivedAtMs;
   const rttMs = Math.max(0, browserReceivedAtMs - clientSentAtMs - serverProcessingMs);
   const clockOffsetMs = ((serverReceivedAtMs - clientSentAtMs) + (serverSentAtMs - browserReceivedAtMs)) / 2;
+  const nextLatencySamples = appendNumericHistory(
+    Array.isArray(state?.latencyProbeSamples) ? state.latencyProbeSamples : [],
+    rttMs,
+    LATENCY_HISTORY_MAX,
+  );
+  const { max, p95 } = latencyProbeStats(nextLatencySamples);
 
   return {
     ...state,
+    latencyProbeSamples: nextLatencySamples,
+    latencyProbeMaxMs: max,
+    latencyProbeP95Ms: p95,
     clockOffsetMs: Math.round(clockOffsetMs),
     rttMs: Math.round(rttMs),
   };
@@ -193,6 +206,8 @@ export const formatPerformanceMonitorText = (state) => {
   const audioCaptureMs = Number.isFinite(state?.audioCaptureMs) ? `${Number(state.audioCaptureMs).toFixed(1)}ms` : "--";
   const audioAnalysisMs = Number.isFinite(state?.audioAnalysisMs) ? `${Number(state.audioAnalysisMs).toFixed(1)}ms` : "--";
   const sceneBuildMs = Number.isFinite(state?.sceneBuildMs) ? `${Number(state.sceneBuildMs).toFixed(1)}ms` : "--";
+  const probeMax = Number.isFinite(state?.latencyProbeMaxMs) ? `${Math.round(state.latencyProbeMaxMs)}ms` : "--";
+  const probeP95 = Number.isFinite(state?.latencyProbeP95Ms) ? `${Math.round(state.latencyProbeP95Ms)}ms` : "--";
   const shaderCompile = Number.isFinite(state?.shaderCompileMs) ? `${Number(state.shaderCompileMs).toFixed(1)}ms` : "--";
   const rendererDpr = Number.isFinite(state?.rendererDpr) ? `${Number(state.rendererDpr).toFixed(2)}x` : "--";
   const maxTexture = Number.isFinite(state?.rendererMaxTextureSize) ? Math.round(state.rendererMaxTextureSize) : "--";
@@ -203,7 +218,7 @@ export const formatPerformanceMonitorText = (state) => {
   const reconnects = Math.max(0, Number(state?.reconnects || 0));
   const wsAvgPayload = Number.isFinite(state?.wsAvgPayloadBytes) ? `${Math.round(state.wsAvgPayloadBytes)}B` : "--";
 
-  return `Perf: ${fps} FPS | Frame ${frameMs} | WS ${wsLatency} | RTT ${rtt} | Clock ${clockOffset} | Drop ${droppedFrames} | BDrop ${wsDroppedFrames} | WSLag ${wsEstimatedLagFrames.toFixed(1)}f | Audio ${audioLatency} | Capture ${audioCaptureMs} | Analyze ${audioAnalysisMs} | Build ${sceneBuildMs} | Shader ${shaderCompile} | DPR ${rendererDpr} | MaxTex ${maxTexture} | Safe ${safeMode} | Backpressure ${wsAvgPayload} | Reconnect ${reconnects}`;
+  return `Perf: ${fps} FPS | Frame ${frameMs} | WS ${wsLatency} | RTT ${rtt} | Probe max ${probeMax} | Probe p95 ${probeP95} | Clock ${clockOffset} | Drop ${droppedFrames} | BDrop ${wsDroppedFrames} | WSLag ${wsEstimatedLagFrames.toFixed(1)}f | Audio ${audioLatency} | Capture ${audioCaptureMs} | Analyze ${audioAnalysisMs} | Build ${sceneBuildMs} | Shader ${shaderCompile} | DPR ${rendererDpr} | MaxTex ${maxTexture} | Safe ${safeMode} | Backpressure ${wsAvgPayload} | Reconnect ${reconnects}`;
 };
 
 export const estimateDroppedFrames = (frameGapMs, expectedFrameMs = DEFAULT_EXPECTED_FRAME_MS) => {
@@ -260,4 +275,34 @@ const coerceFiniteNumber = (value) => {
 const formatSignedInteger = (value) => {
   const rounded = Math.round(Number(value) || 0);
   return rounded > 0 ? `+${rounded}` : `${rounded}`;
+};
+
+const appendNumericHistory = (history = [], sample, maxLength = LATENCY_HISTORY_MAX) => {
+  if (!Number.isFinite(sample)) {
+    return Array.isArray(history) ? history.slice(-maxLength) : [];
+  }
+
+  const keep = Math.max(1, Number(maxLength) || 1);
+  const sanitizedHistory = Array.isArray(history)
+    ? history.filter((entry) => Number.isFinite(entry)).map((entry) => Number(entry))
+    : [];
+  const next = [...sanitizedHistory, Number(sample)];
+  if (next.length <= keep) {
+    return next;
+  }
+
+  return next.slice(next.length - keep);
+};
+
+const latencyProbeStats = (samples) => {
+  const numericSamples = (Array.isArray(samples) ? samples : []).filter((entry) => Number.isFinite(entry));
+  if (numericSamples.length === 0) {
+    return { max: null, p95: null };
+  }
+
+  const sorted = [...numericSamples].sort((left, right) => left - right);
+  const max = sorted[sorted.length - 1];
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(0.95 * sorted.length) - 1));
+
+  return { max, p95: sorted[index] };
 };
