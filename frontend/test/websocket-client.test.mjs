@@ -3,6 +3,43 @@ import assert from "node:assert/strict";
 
 import { PROTOCOL_VERSION, WebSocketClient } from "../src/websocket-client.js";
 
+function installMockWebSocket() {
+  const instances = [];
+
+  class FakeWebSocket {
+    constructor(url) {
+      this.url = url;
+      this.readyState = 0;
+      this.listeners = {};
+      instances.push(this);
+    }
+
+    addEventListener(type, handler) {
+      this.listeners[type] = this.listeners[type] || [];
+      this.listeners[type].push(handler);
+    }
+
+    close() {
+      if (this.readyState !== 3) {
+        this.readyState = 3;
+      }
+      this.dispatchEvent("close");
+    }
+
+    dispatchEvent(type, payload = {}) {
+      (this.listeners[type] || []).forEach((handler) => {
+        handler(payload);
+      });
+    }
+
+    send() {
+      return;
+    }
+  }
+
+  return { FakeWebSocket, instances };
+}
+
 test("WebSocketClient routes parsed message payload by message type", () => {
   const calls = {
     frame: null,
@@ -61,4 +98,78 @@ test("WebSocketClient sends protocol version in outgoing messages", () => {
     type: "switch_scene",
     payload: { scene: "drop" }
   });
+});
+
+test("WebSocketClient reconnects after socket close", () => {
+  const { FakeWebSocket, instances } = installMockWebSocket();
+  const originalWebSocket = global.WebSocket;
+  const originalSetTimeout = global.setTimeout;
+  let reconnectTask = null;
+
+  global.WebSocket = FakeWebSocket;
+  global.setTimeout = (fn, ms) => {
+    reconnectTask = fn;
+    return 1;
+  };
+
+  try {
+    const statuses = [];
+    const client = new WebSocketClient("ws://127.0.0.1:4567/ws", {
+      onStatus: (status) => statuses.push(status)
+    });
+
+    client.connect();
+    const first = instances[0];
+    first.readyState = 1;
+    first.dispatchEvent("open");
+
+    first.close();
+
+    assert.equal(first.readyState, 3);
+    assert.deepEqual(statuses, ["connecting", "connected", "reconnecting"]);
+    assert.equal(typeof reconnectTask, "function");
+
+    reconnectTask();
+    assert.equal(statuses[3], "connecting");
+    assert.equal(instances.length, 2);
+  } finally {
+    global.WebSocket = originalWebSocket;
+    global.setTimeout = originalSetTimeout;
+  }
+});
+
+test("WebSocketClient ignores close events from stale sockets", () => {
+  const { FakeWebSocket, instances } = installMockWebSocket();
+  const originalWebSocket = global.WebSocket;
+  const originalSetTimeout = global.setTimeout;
+  let reconnectCalls = 0;
+
+  global.WebSocket = FakeWebSocket;
+  global.setTimeout = () => {
+    reconnectCalls += 1;
+    return 1;
+  };
+
+  try {
+    const statuses = [];
+    const client = new WebSocketClient("ws://127.0.0.1:4567/ws", {
+      onStatus: (status) => statuses.push(status)
+    });
+
+    client.connect();
+    const first = instances[0];
+    first.readyState = 1;
+    first.dispatchEvent("open");
+
+    // Force a stale serial to mimic an older socket event.
+    client.connectionSerial += 1;
+    first.dispatchEvent("close");
+
+    assert.equal(reconnectCalls, 0);
+    assert.deepEqual(statuses, ["connecting", "connected"]);
+    assert.equal(instances.length, 1);
+  } finally {
+    global.WebSocket = originalWebSocket;
+    global.setTimeout = originalSetTimeout;
+  }
 });
