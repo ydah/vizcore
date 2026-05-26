@@ -166,8 +166,14 @@ RSpec.describe Vizcore::Server::WebSocketHandler do
     expect(status[:clients][role_index][:sent_frames]).to be >= 1
   end
 
-  it "defaults invalid query role values to projector" do
+  it "accepts monitor role from query string" do
     role = described_class.send(:websocket_role_for_env, "QUERY_STRING" => "role=monitor")
+
+    expect(role).to eq(described_class::MONITOR_ROLE)
+  end
+
+  it "normalizes unsupported query role values to projector" do
+    role = described_class.send(:websocket_role_for_env, "QUERY_STRING" => "role=watcher")
 
     expect(role).to eq(described_class::PROJECTOR_ROLE)
   end

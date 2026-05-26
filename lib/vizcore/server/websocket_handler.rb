@@ -13,9 +13,11 @@ module Vizcore
       PROTOCOL_VERSION = "vizcore.frame.v1"
       MAX_BUFFERED_FRAME_BYTES = 1_000_000
       DROPPABLE_MESSAGE_TYPES = Set["audio_frame"].freeze
-      VALID_CLIENT_ROLES = Set["projector", "control"].freeze
+      VALID_CLIENT_ROLES = Set["projector", "control", "monitor"].freeze
       CONTROL_ROLE = "control".freeze
       PROJECTOR_ROLE = "projector".freeze
+      MONITOR_ROLE = "monitor".freeze
+      LOW_BANDWIDTH_ROLES = Set[CONTROL_ROLE, MONITOR_ROLE].freeze
       CONTROL_AUDIO_FRAME_INTERVAL = 4
 
       class << self
@@ -282,7 +284,7 @@ module Vizcore
         end
 
         def should_send_to_socket?(socket, type:)
-          return true unless socket_role(socket) == CONTROL_ROLE
+          return true unless LOW_BANDWIDTH_ROLES.include?(socket_role(socket))
           return true unless type.to_s == "audio_frame"
 
           control_audio_frame_due?(socket)

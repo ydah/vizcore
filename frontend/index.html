@@ -554,7 +554,7 @@
       var search = String(window.location.search || "");
       var params = new URLSearchParams(search);
       var mode = String(params.get("mode") || "").toLowerCase();
-      var role = mode === "projector" || pathname.indexOf("/projector") === 0 ? "projector" : "control";
+      var role = mode === "projector" || pathname.indexOf("/projector") === 0 ? "projector" : (mode === "monitor" ? "monitor" : "control");
       var websocketUrl = protocol + "//" + window.location.host + "/ws?role=" + encodeURIComponent(role);
       var fallbackTimer = window.setTimeout(function () {
         if (window.__vizcoreMainStarted) return;
