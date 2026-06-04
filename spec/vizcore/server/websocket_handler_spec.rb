@@ -188,6 +188,23 @@ RSpec.describe Vizcore::Server::WebSocketHandler do
     expect(handled_messages).to be_empty
   end
 
+  it "allows projector sockets to report file transport playback" do
+    projector_socket = FakeSocket.new([])
+    handled_messages = []
+    described_class.on_message { |message| handled_messages << message }
+    described_class.send(:register, projector_socket, role: described_class::PROJECTOR_ROLE)
+
+    described_class.send(
+      :handle_message,
+      projector_socket,
+      JSON.generate(type: "transport_sync", payload: { playing: true, position_seconds: 1.25 })
+    )
+
+    expect(handled_messages).to eq([
+      { "type" => "transport_sync", "payload" => { "playing" => true, "position_seconds" => 1.25 } }
+    ])
+  end
+
   it "keeps backpressure metrics client role field updated" do
     projector_socket = FakeSocket.new([])
     described_class.send(:register, projector_socket, role: described_class::PROJECTOR_ROLE)

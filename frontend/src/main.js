@@ -121,6 +121,12 @@ const shaderErrorTitleElement = document.querySelector("#shader-error-title");
 const shaderErrorMessageElement = document.querySelector("#shader-error-message");
 const shaderErrorCloseButton = document.querySelector("#shader-error-close");
 const LATENCY_PROBE_INTERVAL_MS = 3000;
+const RUNTIME_REFRESH_INTERVAL_MS = 1500;
+const RUNTIME_RETRY_INTERVAL_MS = 800;
+const frontendAssetVersion = frontendAssetVersionFromScripts({
+  scripts: document.scripts,
+  baseUrl: window.location.href
+});
 
 const visualSettings = loadVisualSettingsPreset(browserStorage());
 let midiLearnBindings = loadMidiLearnBindings(browserStorage());
@@ -129,10 +135,15 @@ const performanceMonitor = createPerformanceMonitorState();
 let projectorMode = resolveProjectorMode({ body: document.body, location: window.location });
 let currentSceneName = "unknown";
 let audioElement = null;
+let currentAudioFileUrl = null;
+let audioStartGestureCleanup = null;
+let websocketRole = "control";
 let frameCount = 0;
 let lastConnectedAt = null;
 let lastTransportSyncAt = 0;
 let latencyProbeTimer = null;
+let runtimeRefreshTimer = null;
+let runtimeRefreshInFlight = null;
 let beatFlashUntil = 0;
 let availableSceneNames = [];
 let keyboardMappings = [];
@@ -292,6 +303,7 @@ const client = new WebSocketClient(websocketUrl, {
     if (status === "connected") {
       lastConnectedAt = new Date();
       startLatencyProbeLoop();
+      void refreshRuntime({ force: true });
       syncAudioTransportToServer({ force: true });
       if (runtimeErrorStatusElement) {
         runtimeErrorStatusElement.textContent = "Runtime: ok";
@@ -316,8 +328,62 @@ client.connect();
 void initializeRuntime();
 
 async function initializeRuntime() {
-  const runtime = await fetchRuntime();
-  applyRuntime(runtime);
+  await refreshRuntime({ scheduleNext: true });
+}
+
+async function refreshRuntime({ scheduleNext = false, force = false } = {}) {
+  if (runtimeRefreshInFlight && !force) {
+    return runtimeRefreshInFlight;
+  }
+
+  runtimeRefreshInFlight = (async () => {
+    const runtime = await fetchRuntime();
+    if (!runtime) {
+      if (scheduleNext) {
+        scheduleRuntimeRefresh(RUNTIME_RETRY_INTERVAL_MS);
+      }
+      return null;
+    }
+
+    if (shouldReloadForFrontendAsset(runtime)) {
+      return runtime;
+    }
+
+    applyRuntime(runtime);
+    if (scheduleNext) {
+      scheduleRuntimeRefresh(RUNTIME_REFRESH_INTERVAL_MS);
+    }
+    return runtime;
+  })();
+
+  try {
+    return await runtimeRefreshInFlight;
+  } finally {
+    runtimeRefreshInFlight = null;
+  }
+}
+
+function scheduleRuntimeRefresh(delayMs) {
+  if (runtimeRefreshTimer) {
+    clearTimeout(runtimeRefreshTimer);
+  }
+
+  runtimeRefreshTimer = setTimeout(() => {
+    runtimeRefreshTimer = null;
+    void refreshRuntime({ scheduleNext: true });
+  }, Math.max(250, Number(delayMs || RUNTIME_REFRESH_INTERVAL_MS)));
+}
+
+function shouldReloadForFrontendAsset(runtime) {
+  if (!shouldReloadForFrontendAssetVersion({
+    currentVersion: frontendAssetVersion,
+    runtimeVersion: runtime?.frontend_asset_version
+  })) {
+    return false;
+  }
+
+  window.location.reload();
+  return true;
 }
 
 async function fetchRuntime() {
@@ -357,7 +423,7 @@ function applyRuntime(runtime) {
   const fileUrl = runtime?.audio_file_url;
   applyRuntimeAudioInputHealth(runtime?.input);
   if (!fileUrl) {
-    engine.setMediaElement(null);
+    clearAudioPlayback();
     audioTrackStatusElement.textContent = "Track: none";
     audioPlaybackStatusElement.textContent = "Playback: unavailable";
     audioToggleButton.hidden = true;
@@ -365,7 +431,10 @@ function applyRuntime(runtime) {
   }
 
   audioTrackStatusElement.textContent = `Track: ${String(fileName || "source file")}`;
-  setupAudioPlayback(fileUrl);
+  const nextAudioFileUrl = String(fileUrl);
+  if (currentAudioFileUrl !== nextAudioFileUrl || !audioElement) {
+    setupAudioPlayback(nextAudioFileUrl);
+  }
 }
 
 function applyRuntimeAudioInputHealth(input) {
@@ -1242,7 +1311,9 @@ function setupAudioPlayback(audioUrl) {
   if (audioElement) {
     audioElement.pause();
   }
+  clearAudioStartGesture();
 
+  currentAudioFileUrl = String(audioUrl || "");
   audioElement = new Audio(audioUrl);
   audioElement.preload = "auto";
   audioElement.loop = true;
@@ -1264,28 +1335,35 @@ function setupAudioPlayback(audioUrl) {
 
   const playAudio = async () => {
     if (!audioElement) {
-      return;
+      return false;
     }
     try {
       await audioElement.play();
       updatePlaybackState();
+      clearAudioStartGesture();
+      return true;
     } catch (error) {
       const message = String(error?.message || "autoplay blocked");
       audioPlaybackStatusElement.textContent = `Playback: blocked (${message})`;
       audioToggleButton.textContent = "Play Audio";
+      return false;
     }
+  };
+
+  const syncPlaybackTransportToServer = (options = {}) => {
+    syncAudioTransportToServer({ ...options, allowReadOnlyStart: true });
   };
 
   audioElement.addEventListener("play", updatePlaybackState);
   audioElement.addEventListener("pause", updatePlaybackState);
   audioElement.addEventListener("timeupdate", updatePlaybackState);
   audioElement.addEventListener("loadedmetadata", updatePlaybackState);
-  audioElement.addEventListener("play", () => syncAudioTransportToServer({ force: true }));
-  audioElement.addEventListener("pause", () => syncAudioTransportToServer({ force: true }));
-  audioElement.addEventListener("seeking", () => syncAudioTransportToServer({ force: true }));
-  audioElement.addEventListener("seeked", () => syncAudioTransportToServer({ force: true }));
-  audioElement.addEventListener("loadedmetadata", () => syncAudioTransportToServer({ force: true }));
-  audioElement.addEventListener("timeupdate", () => syncAudioTransportToServer());
+  audioElement.addEventListener("play", () => syncPlaybackTransportToServer({ force: true }));
+  audioElement.addEventListener("pause", () => syncPlaybackTransportToServer({ force: true }));
+  audioElement.addEventListener("seeking", () => syncPlaybackTransportToServer({ force: true }));
+  audioElement.addEventListener("seeked", () => syncPlaybackTransportToServer({ force: true }));
+  audioElement.addEventListener("loadedmetadata", () => syncPlaybackTransportToServer({ force: true }));
+  audioElement.addEventListener("timeupdate", () => syncPlaybackTransportToServer());
 
   audioToggleButton.onclick = async () => {
     if (!audioElement) {
@@ -1300,8 +1378,51 @@ function setupAudioPlayback(audioUrl) {
   };
 
   updatePlaybackState();
+  bindProjectorAudioStartGesture(playAudio);
   syncAudioTransportToServer({ force: true });
   void playAudio();
+}
+
+function clearAudioPlayback() {
+  if (audioElement) {
+    audioElement.pause();
+  }
+  audioElement = null;
+  currentAudioFileUrl = null;
+  engine.setMediaElement(null);
+  clearAudioStartGesture();
+}
+
+function clearAudioStartGesture() {
+  if (!audioStartGestureCleanup) {
+    return;
+  }
+
+  audioStartGestureCleanup();
+  audioStartGestureCleanup = null;
+}
+
+function bindProjectorAudioStartGesture(playAudio) {
+  clearAudioStartGesture();
+  if (!projectorMode || typeof playAudio !== "function") {
+    return;
+  }
+
+  const startFromGesture = async () => {
+    if (!audioElement || !audioElement.paused) {
+      clearAudioStartGesture();
+      return;
+    }
+
+    await playAudio();
+  };
+
+  window.addEventListener("pointerdown", startFromGesture, true);
+  window.addEventListener("keydown", startFromGesture, true);
+  audioStartGestureCleanup = () => {
+    window.removeEventListener("pointerdown", startFromGesture, true);
+    window.removeEventListener("keydown", startFromGesture, true);
+  };
 }
 
 function formatSeconds(value) {
@@ -1318,8 +1439,13 @@ function formatClock(date) {
   return `${hours}:${minutes}:${seconds}`;
 }
 
-function syncAudioTransportToServer({ force = false } = {}) {
+function syncAudioTransportToServer({ force = false, allowReadOnlyStart = false } = {}) {
   if (!audioElement) {
+    return;
+  }
+
+  const playing = !audioElement.paused;
+  if (!canSendAudioTransport({ role: websocketRole, playing, allowReadOnlyStart })) {
     return;
   }
 
@@ -1329,7 +1455,7 @@ function syncAudioTransportToServer({ force = false } = {}) {
   }
 
   const sent = client.send("transport_sync", {
-    playing: !audioElement.paused,
+    playing,
     position_seconds: Number(audioElement.currentTime || 0)
   });
   if (sent) {
@@ -1729,10 +1855,54 @@ function setMeter(fill, valueElement, value, digits) {
   }
 }
 
+function frontendAssetVersionFromScripts({ scripts = [], baseUrl = "http://127.0.0.1/" } = {}) {
+  for (const script of Array.from(scripts || [])) {
+    const src = String(script?.src || script?.getAttribute?.("src") || "");
+    if (!src.includes("/src/main.js")) {
+      continue;
+    }
+
+    try {
+      return new URL(src, baseUrl).searchParams.get("v") || "";
+    } catch {
+      return "";
+    }
+  }
+
+  return "";
+}
+
+function shouldReloadForFrontendAssetVersion({ currentVersion = "", runtimeVersion = "" } = {}) {
+  const current = String(currentVersion || "").trim();
+  const runtime = String(runtimeVersion || "").trim();
+  return Boolean(current && runtime && current !== runtime);
+}
+
+function canSendAudioTransport({ role = "control", playing = false, allowReadOnlyStart = false } = {}) {
+  if (String(role || "control") === "control") {
+    return true;
+  }
+
+  return !!allowReadOnlyStart && !!playing;
+}
+
+function resolveWebSocketRole({ projectorMode: isProjectorMode = false, search = "" } = {}) {
+  const mode = new URLSearchParams(String(search || "")).get("mode");
+  const normalizedMode = String(mode || "").toLowerCase();
+  if (isProjectorMode || normalizedMode === "projector") {
+    return "projector";
+  }
+  if (normalizedMode === "monitor") {
+    return "monitor";
+  }
+  return "control";
+}
+
 function buildWebSocketUrl() {
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-  const mode = new URLSearchParams(window.location.search || "").get("mode");
-  const normalizedMode = String(mode || "").toLowerCase();
-  const role = projectorMode || normalizedMode === "projector" ? "projector" : normalizedMode === "monitor" ? "monitor" : "control";
-  return `${protocol}://${window.location.host}/ws?role=${encodeURIComponent(role)}`;
+  websocketRole = resolveWebSocketRole({
+    projectorMode,
+    search: window.location.search || ""
+  });
+  return `${protocol}://${window.location.host}/ws?role=${encodeURIComponent(websocketRole)}`;
 }

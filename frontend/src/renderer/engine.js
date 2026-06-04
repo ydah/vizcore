@@ -271,26 +271,16 @@ export class Engine {
   }
 
   render(time) {
-    let deltaSeconds = (time - this.lastTime) / 1000;
+    const timing = resolveRenderTiming({
+      frameTimeMs: time,
+      lastFrameTimeMs: this.lastTime,
+      mediaElement: this.mediaElement,
+      lastMediaTime: this.lastMediaTime
+    });
     this.lastTime = time;
-    let visualTimeSeconds = time / 1000;
-
-    if (this.mediaElement) {
-      const currentMediaTime = Number(this.mediaElement.currentTime || 0);
-      visualTimeSeconds = currentMediaTime;
-
-      if (this.mediaElement.paused) {
-        deltaSeconds = 0;
-      } else if (this.lastMediaTime === null) {
-        deltaSeconds = 0;
-      } else {
-        deltaSeconds = Math.max(0, currentMediaTime - this.lastMediaTime);
-      }
-
-      this.lastMediaTime = currentMediaTime;
-    } else {
-      this.lastMediaTime = null;
-    }
+    const deltaSeconds = timing.deltaSeconds;
+    const visualTimeSeconds = timing.visualTimeSeconds;
+    this.lastMediaTime = timing.nextLastMediaTime;
 
     this.updateSafeMode(deltaSeconds * 1000);
     this.updateLiveControlRuntime(time);
@@ -476,6 +466,34 @@ const resolveRotationSpeed = (layers, amplitude) => {
     return clamp(fromLayer, 0.1, 8.0);
   }
   return 0.7 + amplitude * 2.4;
+};
+
+export const resolveRenderTiming = ({
+  frameTimeMs,
+  lastFrameTimeMs,
+  mediaElement = null,
+  lastMediaTime = null
+} = {}) => {
+  const frameTime = Number(frameTimeMs || 0);
+  const lastFrameTime = Number(lastFrameTimeMs || 0);
+  const wallDeltaSeconds = Math.max(0, (frameTime - lastFrameTime) / 1000);
+  const wallTimeSeconds = frameTime / 1000;
+
+  if (!mediaElement || mediaElement.paused) {
+    return {
+      deltaSeconds: wallDeltaSeconds,
+      visualTimeSeconds: wallTimeSeconds,
+      nextLastMediaTime: null
+    };
+  }
+
+  const currentMediaTime = Number(mediaElement.currentTime || 0);
+  const safeMediaTime = Number.isFinite(currentMediaTime) ? currentMediaTime : 0;
+  return {
+    deltaSeconds: lastMediaTime === null ? 0 : Math.max(0, safeMediaTime - Number(lastMediaTime || 0)),
+    visualTimeSeconds: safeMediaTime,
+    nextLastMediaTime: safeMediaTime
+  };
 };
 
 export const applyVisualSettings = ({ audio, settings, previous }) => {

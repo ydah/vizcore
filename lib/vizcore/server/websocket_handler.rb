@@ -18,7 +18,7 @@ module Vizcore
       PROJECTOR_ROLE = "projector".freeze
       MONITOR_ROLE = "monitor".freeze
       READ_ONLY_ROLES = Set[PROJECTOR_ROLE, MONITOR_ROLE].freeze
-      READ_ONLY_ALLOWED_MESSAGE_TYPES = Set["latency_probe", "client_runtime_error"].freeze
+      READ_ONLY_ALLOWED_MESSAGE_TYPES = Set["latency_probe", "client_runtime_error", "transport_sync"].freeze
       LOW_BANDWIDTH_ROLES = Set[CONTROL_ROLE, MONITOR_ROLE].freeze
       CONTROL_AUDIO_FRAME_INTERVAL = 4
 
@@ -122,6 +122,14 @@ module Vizcore
         # @return [void]
         def clear_message_handler
           mutex.synchronize { @message_handler = nil }
+        end
+
+        # Resolve the role registered for a websocket client.
+        #
+        # @param socket [Object]
+        # @return [String]
+        def role_for(socket)
+          mutex.synchronize { client_backpressure_metrics(socket)[:role] }
         end
 
         private

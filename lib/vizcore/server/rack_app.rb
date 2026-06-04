@@ -101,6 +101,7 @@ module Vizcore
           control_preset_url: @control_preset_path ? CONTROL_PRESET_PATH : nil,
           plugin_assets: @plugin_assets.map { |asset| asset.fetch(:url) },
           projector_mode: @projector_mode,
+          frontend_asset_version: frontend_asset_version,
           websocket_clients: WebSocketHandler.connection_count,
           dropped_frames: WebSocketHandler.dropped_frame_count,
           websocket_backpressure: WebSocketHandler.backpressure_status,
@@ -193,6 +194,16 @@ module Vizcore
 
       def root_display_mode
         @projector_mode ? "projector" : "auto"
+      end
+
+      def frontend_asset_version
+        index_path = @frontend_root.join("index.html")
+        return "" unless index_path.file?
+
+        body = File.read(index_path)
+        body[%r{/src/main\.js\?v=([^"']+)}, 1].to_s
+      rescue StandardError
+        ""
       end
 
       def runtime_status
@@ -476,7 +487,7 @@ module Vizcore
         scripts = @plugin_assets.map do |asset|
           %(<script type="module" src="#{asset.fetch(:url)}"></script>)
         end.join("\n  ")
-        body.sub(%(<script type="module" src="/src/main.js?v=20260516d"></script>), "#{scripts}\n  \\0")
+        body.sub(%r{<script type="module" src="/src/main\.js\?v=[^"]+"></script>}, "#{scripts}\n  \\0")
       end
 
       def rack_escape_path(value)

@@ -6,6 +6,7 @@ import {
   collectRendererCapabilities,
   nextSafeModeState,
   resolveEffectiveDevicePixelRatio,
+  resolveRenderTiming,
 } from "../src/renderer/engine.js";
 
 test("applyVisualSettings boosts and clamps audio values", () => {
@@ -73,6 +74,41 @@ test("resolveEffectiveDevicePixelRatio applies caps and safe-mode scale", () => 
     safeModeActive: true,
     safeModeScale: 0.5,
   }), 1);
+});
+
+test("resolveRenderTiming keeps wall-clock motion when media is paused", () => {
+  const timing = resolveRenderTiming({
+    frameTimeMs: 2_500,
+    lastFrameTimeMs: 1_000,
+    mediaElement: { paused: true, currentTime: 12 },
+    lastMediaTime: 11.5,
+  });
+
+  assert.equal(timing.deltaSeconds, 1.5);
+  assert.equal(timing.visualTimeSeconds, 2.5);
+  assert.equal(timing.nextLastMediaTime, null);
+});
+
+test("resolveRenderTiming uses media time only while media is playing", () => {
+  const first = resolveRenderTiming({
+    frameTimeMs: 2_500,
+    lastFrameTimeMs: 1_000,
+    mediaElement: { paused: false, currentTime: 12 },
+    lastMediaTime: null,
+  });
+  const second = resolveRenderTiming({
+    frameTimeMs: 3_000,
+    lastFrameTimeMs: 2_500,
+    mediaElement: { paused: false, currentTime: 12.25 },
+    lastMediaTime: first.nextLastMediaTime,
+  });
+
+  assert.equal(first.deltaSeconds, 0);
+  assert.equal(first.visualTimeSeconds, 12);
+  assert.equal(first.nextLastMediaTime, 12);
+  assert.equal(second.deltaSeconds, 0.25);
+  assert.equal(second.visualTimeSeconds, 12.25);
+  assert.equal(second.nextLastMediaTime, 12.25);
 });
 
 test("nextSafeModeState enters after repeated slow frames and exits after sustained fast frames", () => {

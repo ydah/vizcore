@@ -392,6 +392,7 @@ export class LayerManager {
         }
 
         this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.layerFramebuffer);
+        this.attachPrimaryLayerTarget();
         this.gl.viewport(0, 0, this.layerTargetWidth, this.layerTargetHeight);
         this.gl.clearColor(0.0, 0.0, 0.0, 0.0);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
@@ -1016,6 +1017,20 @@ export class LayerManager {
 
     gl.bindRenderbuffer(gl.RENDERBUFFER, null);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+
+  attachPrimaryLayerTarget() {
+    if (!this.layerFramebuffer || !this.layerTexture) {
+      return;
+    }
+
+    this.gl.framebufferTexture2D(
+      this.gl.FRAMEBUFFER,
+      this.gl.COLOR_ATTACHMENT0,
+      this.gl.TEXTURE_2D,
+      this.layerTexture,
+      0
+    );
   }
 
   createLayerTexture(width, height) {

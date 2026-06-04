@@ -41,6 +41,7 @@ RSpec.describe Vizcore::Server::RackApp do
     expect(response.body).to include("\"control_preset\":{}")
     expect(response.body).to include("\"control_preset_writable\":false")
     expect(response.body).to include("\"projector_mode\":false")
+    expect(response.body).to include("\"frontend_asset_version\":")
     expect(response.body).to include("\"websocket_clients\":")
     expect(response.body).to include("\"dropped_frames\":")
     expect(response.body).to include("\"websocket_backpressure\":{")

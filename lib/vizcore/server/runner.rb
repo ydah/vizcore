@@ -681,8 +681,11 @@ module Vizcore
           return unless file_transport_enabled?
 
           values = Hash(payload)
+          playing = values.fetch("playing", values.fetch(:playing, false))
+          return unless client_transport_sync_allowed?(socket, playing: playing)
+
           broadcaster.sync_transport(
-            playing: values.fetch("playing", values.fetch(:playing, false)),
+            playing: playing,
             position_seconds: values.fetch("position_seconds", values.fetch(:position_seconds, 0.0))
           )
         when "switch_scene"
@@ -716,6 +719,15 @@ module Vizcore
         response[:client_sent_at_ms] = client_sent_at_ms if client_sent_at_ms
 
         WebSocketHandler.send_to(socket, type: "latency_probe", payload: response)
+      end
+
+      def client_transport_sync_allowed?(socket, playing:)
+        return true unless socket
+
+        role = WebSocketHandler.role_for(socket)
+        return true if role == WebSocketHandler::CONTROL_ROLE
+
+        !!playing
       end
 
       def report_client_runtime_error(payload)

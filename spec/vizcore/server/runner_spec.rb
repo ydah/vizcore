@@ -1139,6 +1139,52 @@ RSpec.describe Vizcore::Server::Runner do
       )
     end
 
+    it "ignores read-only client transport pause messages" do
+      file_config = Vizcore::Config.new(
+        scene_file: scene_file.to_s,
+        host: "127.0.0.1",
+        port: 4567,
+        audio_source: :file,
+        audio_file: Vizcore.root.join("spec", "fixtures", "audio", "pulse16_mono.wav").to_s
+      )
+      runner = described_class.new(file_config, output: output)
+      broadcaster = instance_double(Vizcore::Server::FrameBroadcaster, sync_transport: nil)
+      socket = double("ProjectorSocket")
+      allow(Vizcore::Server::WebSocketHandler).to receive(:role_for).with(socket).and_return(Vizcore::Server::WebSocketHandler::PROJECTOR_ROLE)
+
+      runner.send(
+        :handle_client_message,
+        { "type" => "transport_sync", "payload" => { "playing" => false, "position_seconds" => 0.0 } },
+        broadcaster,
+        socket
+      )
+
+      expect(broadcaster).not_to have_received(:sync_transport)
+    end
+
+    it "accepts read-only client transport play messages" do
+      file_config = Vizcore::Config.new(
+        scene_file: scene_file.to_s,
+        host: "127.0.0.1",
+        port: 4567,
+        audio_source: :file,
+        audio_file: Vizcore.root.join("spec", "fixtures", "audio", "pulse16_mono.wav").to_s
+      )
+      runner = described_class.new(file_config, output: output)
+      broadcaster = instance_double(Vizcore::Server::FrameBroadcaster, sync_transport: nil)
+      socket = double("ProjectorSocket")
+      allow(Vizcore::Server::WebSocketHandler).to receive(:role_for).with(socket).and_return(Vizcore::Server::WebSocketHandler::PROJECTOR_ROLE)
+
+      runner.send(
+        :handle_client_message,
+        { "type" => "transport_sync", "payload" => { "playing" => true, "position_seconds" => 1.5 } },
+        broadcaster,
+        socket
+      )
+
+      expect(broadcaster).to have_received(:sync_transport).with(playing: true, position_seconds: 1.5)
+    end
+
     it "forwards shader compile runtime errors from client" do
       runner = described_class.new(config, output: output)
       broadcaster = instance_double(Vizcore::Server::FrameBroadcaster)

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  LayerManager,
   coerceUniformNumber,
   normalizeBlendMode,
   normalizePaletteColors,
@@ -27,6 +28,31 @@ test("coerceUniformNumber rejects non-finite and non-numeric values", () => {
   assert.equal(coerceUniformNumber(Infinity), null);
   assert.equal(coerceUniformNumber({}), null);
   assert.equal(coerceUniformNumber([]), null);
+});
+
+test("attachPrimaryLayerTarget reattaches the render source texture", () => {
+  const calls = [];
+  const framebuffer = { id: "framebuffer" };
+  const texture = { id: "primary" };
+  const manager = Object.create(LayerManager.prototype);
+  manager.layerFramebuffer = framebuffer;
+  manager.layerTexture = texture;
+  manager.gl = {
+    FRAMEBUFFER: "FRAMEBUFFER",
+    COLOR_ATTACHMENT0: "COLOR_ATTACHMENT0",
+    TEXTURE_2D: "TEXTURE_2D",
+    framebufferTexture2D: (...args) => calls.push(args)
+  };
+
+  manager.attachPrimaryLayerTarget();
+
+  assert.deepEqual(calls, [[
+    "FRAMEBUFFER",
+    "COLOR_ATTACHMENT0",
+    "TEXTURE_2D",
+    texture,
+    0
+  ]]);
 });
 
 test("shaderParamUniformNames supports plain and legacy param_ targets", () => {

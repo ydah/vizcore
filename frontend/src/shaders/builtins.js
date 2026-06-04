@@ -525,6 +525,7 @@ void main() {
   float rawSnare = clamp(max(u_param_snare, u_high * 0.9), 0.0, 1.4);
   float soundEnergy = max(max(u_amplitude, rawKick * 0.7), rawSnare * 0.55);
   float soundGate = smoothstep(0.006, 0.035, soundEnergy);
+  float tempo = max(u_bpm, 120.0) / 60.0;
   float motionTime = u_time * soundGate;
   float pulse = rawPulse * soundGate;
   float kick = rawKick * soundGate;
@@ -533,7 +534,9 @@ void main() {
   float wobble = max(u_param_wobble, 0.3) + kick * 0.35;
   float twist = max(u_param_twist, 0.35) + snare * 0.38;
   float lineGlow = max(u_param_line_glow, 0.16);
-  float tempo = max(u_bpm, 120.0) / 60.0;
+
+  float motionSpin = motionTime * (0.20 + tempo * 0.07 + kick * 0.06) + pulse * 0.10;
+  p = rotate2d(motionSpin) * p;
 
   vec2 bodyDrift = vec2(
     sin(motionTime * (0.65 + tempo * 0.08) + seed * 1.7),
@@ -571,8 +574,8 @@ void main() {
   bg += vec3(0.018, 0.024, 0.040) * smoothstep(1.25, 0.05, length(p));
   bg += vec3(0.04, 0.028, 0.065) * (0.06 + u_mid * 0.12) * smoothstep(1.0, 0.0, radius);
 
-  vec3 shapeColor = palette(fract(seed * 0.071 + warpedAngle / TAU + u_high * 0.16));
-  vec3 innerColor = palette(fract(seed * 0.11 + 0.45 + warpedRadius));
+  vec3 shapeColor = palette(fract(seed * 0.071 + warpedAngle / TAU + u_high * 0.16 + motionTime * 0.035));
+  vec3 innerColor = palette(fract(seed * 0.11 + 0.45 + warpedRadius + motionTime * 0.025));
   shapeColor *= 0.78 + u_amplitude * 0.42 + drumHit * 0.46 + snare * 0.18;
 
   vec3 color = bg;
