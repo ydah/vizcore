@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# vj_glitch_industrial.rb
+# glitch_scan_feedback.rb
 #
 # Genre   : Glitch / Industrial / Noise
 # BPM     : n/a

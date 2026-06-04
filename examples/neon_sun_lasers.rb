@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# vj_synthwave_retro.rb
+# neon_sun_lasers.rb
 #
 # Genre   : Synthwave / Retro 80s
 # BPM     : 100-120

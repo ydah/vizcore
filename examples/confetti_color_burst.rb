@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# vj_jpop_idol_live.rb
+# confetti_color_burst.rb
 #
 # Genre   : J-POP / Idol live
 # BPM     : 130-180

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# vj_hiphop_cipher.rb
+# stage_text_pulse.rb
 #
 # Genre   : HipHop / Cipher
 # BPM     : 85-100

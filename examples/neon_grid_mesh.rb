@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# vj_techno_warehouse.rb
+# neon_grid_mesh.rb
 #
 # Genre   : Techno / Warehouse
 # BPM     : 128-140

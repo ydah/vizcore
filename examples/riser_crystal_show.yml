@@ -1,13 +1,13 @@
-# Example manifest for the festival mainstage set.
+# Example manifest for the riser crystal show.
 #
 # Start with:
-#   vizcore start examples/vj_festival_mainstage.yml
+#   vizcore start examples/riser_crystal_show.yml
 #
 # A writable control preset can be attached when you want HUD reactivity and
 # MIDI Learn bindings to round-trip with "Save Project":
 #
-# control_preset: assets/vj_festival_mainstage_controls.json
-scene: vj_festival_mainstage.rb
+# control_preset: assets/riser_crystal_show_controls.json
+scene: riser_crystal_show.rb
 audio_source: file
 audio_file: assets/complex_demo_loop.wav
 

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# vj_ambient_chill_room.rb
+# nebula_ribbon_bloom.rb
 #
 # Genre   : Ambient / Chill Room
 # BPM     : none, or 60-90 when a pulse appears

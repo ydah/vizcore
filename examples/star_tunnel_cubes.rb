@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# vj_dnb_jungle.rb
+# star_tunnel_cubes.rb
 #
 # Genre   : Drum & Bass / Jungle
 # BPM     : 170-180

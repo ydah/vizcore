@@ -44,7 +44,7 @@ To run a scene file directly:
 
 ```bash
 vizcore start examples/basic.rb
-vizcore start examples/vj_techno_warehouse.rb --audio-source file --audio-file examples/assets/complex_demo_loop.wav
+vizcore start examples/neon_grid_mesh.rb --audio-source file --audio-file examples/assets/complex_demo_loop.wav
 ```
 
 ## Minimal Scene

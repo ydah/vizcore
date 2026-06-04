@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# vj_festival_mainstage.rb
+# riser_crystal_show.rb
 #
 # Genre   : EDM / Festival mainstage
 # BPM     : 124-132
@@ -10,7 +10,7 @@
 # Keys    : 1..5 scenes, B blackout, F freeze, Space tap-tempo
 # MIDI    : note 36..40 = scenes, CC 1 = global intensity
 #
-# Manifest: examples/vj_festival_mainstage.yml shows a reusable file-audio setup.
+# Manifest: examples/riser_crystal_show.yml shows a reusable file-audio setup.
 Vizcore.define do
   set :global_intensity, 0.92
   audio_normalize mode: :adaptive, window: 3.0, target: 0.88, floor: 0.04
