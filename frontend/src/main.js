@@ -81,6 +81,8 @@ const freezeButton = document.querySelector("#freeze-toggle");
 const liveControlStatusElement = document.querySelector("#live-control-status");
 const performanceMonitorElement = document.querySelector("#performance-monitor");
 const inspectorPeakElement = document.querySelector("#inspector-peak");
+const inspectorHiraganaElement = document.querySelector("#inspector-hiragana");
+const inspectorHiraganaDetailElement = document.querySelector("#inspector-hiragana-detail");
 const inspectorAmplitudeFill = document.querySelector("#inspector-amplitude-fill");
 const inspectorAmplitudeValue = document.querySelector("#inspector-amplitude-value");
 const inspectorBandElements = Object.fromEntries(
@@ -1824,6 +1826,36 @@ function renderAudioInspector(audio) {
       ? `Peak: ${Math.round(state.peakFrequency)} Hz`
       : "Peak: --";
   }
+  renderHiraganaInspector(state.hiragana);
+}
+
+function renderHiraganaInspector(hiragana) {
+  if (!inspectorHiraganaElement || !inspectorHiraganaDetailElement) {
+    return;
+  }
+
+  if (!hiragana?.enabled) {
+    inspectorHiraganaElement.hidden = true;
+    inspectorHiraganaDetailElement.hidden = true;
+    return;
+  }
+
+  const text = hiragana.text || "--";
+  inspectorHiraganaElement.hidden = false;
+  inspectorHiraganaElement.textContent = `Hiragana: ${text} ${formatMeterValue(hiragana.confidence, 2)}`;
+
+  const vowel = hiragana.vowel
+    ? `Vowel: ${hiragana.vowel} ${formatMeterValue(hiragana.vowelConfidence, 2)}`
+    : "Vowel: --";
+  const consonant = hiragana.consonant
+    ? `Consonant: ${hiragana.consonant} ${formatMeterValue(hiragana.consonantConfidence, 2)}`
+    : "Consonant: --";
+  const candidates = hiragana.candidates.length
+    ? `Candidates: ${hiragana.candidates.map((candidate) => `${candidate.text} ${formatMeterValue(candidate.confidence, 2)}`).join(" / ")}`
+    : "Candidates: --";
+
+  inspectorHiraganaDetailElement.hidden = false;
+  inspectorHiraganaDetailElement.textContent = `${vowel} | ${consonant} | ${candidates}`;
 }
 
 function updateRuntimeErrorStatus(payload = {}) {

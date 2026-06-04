@@ -54,6 +54,7 @@ RSpec.describe Vizcore::Analysis::Pipeline do
     expect(result[:zero_crossing_rate]).to be_between(0.0, 1.0)
     expect(result[:peak_frequency]).to be_within(50.0).of(440.0)
     expect(result[:bpm]).to be_a(Float)
+    expect(result).not_to have_key(:japanese_hiragana)
   end
 
   it "returns zeroed output for empty samples" do
@@ -86,6 +87,42 @@ RSpec.describe Vizcore::Analysis::Pipeline do
     expect(result[:spectral_flux]).to eq(0.0)
     expect(result[:zero_crossing_rate]).to eq(0.0)
     expect(result[:peak_frequency]).to eq(0.0)
+    expect(result).not_to have_key(:japanese_hiragana)
+  end
+
+  it "includes japanese_hiragana payload when the experimental guesser is enabled" do
+    pipeline = described_class.new(
+      sample_rate: 44_100,
+      fft_size: 1024,
+      japanese_hiragana: { enabled: true, update: :frame, min_confidence: 0.1 }
+    )
+    samples = sine_samples(frequency_hz: 850.0, sample_rate: 44_100, count: 1024, amplitude: 0.7)
+
+    result = pipeline.call(samples)
+
+    expect(result[:japanese_hiragana]).to include(
+      :text,
+      :confidence,
+      :candidates,
+      silence: false
+    )
+  end
+
+  it "keeps japanese_hiragana payload safe for silent frames when enabled" do
+    pipeline = described_class.new(
+      sample_rate: 44_100,
+      fft_size: 1024,
+      japanese_hiragana: { enabled: true }
+    )
+
+    result = pipeline.call(Array.new(1024, 0.0))
+
+    expect(result[:japanese_hiragana]).to include(
+      text: "",
+      confidence: 0.0,
+      silence: true,
+      candidates: []
+    )
   end
 
   it "suppresses beats and bpm while input is below the silence floor" do
@@ -210,6 +247,30 @@ RSpec.describe Vizcore::Analysis::Pipeline do
 
     expect(result[:amplitude]).to eq(0.8)
     expect(result[:fft].max).to be <= 1.0
+  end
+
+  it "can gate visual band output without silencing analysis" do
+    smoother = instance_double(Vizcore::Analysis::Smoother)
+    allow(smoother).to receive(:smooth) { |_key, value, **_opts| value }
+    allow(smoother).to receive(:smooth_hash) { |hash, **_opts| hash }
+    allow(smoother).to receive(:smooth_array) { |array, **_opts| array }
+
+    pipeline = described_class.new(
+      sample_rate: 44_100,
+      fft_size: 1024,
+      noise_gate: 0.0001,
+      smoother: smoother,
+      audio_normalize: { mode: :adaptive, window_size: 4, target: 0.8, floor: 0.05, scale_bands: false, scale_fft: false, band_gate: 0.03 },
+      japanese_hiragana: { enabled: true, update: :frame, min_confidence: 0.1 }
+    )
+    samples = sine_samples(frequency_hz: 180.0, sample_rate: 44_100, count: 1024, amplitude: 0.03)
+
+    result = pipeline.call(samples)
+
+    expect(result[:amplitude]).to be > 0.0
+    expect(result[:bands]).to eq(sub: 0.0, low: 0.0, mid: 0.0, high: 0.0)
+    expect(result[:fft].sum).to eq(0.0)
+    expect(result.dig(:japanese_hiragana, :silence)).to eq(false)
   end
 
   it "keeps intentional microphone-level input above the noise gate active" do

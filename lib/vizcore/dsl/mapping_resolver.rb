@@ -7,6 +7,8 @@ module Vizcore
   module DSL
     # Resolves `map` definitions into concrete per-layer parameter values.
     class MappingResolver
+      TEXT_TRANSFORM_KEYS = %i[hold fallback prefix suffix].freeze
+
       def initialize
         @mapping_state = {}
       end
@@ -315,6 +317,28 @@ module Vizcore
           audio[:spectral_flux]
         when :zero_crossing_rate
           audio[:zero_crossing_rate]
+        when :hiragana, :hiragana_text
+          audio.dig(:japanese_hiragana, :text)
+        when :hiragana_confidence
+          audio.dig(:japanese_hiragana, :confidence)
+        when :hiragana_vowel
+          audio.dig(:japanese_hiragana, :vowel)
+        when :hiragana_vowel_index
+          audio.dig(:japanese_hiragana, :vowel_index)
+        when :hiragana_vowel_confidence
+          audio.dig(:japanese_hiragana, :vowel_confidence)
+        when :hiragana_consonant
+          audio.dig(:japanese_hiragana, :consonant)
+        when :hiragana_consonant_confidence
+          audio.dig(:japanese_hiragana, :consonant_confidence)
+        when :hiragana_changed
+          audio.dig(:japanese_hiragana, :changed)
+        when :hiragana_stable
+          audio.dig(:japanese_hiragana, :stable)
+        when :hiragana_silence
+          audio.dig(:japanese_hiragana, :silence)
+        when :hiragana_age_ms
+          audio.dig(:japanese_hiragana, :age_ms)
         when :global
           resolve_global(source, globals)
         when :lfo
@@ -540,6 +564,7 @@ module Vizcore
 
       def apply_transform(value, transform, state_key:, frame:)
         return value if transform.nil? || transform.empty?
+        return transform_text(value, transform, state_key: state_key, frame: frame) if text_transform?(value, transform)
         return transform_array(value, transform) if value.is_a?(Array)
         return nil if value.is_a?(Hash) || value.nil?
 
@@ -550,6 +575,39 @@ module Vizcore
         transformed = apply_event_shaping(transformed, transform, state_key: state_key, frame: frame)
         return apply_smoothing(transformed, transform, state_key) unless transform[:as] == :trigger
         transformed
+      end
+
+      def text_transform?(value, transform)
+        return false unless (transform.keys.map(&:to_sym) - TEXT_TRANSFORM_KEYS).empty?
+
+        value.nil? || value.is_a?(String) || value.is_a?(Symbol)
+      end
+
+      def transform_text(value, transform, state_key:, frame:)
+        text = value.nil? ? nil : value.to_s
+        text = apply_text_hold(text, transform, state_key: state_key, frame: frame) if transform.key?(:hold)
+        text = transform[:fallback].to_s if text.nil? && transform.key?(:fallback)
+        return nil if text.nil?
+
+        "#{transform[:prefix]}#{text}#{transform[:suffix]}"
+      end
+
+      def apply_text_hold(value, transform, state_key:, frame:)
+        hold_frames = (Float(transform[:hold]) * 60.0).ceil
+        return value unless hold_frames.positive? && state_key
+
+        key = [:text_hold, state_key]
+        state = @mapping_state[key] || { until_frame: -1, value: nil }
+        current_frame = Integer(frame)
+        if value && !value.empty?
+          state = { until_frame: current_frame + hold_frames, value: value }
+        elsif current_frame <= state[:until_frame]
+          value = state[:value]
+        end
+        @mapping_state[key] = state
+        value
+      rescue StandardError
+        value
       end
 
       def transform_array(value, transform)

@@ -117,10 +117,12 @@ RSpec.describe Vizcore::CLI do
             "--duration",
             "0.05",
             "--fps",
-            "2"
+            "2",
+            "--sample-rate",
+            "8000"
           ]
         )
-      end.to output(/Audio calibration:.*recommended_noise_gate:/m).to_stdout
+      end.to output(/Audio calibration:.*sample_rate: 8000.*recommended_noise_gate:/m).to_stdout
     end
 
     it "validates a scene file" do
@@ -603,6 +605,70 @@ RSpec.describe Vizcore::CLI do
       end
     end
 
+    it "collects labeled kana audio samples" do
+      Dir.mktmpdir("vizcore-cli-kana") do |dir|
+        manifest_path = Pathname.new(dir).join("manifest.json")
+        result = Vizcore::Audio::KanaSampleRecorder::Result.new(
+          output_dir: Pathname.new(dir),
+          manifest_path: manifest_path,
+          samples: [
+            {
+              "path" => "audio/sample_0001.wav",
+              "label" => "あ",
+              "take" => 1,
+              "rms" => 0.12,
+              "peak" => 0.5
+            }
+          ],
+          total_samples: 1
+        )
+        recorder = instance_double(Vizcore::Audio::KanaSampleRecorder, call: result)
+        allow(Vizcore::Audio::KanaSampleRecorder).to receive(:new).and_return(recorder)
+
+        expect do
+          described_class.start(
+            [
+              "kana",
+              "collect",
+              "--out",
+              dir,
+              "--labels",
+              "あ,ん",
+              "--takes",
+              "2",
+              "--duration",
+              "0.5",
+              "--lead-in",
+              "0",
+              "--audio-source",
+              "dummy",
+              "--sample-rate",
+              "8000",
+              "--min-rms",
+              "0.002",
+              "--allow-silent",
+              "--no-prompt"
+            ]
+          )
+        end.to output(/Kana samples written: #{Regexp.escape(manifest_path.to_s)} \(new_samples=1, total_samples=1\)/).to_stdout
+
+        expect(Vizcore::Audio::KanaSampleRecorder).to have_received(:new).with(
+          hash_including(
+            labels: "あ,ん",
+            takes: 2,
+            duration: 0.5,
+            output_dir: dir,
+            source: "dummy",
+            sample_rate: 8000,
+            lead_in: 0,
+            min_rms: 0.002,
+            allow_silent: true
+          )
+        )
+        expect(recorder).to have_received(:call)
+      end
+    end
+
     it "passes audio options to config" do
       described_class.start(
         [
@@ -625,6 +691,7 @@ RSpec.describe Vizcore::CLI do
           "controls.json",
           "--osc-port",
           "9000",
+          "--voice-kana",
           "--no-reload",
           "--projector",
           "--allow-public-control"
@@ -641,6 +708,7 @@ RSpec.describe Vizcore::CLI do
         expect(config.feature_file.to_s).to end_with("features.json")
         expect(config.control_preset.to_s).to end_with("controls.json")
         expect(config.osc_port).to eq(9000)
+        expect(config.voice_kana?).to eq(true)
         expect(config.reload?).to eq(false)
         expect(config.projector_mode).to eq(true)
         expect(config.allow_public_control?).to eq(true)

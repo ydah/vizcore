@@ -122,6 +122,7 @@ module Vizcore
     option :noise_gate, type: :numeric, default: Config::DEFAULT_NOISE_GATE, desc: "RMS level below which audio is treated as silence"
     option :bpm, type: :numeric, desc: "Fixed BPM value used with --bpm-lock"
     option :bpm_lock, type: :boolean, default: false, desc: "Lock analysis BPM output to --bpm"
+    option :voice_kana, type: :boolean, default: false, desc: "Enable experimental voice-to-kana analysis"
     option :osc_port, type: :numeric, desc: "UDP port for OSC sync (/vizcore/scene, /vizcore/tap)"
     option :scene_switch_effect, type: :string, desc: "Transition effect name for manual scene switch actions"
     option :scene_switch_duration, type: :numeric, desc: "Duration in seconds for manual scene switch effects"
@@ -152,6 +153,7 @@ module Vizcore
         noise_gate: options.fetch(:noise_gate),
         bpm: options[:bpm],
         bpm_lock: options.fetch(:bpm_lock),
+        voice_kana: options.fetch(:voice_kana),
         osc_port: options[:osc_port] || defaults[:osc_port],
         scene_switch_effect: options[:scene_switch_effect] || defaults[:scene_switch_effect],
         scene_switch_effect_duration: options[:scene_switch_duration] || defaults[:scene_switch_effect_duration],
@@ -297,6 +299,7 @@ module Vizcore
     option :audio_source, type: :string, default: "mic", desc: "Audio source: mic, file, dummy"
     option :audio_file, type: :string, desc: "Path to audio file used when --audio-source file"
     option :audio_device, type: :string, desc: "Audio input device index or name used when --audio-source mic"
+    option :sample_rate, type: :numeric, default: Vizcore::Audio::InputManager::DEFAULT_SAMPLE_RATE, desc: "Requested sample rate for mic/dummy sources"
     option :duration, type: :numeric, default: Vizcore::Audio::Calibration::DEFAULT_DURATION, desc: "Calibration duration in seconds"
     option :fps, type: :numeric, default: Vizcore::Audio::Calibration::DEFAULT_FPS, desc: "Calibration sampling rate"
     option :format, type: :string, default: "text", desc: "Output format: text or json"
@@ -312,10 +315,55 @@ module Vizcore
         source: options.fetch(:audio_source),
         file_path: options[:audio_file],
         audio_device: options[:audio_device],
+        sample_rate: options.fetch(:sample_rate),
         duration: options.fetch(:duration),
         fps: options.fetch(:fps)
       ).call
       print_calibration_result(result, format: options.fetch(:format))
+    rescue ArgumentError => e
+      raise Thor::Error, e.message
+    end
+
+    desc "kana COMMAND", "Collect voice-to-kana tuning samples"
+    option :out, type: :string, default: Vizcore::Audio::KanaSampleRecorder::DEFAULT_OUTPUT_DIR, desc: "Output directory for manifest.json and WAV samples"
+    option :labels, type: :string, default: Vizcore::Audio::KanaSampleRecorder::DEFAULT_LABELS.join(","), desc: "Comma-separated kana labels to record"
+    option :takes, type: :numeric, default: Vizcore::Audio::KanaSampleRecorder::DEFAULT_TAKES, desc: "Number of takes per label"
+    option :duration, type: :numeric, default: Vizcore::Audio::KanaSampleRecorder::DEFAULT_DURATION, desc: "Recording duration per take in seconds"
+    option :lead_in, type: :numeric, default: Vizcore::Audio::KanaSampleRecorder::DEFAULT_LEAD_IN, desc: "Delay after prompt before recording starts"
+    option :audio_source, type: :string, default: "mic", desc: "Audio source: mic, file, dummy"
+    option :audio_file, type: :string, desc: "Path to audio file used when --audio-source file"
+    option :audio_device, type: :string, desc: "Audio input device index or name used when --audio-source mic"
+    option :sample_rate, type: :numeric, default: Vizcore::Audio::InputManager::DEFAULT_SAMPLE_RATE, desc: "Requested sample rate for mic/dummy sources"
+    option :min_rms, type: :numeric, default: Vizcore::Audio::KanaSampleRecorder::DEFAULT_MIN_RMS, desc: "Warn when a collected sample RMS is at or below this level"
+    option :allow_silent, type: :boolean, default: false, desc: "Allow near-silent samples instead of aborting collection"
+    option :prompt, type: :boolean, default: true, desc: "Prompt before each take"
+    # Run kana-related tooling.
+    #
+    # @param command [String, nil]
+    # @raise [Thor::Error] when arguments are invalid
+    # @return [void]
+    def kana(command = nil)
+      raise Thor::Error, "Unknown kana command: #{command || '(nil)'}. Use `vizcore kana collect`." unless command.to_s == "collect"
+
+      result = Vizcore::Audio::KanaSampleRecorder.new(
+        labels: options.fetch(:labels),
+        takes: options.fetch(:takes),
+        duration: options.fetch(:duration),
+        output_dir: options.fetch(:out),
+        source: options.fetch(:audio_source),
+        file_path: options[:audio_file],
+        audio_device: options[:audio_device],
+        sample_rate: options.fetch(:sample_rate),
+        lead_in: options.fetch(:lead_in),
+        min_rms: options.fetch(:min_rms),
+        allow_silent: options.fetch(:allow_silent),
+        before_sample: kana_sample_prompt(options.fetch(:prompt)),
+        after_sample: kana_sample_reporter
+      ).call
+      say(
+        "Kana samples written: #{result.manifest_path} " \
+        "(new_samples=#{result.samples.length}, total_samples=#{result.total_samples})"
+      )
     rescue ArgumentError => e
       raise Thor::Error, e.message
     end
@@ -464,6 +512,7 @@ module Vizcore
     option :audio_file, type: :string, desc: "Path to audio file used when --audio-source file"
     option :feature_file, type: :string, desc: "Replay recorded feature JSON instead of live audio analysis"
     option :control_preset, type: :string, desc: "Control preset JSON for browser HUD and MIDI learn"
+    option :voice_kana, type: :boolean, default: false, desc: "Enable experimental voice-to-kana analysis"
     option :out, type: :string, default: "browser-capture.png", desc: "Output PNG path"
     option :selector, type: :string, default: "#vizcore-canvas", desc: "Element selector to capture"
     option :wait, type: :numeric, default: 1000, desc: "Milliseconds to wait after page load"
@@ -488,6 +537,7 @@ module Vizcore
         audio_file: options[:audio_file],
         feature_file: options[:feature_file],
         control_preset: options[:control_preset],
+        voice_kana: options.fetch(:voice_kana),
         reload: false,
         projector_mode: true,
         allow_public_control: options.fetch(:allow_public_control)
@@ -522,6 +572,7 @@ module Vizcore
     option :noise_gate, type: :numeric, default: Config::DEFAULT_NOISE_GATE, desc: "RMS level below which audio is treated as silence"
     option :bpm, type: :numeric, desc: "Fixed BPM value used with --bpm-lock"
     option :bpm_lock, type: :boolean, default: false, desc: "Lock analysis BPM output to --bpm"
+    option :voice_kana, type: :boolean, default: false, desc: "Enable experimental voice-to-kana analysis"
     option :out, type: :string, default: "snapshot.png", desc: "Output PNG path"
     option :width, type: :numeric, default: Vizcore::Renderer::SnapshotRenderer::DEFAULT_WIDTH, desc: "Snapshot width"
     option :height, type: :numeric, default: Vizcore::Renderer::SnapshotRenderer::DEFAULT_HEIGHT, desc: "Snapshot height"
@@ -540,7 +591,8 @@ module Vizcore
         audio_device: options[:audio_device],
         noise_gate: options.fetch(:noise_gate),
         bpm: options[:bpm],
-        bpm_lock: options.fetch(:bpm_lock)
+        bpm_lock: options.fetch(:bpm_lock),
+        voice_kana: options.fetch(:voice_kana)
       )
       validate_snapshot_config!(config)
       warn_untrusted_scene(config.scene_file) unless options.fetch(:trust)
@@ -563,6 +615,7 @@ module Vizcore
     option :noise_gate, type: :numeric, default: Config::DEFAULT_NOISE_GATE, desc: "RMS level below which audio is treated as silence"
     option :bpm, type: :numeric, desc: "Fixed BPM value used with --bpm-lock"
     option :bpm_lock, type: :boolean, default: false, desc: "Lock analysis BPM output to --bpm"
+    option :voice_kana, type: :boolean, default: false, desc: "Enable experimental voice-to-kana analysis"
     option :out, type: :string, default: "frames", desc: "Output directory for PNG frames, or .mp4 video path"
     option :frames, type: :numeric, default: Vizcore::Renderer::RenderSequence::DEFAULT_FRAME_COUNT, desc: "Number of frames to write"
     option :duration, type: :numeric, desc: "Render duration in seconds; overrides --frames"
@@ -597,6 +650,7 @@ module Vizcore
         noise_gate: options.fetch(:noise_gate),
         bpm: options[:bpm],
         bpm_lock: options.fetch(:bpm_lock),
+        voice_kana: options.fetch(:voice_kana),
         feature_file: feature_file
       )
       validate_snapshot_config!(config)
@@ -756,6 +810,33 @@ module Vizcore
       end
     end
 
+    def kana_sample_prompt(enabled)
+      lambda do |sample|
+        label = sample.fetch(:label)
+        take = sample.fetch(:take)
+        total_takes = sample.fetch(:total_takes)
+        duration = sample.fetch(:duration)
+        if enabled
+          say("Label #{label} take #{take}/#{total_takes}: press Enter, then speak for #{duration}s")
+          $stdin.gets
+        else
+          say("Recording label=#{label} take=#{take}/#{total_takes}")
+        end
+      end
+    end
+
+    def kana_sample_reporter
+      lambda do |sample|
+        warnings = Array(sample["warnings"])
+        warning_suffix = warnings.empty? ? "" : " warnings=#{warnings.join(',')}"
+        say(
+          "Saved #{sample.fetch('path')} " \
+          "(label=#{sample.fetch('label')}, take=#{sample.fetch('take')}, " \
+          "rms=#{sample.fetch('rms')}, peak=#{sample.fetch('peak')}#{warning_suffix})"
+        )
+      end
+    end
+
     def validate_snapshot_config!(config)
       raise ArgumentError, "Scene file not found: #{config.scene_file || '(nil)'}" unless config.scene_exists?
       return unless config.audio_source == :file
@@ -907,6 +988,7 @@ module Vizcore
       command.concat(["--audio-file", config.audio_file.to_s]) if config.audio_file
       command.concat(["--feature-file", config.feature_file.to_s]) if config.feature_file
       command.concat(["--control-preset", config.control_preset.to_s]) if config.control_preset
+      command << "--voice-kana" if config.voice_kana?
       command << "--allow-public-control" if config.allow_public_control?
       command
     end

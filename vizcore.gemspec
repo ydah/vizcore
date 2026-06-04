@@ -59,4 +59,5 @@ Gem::Specification.new do |spec|
   spec.add_dependency "puma", "~> 6.0"
   spec.add_dependency "rack", "~> 2.2.0"
   spec.add_dependency "thor", "~> 1.3"
+  spec.add_dependency "wavefile", "~> 1.1"
 end

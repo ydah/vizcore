@@ -69,6 +69,12 @@ RSpec.describe Vizcore::Config do
     expect(config.projector?).to eq(true)
   end
 
+  it "parses voice kana analysis opt-in" do
+    config = described_class.new(scene_file: scene_file, voice_kana: true)
+
+    expect(config.voice_kana?).to eq(true)
+  end
+
   it "parses public control opt-in" do
     config = described_class.new(scene_file: scene_file, allow_public_control: true)
 

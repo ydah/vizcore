@@ -220,6 +220,46 @@ module Vizcore::Analysis
   end
 end
 
+module Vizcore::Audio
+  class KanaSampleRecorder
+    VERSION: String
+    DEFAULT_LABELS: Array[String]
+    DEFAULT_TAKES: Integer
+    DEFAULT_DURATION: Float
+    DEFAULT_OUTPUT_DIR: String
+    DEFAULT_LEAD_IN: Float
+    DEFAULT_MIN_RMS: Float
+
+    class Result < Struct[untyped]
+      attr_accessor output_dir: Pathname
+      attr_accessor manifest_path: Pathname
+      attr_accessor samples: Array[Hash[String, untyped]]
+      attr_accessor total_samples: Integer
+    end
+
+    def initialize: (
+      ?labels: Array[String] | String labels,
+      ?takes: Integer takes,
+      ?duration: Numeric duration,
+      ?output_dir: String | Pathname output_dir,
+      ?source: Symbol | String source,
+      ?file_path: String? file_path,
+      ?audio_device: String? audio_device,
+      ?sample_rate: Integer sample_rate,
+      ?lead_in: Numeric lead_in,
+      ?min_rms: Numeric min_rms,
+      ?allow_silent: bool allow_silent,
+      ?input_manager_factory: untyped input_manager_factory,
+      ?sleeper: untyped sleeper,
+      ?clock: untyped clock,
+      ?before_sample: untyped before_sample,
+      ?after_sample: untyped after_sample
+    ) -> void
+
+    def call: () -> Result
+  end
+end
+
 module Vizcore::DSL
   type source = { kind: Symbol, ?band: Symbol }
   type transform = {

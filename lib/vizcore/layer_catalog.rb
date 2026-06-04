@@ -79,7 +79,7 @@ module Vizcore
           shadow_blur: "Float",
           glow_strength: "Float"
         ),
-        mappable_params: %i[font_size letter_spacing glow_strength],
+        mappable_params: %i[content font_size letter_spacing glow_strength],
         description: "Canvas text rendered into the WebGL scene."
       ),
       Capability.new(

@@ -168,7 +168,7 @@ module Vizcore
       # Configure analysis-level audio feature normalization.
       #
       # @param mode [Symbol, String] `:off` or `:adaptive`
-      # @param options [Hash] optional `window`, `target`, and `floor` values
+      # @param options [Hash] optional normalization and output scaling values
       # @return [Hash] normalized audio normalization settings
       def audio_normalize(mode: :adaptive, **options)
         settings = normalize_audio_normalize(mode: mode, **options)
@@ -182,6 +182,16 @@ module Vizcore
       def audio_analysis(**options)
         settings = normalize_audio_analysis(options)
         @analysis_settings.merge!(settings)
+      end
+
+      # Configure the experimental Japanese hiragana guesser.
+      #
+      # @param enabled [Boolean]
+      # @param options [Hash] heuristic and stabilization settings
+      # @return [Hash]
+      def experimental_japanese_hiragana(enabled: false, **options)
+        settings = normalize_experimental_japanese_hiragana(enabled: enabled, **options)
+        @analysis_settings[:japanese_hiragana] = settings
       end
 
       # Set a fixed BPM value for analysis output.
@@ -386,6 +396,9 @@ module Vizcore
         settings[:target] = unit_float(options[:target], "audio_normalize target") if options.key?(:target)
         settings[:floor] = unit_float(options[:floor], "audio_normalize floor") if options.key?(:floor)
         settings[:per_band] = !!options[:per_band] if options.key?(:per_band)
+        settings[:scale_bands] = !!options[:scale_bands] if options.key?(:scale_bands)
+        settings[:scale_fft] = !!options[:scale_fft] if options.key?(:scale_fft)
+        settings[:band_gate] = unit_float(options[:band_gate], "audio_normalize band_gate") if options.key?(:band_gate)
         settings
       end
 
@@ -397,6 +410,34 @@ module Vizcore
         settings[:peak_hold_frames] = ranged_integer(peak_hold, "peak_hold", 0, 10_000) unless peak_hold.nil?
         settings[:silence_reset_frames] = ranged_integer(options[:silence_reset_frames], "silence_reset_frames", 1, 10_000) if options.key?(:silence_reset_frames)
         settings
+      end
+
+      def normalize_experimental_japanese_hiragana(enabled:, **options)
+        settings = { enabled: !!enabled }
+        settings[:min_confidence] = unit_float(options[:min_confidence], "japanese_hiragana min_confidence") if options.key?(:min_confidence)
+        settings[:hold_ms] = ranged_integer(options[:hold_ms], "japanese_hiragana hold_ms", 0, 10_000) if options.key?(:hold_ms)
+        settings[:hysteresis] = unit_float(options[:hysteresis], "japanese_hiragana hysteresis") if options.key?(:hysteresis)
+        settings[:window_ms] = ranged_integer(options[:window_ms], "japanese_hiragana window_ms", 20, 2_000) if options.key?(:window_ms)
+        settings[:onset_window_ms] = ranged_integer(options[:onset_window_ms], "japanese_hiragana onset_window_ms", 10, 1_000) if options.key?(:onset_window_ms)
+        settings[:history_ms] = ranged_integer(options[:history_ms], "japanese_hiragana history_ms", 50, 5_000) if options.key?(:history_ms)
+        settings[:silence_gate] = unit_float(options[:silence_gate], "japanese_hiragana silence_gate") if options.key?(:silence_gate) && !options[:silence_gate].nil?
+        settings[:silence_clear_ms] = ranged_integer(options[:silence_clear_ms], "japanese_hiragana silence_clear_ms", 0, 30_000) if options.key?(:silence_clear_ms)
+        settings[:candidates] = ranged_integer(options[:candidates], "japanese_hiragana candidates", 1, 10) if options.key?(:candidates)
+        settings[:dakuten] = !!options[:dakuten] if options.key?(:dakuten)
+        settings[:handakuten] = !!options[:handakuten] if options.key?(:handakuten)
+        settings[:small_kana] = !!options[:small_kana] if options.key?(:small_kana)
+        settings[:unknown_text] = options[:unknown_text].to_s if options.key?(:unknown_text)
+        settings[:silence_text] = options[:silence_text].to_s if options.key?(:silence_text)
+        settings[:update] = normalize_hiragana_update_mode(options[:update]) if options.key?(:update)
+        settings[:debug] = !!options[:debug] if options.key?(:debug)
+        settings
+      end
+
+      def normalize_hiragana_update_mode(value)
+        mode = value.to_s.strip.to_sym
+        return mode if %i[frame candidate stable].include?(mode)
+
+        raise ArgumentError, "japanese_hiragana update must be :frame, :candidate, or :stable"
       end
 
       def positive_integer(value, name)

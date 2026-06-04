@@ -99,6 +99,7 @@ module Vizcore
           fft_preview_bins: analysis_setting(definition, :fft_bins, Vizcore::Analysis::Pipeline::DEFAULT_FFT_PREVIEW_BINS),
           peak_hold_frames: analysis_setting(definition, :peak_hold_frames, 0),
           silence_reset_frames: analysis_setting(definition, :silence_reset_frames, Vizcore::Analysis::Pipeline::SILENCE_RESET_FRAMES),
+          japanese_hiragana: japanese_hiragana_setting(definition),
           error_reporter: ->(message) { @output.puts(message) }
         )
         @broadcaster = broadcaster
@@ -333,7 +334,8 @@ module Vizcore
           onset_sensitivity: analysis_setting(definition, :onset_sensitivity, 1.0),
           fft_preview_bins: analysis_setting(definition, :fft_bins, Vizcore::Analysis::Pipeline::DEFAULT_FFT_PREVIEW_BINS),
           peak_hold_frames: analysis_setting(definition, :peak_hold_frames, 0),
-          silence_reset_frames: analysis_setting(definition, :silence_reset_frames, Vizcore::Analysis::Pipeline::SILENCE_RESET_FRAMES)
+          silence_reset_frames: analysis_setting(definition, :silence_reset_frames, Vizcore::Analysis::Pipeline::SILENCE_RESET_FRAMES),
+          japanese_hiragana: japanese_hiragana_setting(definition)
         )
         scene = initial_scene(definition) || fallback_scene
         broadcaster.update_scene(scene_name: scene[:name], scene_layers: scene[:layers])
@@ -926,6 +928,12 @@ module Vizcore
         @config.bpm_lock? || !!Hash(definition[:analysis] || {})[:bpm_lock]
       rescue StandardError
         @config.bpm_lock?
+      end
+
+      def japanese_hiragana_setting(definition)
+        return { enabled: true } if @config.voice_kana?
+
+        analysis_setting(definition, :japanese_hiragana, nil)
       end
 
       def tap_tempo_key(definition)

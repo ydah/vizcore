@@ -72,6 +72,47 @@ RSpec.describe Vizcore::CLISupport::SceneValidator do
     end
   end
 
+  it "validates experimental hiragana text content mapping" do
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        experimental_japanese_hiragana enabled: true
+
+        scene :voice do
+          layer :kana_text do
+            type :text
+            content "…"
+            map hiragana, to: :content, fallback: "…"
+            map hiragana_confidence, to: :opacity, range: 0.1..1.0
+          end
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+
+      expect(result).to be_valid
+      expect(result.issues).to be_empty
+    end
+  end
+
+  it "rejects text content mapping outside text layers" do
+    with_scene_file(<<~RUBY) do |scene_path|
+      Vizcore.define do
+        scene :bad do
+          layer :ring do
+            type :radial_blob
+            map hiragana, to: :content
+          end
+        end
+      end
+    RUBY
+      result = described_class.new(scene_file: scene_path).call
+
+      expect(result).not_to be_valid
+      expect(result.errors.map(&:code)).to include("E_MAPPING_TARGET")
+      expect(result.errors.map(&:message).join("\n")).to include("maps content on non-text layer")
+    end
+  end
+
   it "reports invalid envelope source options and nested kinds" do
     with_scene_file(<<~RUBY) do |scene_path|
       Vizcore.define do

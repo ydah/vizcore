@@ -75,10 +75,14 @@ module Vizcore
 
       def open_stream
         stream = open_requested_stream
-        return nil unless stream
+        unless stream
+          @last_error = AudioSourceError.new("Microphone stream open failed")
+          return nil
+        end
         return stream if stream.start
 
         @portaudio_backend.close_stream(stream)
+        @last_error = AudioSourceError.new("Microphone stream start failed")
         nil
       rescue StandardError => e
         @last_error = AudioSourceError.new("Microphone stream open failed: #{e.message}")

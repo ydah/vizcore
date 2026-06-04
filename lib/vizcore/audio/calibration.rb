@@ -19,6 +19,8 @@ module Vizcore
         :peak_max,
         :clip_ratio,
         :recommended_noise_gate,
+        :using_fallback,
+        :last_error,
         keyword_init: true
       ) do
         def to_h
@@ -31,7 +33,9 @@ module Vizcore
             rms_p95: rms_p95,
             peak_max: peak_max,
             clip_ratio: clip_ratio,
-            recommended_noise_gate: recommended_noise_gate
+            recommended_noise_gate: recommended_noise_gate,
+            using_fallback: using_fallback,
+            last_error: last_error
           }
         end
       end
@@ -39,6 +43,7 @@ module Vizcore
       # @param source [String, Symbol]
       # @param file_path [String, nil]
       # @param audio_device [String, nil]
+      # @param sample_rate [Integer]
       # @param duration [Numeric]
       # @param fps [Numeric]
       # @param input_manager_factory [#call]
@@ -47,6 +52,7 @@ module Vizcore
         source: :mic,
         file_path: nil,
         audio_device: nil,
+        sample_rate: InputManager::DEFAULT_SAMPLE_RATE,
         duration: DEFAULT_DURATION,
         fps: DEFAULT_FPS,
         input_manager_factory: nil,
@@ -55,6 +61,7 @@ module Vizcore
         @source = source.to_sym
         @file_path = file_path
         @audio_device = audio_device
+        @sample_rate = positive_integer(sample_rate, "sample_rate")
         @duration = positive_float(duration, "duration")
         @fps = positive_float(fps, "fps")
         @input_manager_factory = input_manager_factory || method(:build_input_manager)
@@ -63,7 +70,12 @@ module Vizcore
 
       # @return [Result]
       def call
-        manager = @input_manager_factory.call(source: @source, file_path: @file_path, audio_device: @audio_device)
+        manager = @input_manager_factory.call(
+          source: @source,
+          file_path: @file_path,
+          audio_device: @audio_device,
+          sample_rate: @sample_rate
+        )
         rms_values = []
         peak_values = []
         manager.start
@@ -81,12 +93,13 @@ module Vizcore
 
       private
 
-      def build_input_manager(source:, file_path:, audio_device:)
-        Vizcore::Audio::InputManager.new(source: source, file_path: file_path, audio_device: audio_device)
+      def build_input_manager(source:, file_path:, audio_device:, sample_rate:)
+        Vizcore::Audio::InputManager.new(source: source, file_path: file_path, audio_device: audio_device, sample_rate: sample_rate)
       end
 
       def build_result(manager, rms_values, peak_values)
         peak_max = peak_values.max.to_f
+        status = manager.respond_to?(:status) ? manager.status : {}
         Result.new(
           source: manager.source_name.to_s,
           sample_rate: manager.sample_rate,
@@ -96,7 +109,9 @@ module Vizcore
           rms_p95: round_metric(percentile(rms_values, 0.95)),
           peak_max: round_metric(peak_max),
           clip_ratio: round_metric(clip_ratio(peak_values)),
-          recommended_noise_gate: round_metric(recommended_noise_gate(rms_values))
+          recommended_noise_gate: round_metric(recommended_noise_gate(rms_values)),
+          using_fallback: !!status[:using_fallback],
+          last_error: status[:last_error]
         )
       end
 
@@ -148,6 +163,15 @@ module Vizcore
         raise ArgumentError, "#{label} must be positive" unless numeric.positive?
 
         numeric
+      rescue ArgumentError, TypeError
+        raise ArgumentError, "#{label} must be positive"
+      end
+
+      def positive_integer(value, label)
+        integer = Integer(value)
+        raise ArgumentError, "#{label} must be positive" unless integer.positive?
+
+        integer
       rescue ArgumentError, TypeError
         raise ArgumentError, "#{label} must be positive"
       end

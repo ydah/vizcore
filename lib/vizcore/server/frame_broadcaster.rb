@@ -33,6 +33,7 @@ module Vizcore
       # @param fft_preview_bins [Integer]
       # @param peak_hold_frames [Integer]
       # @param silence_reset_frames [Integer]
+      # @param japanese_hiragana [Hash, nil]
       # @param error_reporter [#call, nil]
       def initialize(
         scene_name: "basic",
@@ -54,6 +55,7 @@ module Vizcore
         fft_preview_bins: Vizcore::Analysis::Pipeline::DEFAULT_FFT_PREVIEW_BINS,
         peak_hold_frames: 0,
         silence_reset_frames: Vizcore::Analysis::Pipeline::SILENCE_RESET_FRAMES,
+        japanese_hiragana: nil,
         error_reporter: nil
       )
         @scene_name = scene_name.to_s
@@ -71,7 +73,8 @@ module Vizcore
           onset_sensitivity: onset_sensitivity,
           fft_preview_bins: fft_preview_bins,
           peak_hold_frames: peak_hold_frames,
-          silence_reset_frames: silence_reset_frames
+          silence_reset_frames: silence_reset_frames,
+          japanese_hiragana: japanese_hiragana
         )
         @mapping_resolver = mapping_resolver || Vizcore::DSL::MappingResolver.new
         @scene_serializer = scene_serializer || Vizcore::Renderer::SceneSerializer.new
@@ -239,7 +242,7 @@ module Vizcore
       # @param bpm [Numeric, nil]
       # @param bpm_lock [Boolean]
       # @return [void]
-      def update_analysis_settings(audio_normalize:, bpm: nil, bpm_lock: false, onset_sensitivity: 1.0, fft_preview_bins: Vizcore::Analysis::Pipeline::DEFAULT_FFT_PREVIEW_BINS, peak_hold_frames: 0, silence_reset_frames: Vizcore::Analysis::Pipeline::SILENCE_RESET_FRAMES)
+      def update_analysis_settings(audio_normalize:, bpm: nil, bpm_lock: false, onset_sensitivity: 1.0, fft_preview_bins: Vizcore::Analysis::Pipeline::DEFAULT_FFT_PREVIEW_BINS, peak_hold_frames: 0, silence_reset_frames: Vizcore::Analysis::Pipeline::SILENCE_RESET_FRAMES, japanese_hiragana: nil)
         return unless @analysis_pipeline.respond_to?(:audio_normalize=)
 
         @analysis_pipeline.audio_normalize = audio_normalize
@@ -248,6 +251,7 @@ module Vizcore
         @analysis_pipeline.fft_preview_bins = fft_preview_bins if @analysis_pipeline.respond_to?(:fft_preview_bins=)
         @analysis_pipeline.peak_hold_frames = peak_hold_frames if @analysis_pipeline.respond_to?(:peak_hold_frames=)
         @analysis_pipeline.silence_reset_frames = silence_reset_frames if @analysis_pipeline.respond_to?(:silence_reset_frames=)
+        @analysis_pipeline.japanese_hiragana = japanese_hiragana if @analysis_pipeline.respond_to?(:japanese_hiragana=)
       end
 
       # Apply a manual tap tempo event and lock analysis BPM when enough taps exist.

@@ -46,6 +46,7 @@ RSpec.describe Vizcore::LayerCatalog do
     params = described_class.params_for(:particles)
 
     expect(params).to include(count: "Integer", speed: "Float", palette: "Array<String>")
+    expect(described_class.mappable_params_for(:text)).to include(:content, :font_size, :letter_spacing, :glow_strength)
     expect(described_class.mappable_params_for(:particle_field)).to include(:speed, :size, :sparkle)
     expect(described_class.mappable_params_for(:svg)).to include(:scale, :rotation, :opacity)
     expect(described_class.mappable_params_for(:image)).to include(:scale, :rotation, :opacity)

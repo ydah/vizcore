@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "experimental"
+
 module Vizcore
   module Analysis
     # End-to-end analysis pipeline from PCM samples to renderer-ready features.
@@ -31,7 +33,8 @@ module Vizcore
       # @param fft_preview_bins [Integer] number of FFT preview bins included in payloads
       # @param peak_hold_frames [Integer] frames to hold per-band peak values
       # @param silence_reset_frames [Integer] silent frames before tempo state resets
-      def initialize(sample_rate: 44_100, fft_size: 1024, window: :hamming, beat_detector: nil, bpm_estimator: nil, smoother: nil, noise_gate: DEFAULT_NOISE_GATE, audio_normalize: nil, bpm: nil, bpm_lock: false, onset_sensitivity: 1.0, fft_preview_bins: DEFAULT_FFT_PREVIEW_BINS, peak_hold_frames: 0, silence_reset_frames: SILENCE_RESET_FRAMES)
+      # @param japanese_hiragana [Hash, true, false, nil] experimental hiragana guesser settings
+      def initialize(sample_rate: 44_100, fft_size: 1024, window: :hamming, beat_detector: nil, bpm_estimator: nil, smoother: nil, noise_gate: DEFAULT_NOISE_GATE, audio_normalize: nil, bpm: nil, bpm_lock: false, onset_sensitivity: 1.0, fft_preview_bins: DEFAULT_FFT_PREVIEW_BINS, peak_hold_frames: 0, silence_reset_frames: SILENCE_RESET_FRAMES, japanese_hiragana: nil)
         @fft_processor = FFTProcessor.new(sample_rate: sample_rate, fft_size: fft_size, window: window)
         @band_splitter = BandSplitter.new(sample_rate: sample_rate, fft_size: fft_size)
         @beat_detector = beat_detector || BeatDetector.new
@@ -53,6 +56,8 @@ module Vizcore
         @previous_onset_amplitude = 0.0
         @previous_onset_bands = {}
         @previous_flux_spectrum = nil
+        @analysis_frame_index = 0
+        self.japanese_hiragana = japanese_hiragana
       end
 
       # @param settings [Hash, nil]
@@ -94,13 +99,20 @@ module Vizcore
         @silence_reset_frames = normalize_integer(value, fallback: SILENCE_RESET_FRAMES, min: 1, max: 10_000)
       end
 
+      # @param settings [Hash, true, false, nil]
+      # @return [Vizcore::Analysis::Experimental::JapaneseHiraganaGuesser, nil]
+      def japanese_hiragana=(settings)
+        @japanese_hiragana = build_japanese_hiragana_guesser(settings)
+      end
+
       # @param samples [Array<Numeric>] audio frame samples
       # @return [Hash] normalized analysis payload consumed by frame broadcaster
       def call(samples)
+        timestamp_ms = next_analysis_timestamp_ms
         amplitude = rms(samples)
         if silence?(amplitude)
           track_silent_frame(samples)
-          return silent_frame(reset_tempo: sustained_silence?)
+          return silent_frame(reset_tempo: sustained_silence?, samples: samples, amplitude: amplitude, timestamp_ms: timestamp_ms)
         end
 
         @silent_frame_count = 0
@@ -122,16 +134,36 @@ module Vizcore
           bands: bands,
           fft: spectrum_preview
         )
-        band_peaks = update_band_peaks(normalized[:bands])
-        onsets = detect_onsets(amplitude: normalized[:amplitude], bands: normalized[:bands])
-        drums = detect_drum_sources(bands: normalized[:bands], onsets: onsets[:bands])
+        analysis_bands = analysis_bands_for(raw_bands: bands, normalized: normalized)
+        output = output_features_for(amplitude: amplitude, normalized: normalized)
+        band_peaks = update_band_peaks(output[:bands])
+        onsets = detect_onsets(amplitude: normalized[:amplitude], bands: analysis_bands)
+        drums = detect_drum_sources(bands: output[:bands], onsets: onsets[:bands])
+        japanese_hiragana = analyze_japanese_hiragana(
+          samples: samples,
+          fft: fft,
+          features: {
+            amplitude: normalized[:amplitude],
+            peak: peak,
+            bands: analysis_bands,
+            onset: onsets[:amplitude],
+            onsets: onsets[:bands],
+            spectral_centroid: spectral[:centroid],
+            spectral_rolloff: spectral[:rolloff],
+            spectral_flatness: spectral[:flatness],
+            spectral_flux: spectral[:flux],
+            zero_crossing_rate: zero_crossing_rate(samples),
+            peak_frequency: fft[:peak_frequency]
+          },
+          timestamp_ms: timestamp_ms
+        )
 
-        {
+        payload = {
           amplitude: @smoother.smooth(:amplitude, normalized[:amplitude]),
           peak: peak,
-          bands: @smoother.smooth_hash(normalized[:bands], namespace: :bands),
+          bands: @smoother.smooth_hash(output[:bands], namespace: :bands),
           band_peaks: band_peaks,
-          fft: @smoother.smooth_array(normalized[:fft], namespace: :fft),
+          fft: @smoother.smooth_array(output[:fft], namespace: :fft),
           onset: onsets[:amplitude],
           onsets: onsets[:bands],
           drums: drums,
@@ -156,6 +188,8 @@ module Vizcore
           zero_crossing_rate: zero_crossing_rate(samples),
           peak_frequency: fft[:peak_frequency]
         }
+        payload[:japanese_hiragana] = japanese_hiragana if japanese_hiragana
+        payload
       end
 
       private
@@ -211,7 +245,9 @@ module Vizcore
           window_size: normalization_window_size(settings),
           target: settings.fetch(:target, AdaptiveNormalizer::DEFAULT_TARGET),
           floor: settings.fetch(:floor, AdaptiveNormalizer::DEFAULT_FLOOR),
-          per_band: settings.fetch(:per_band, false)
+          per_band: settings.fetch(:per_band, false),
+          scale_bands: settings.fetch(:scale_bands, true),
+          scale_fft: settings.fetch(:scale_fft, true)
         )
       end
 
@@ -226,10 +262,67 @@ module Vizcore
         AdaptiveNormalizer::DEFAULT_WINDOW_SIZE
       end
 
+      def build_japanese_hiragana_guesser(settings)
+        return nil if settings.nil? || settings == false
+
+        values = settings == true ? { enabled: true } : symbolize_hash(settings)
+        return nil if values.empty? || values[:enabled] == false
+        return nil unless values[:enabled]
+
+        options = values.dup
+        options.delete(:enabled)
+        options[:silence_gate] = @noise_gate if options[:silence_gate].nil?
+        Experimental::JapaneseHiraganaGuesser.new(
+          sample_rate: @fft_processor.sample_rate,
+          frame_size: @fft_processor.fft_size,
+          **options
+        )
+      end
+
       def normalize_features(amplitude:, bands:, fft:)
         return { amplitude: amplitude, bands: bands, fft: fft } unless @normalizer
 
         @normalizer.call(amplitude: amplitude, bands: bands, fft: fft)
+      end
+
+      def analysis_bands_for(raw_bands:, normalized:)
+        gain = normalized[:gain].to_f
+        return normalize_band_values(raw_bands, gain) if gain.positive? && @audio_normalize.fetch(:scale_bands, true) == false
+
+        normalize_band_values(normalized[:bands], 1.0)
+      end
+
+      def output_features_for(amplitude:, normalized:)
+        output = {
+          bands: normalize_band_values(normalized[:bands], 1.0),
+          fft: normalize_array_values(normalized[:fft])
+        }
+        return output unless output_band_silence?(amplitude)
+
+        output.merge(bands: zero_bands, fft: Array.new(output[:fft].length, 0.0))
+      end
+
+      def output_band_silence?(amplitude)
+        gate = @audio_normalize[:band_gate]
+        return false if gate.nil?
+
+        Float(amplitude) < Float(gate)
+      rescue ArgumentError, TypeError
+        false
+      end
+
+      def normalize_band_values(values, gain)
+        zero_bands.merge(symbolize_hash(values)).transform_values do |value|
+          (Float(value) * gain.to_f).clamp(0.0, 1.0)
+        end
+      rescue StandardError
+        zero_bands
+      end
+
+      def normalize_array_values(values)
+        Array(values).map { |value| Float(value).clamp(0.0, 1.0) }
+      rescue StandardError
+        []
       end
 
       def update_band_peaks(bands)
@@ -291,7 +384,7 @@ module Vizcore
         0.0
       end
 
-      def silent_frame(reset_tempo:)
+      def silent_frame(reset_tempo:, samples:, amplitude:, timestamp_ms:)
         @beat_pulse = 0.0
         reset_tempo_state if reset_tempo
         tempo = tempo_features(beat_detected: false, beat_count: current_beat_count, bpm: @last_bpm, advance: !reset_tempo)
@@ -301,7 +394,7 @@ module Vizcore
         @previous_onset_bands = {}
         @previous_flux_spectrum = nil
 
-        {
+        payload = {
           amplitude: 0.0,
           peak: 0.0,
           bands: zero_bands,
@@ -331,6 +424,40 @@ module Vizcore
           zero_crossing_rate: 0.0,
           peak_frequency: 0.0
         }
+        japanese_hiragana = analyze_japanese_hiragana(
+          samples: samples,
+          fft: nil,
+          features: {
+            amplitude: amplitude,
+            peak: 0.0,
+            bands: zero_bands,
+            onset: 0.0,
+            onsets: { sub: 0.0, low: 0.0, mid: 0.0, high: 0.0 },
+            spectral_centroid: 0.0,
+            spectral_rolloff: 0.0,
+            spectral_flatness: 0.0,
+            spectral_flux: 0.0,
+            zero_crossing_rate: 0.0,
+            peak_frequency: 0.0
+          },
+          timestamp_ms: timestamp_ms
+        )
+        payload[:japanese_hiragana] = japanese_hiragana if japanese_hiragana
+        payload
+      end
+
+      def analyze_japanese_hiragana(samples:, fft:, features:, timestamp_ms:)
+        return nil unless @japanese_hiragana
+
+        @japanese_hiragana.call(samples: samples, fft: fft, features: features, timestamp_ms: timestamp_ms)
+      rescue StandardError
+        @japanese_hiragana.silent_result(timestamp_ms: timestamp_ms)
+      end
+
+      def next_analysis_timestamp_ms
+        timestamp = @analysis_frame_index * 1000.0 / @analysis_frame_rate
+        @analysis_frame_index += 1
+        timestamp
       end
 
       def reset_tempo_state

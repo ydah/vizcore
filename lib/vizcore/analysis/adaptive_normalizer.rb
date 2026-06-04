@@ -12,11 +12,15 @@ module Vizcore
       # @param target [Numeric] desired level for the rolling peak
       # @param floor [Numeric] minimum peak level used when calculating gain
       # @param per_band [Boolean] true when band levels should track independent peaks
-      def initialize(window_size: DEFAULT_WINDOW_SIZE, target: DEFAULT_TARGET, floor: DEFAULT_FLOOR, per_band: false)
+      # @param scale_bands [Boolean] false when band ratios should stay unamplified
+      # @param scale_fft [Boolean] false when FFT preview values should stay unamplified
+      def initialize(window_size: DEFAULT_WINDOW_SIZE, target: DEFAULT_TARGET, floor: DEFAULT_FLOOR, per_band: false, scale_bands: true, scale_fft: true)
         @window_size = normalize_window_size(window_size)
         @target = normalize_unit(target, DEFAULT_TARGET)
         @floor = normalize_unit(floor, DEFAULT_FLOOR)
         @per_band = !!per_band
+        @scale_bands = !!scale_bands
+        @scale_fft = !!scale_fft
         @history = []
         @band_history = Hash.new { |history, key| history[key] = [] }
       end
@@ -59,7 +63,14 @@ module Vizcore
         {}
       end
 
+      def normalize_hash(values)
+        Hash(values).transform_values { |value| normalize_unit(value, 0.0) }
+      rescue StandardError
+        {}
+      end
+
       def normalize_bands(values, amplitude_gain)
+        return normalize_hash(values) unless @scale_bands
         return scale_hash(values, amplitude_gain) unless @per_band
 
         Hash(values).each_with_object({}) do |(key, value), output|
@@ -75,7 +86,7 @@ module Vizcore
       end
 
       def scale_array(values, gain)
-        Array(values).map { |value| scale_value(value, gain) }
+        Array(values).map { |value| @scale_fft ? scale_value(value, gain) : normalize_unit(value, 0.0) }
       end
 
       def scale_value(value, gain)

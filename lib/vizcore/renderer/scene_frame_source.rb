@@ -230,7 +230,8 @@ module Vizcore
           onset_sensitivity: analysis_setting(:onset_sensitivity, 1.0),
           fft_preview_bins: analysis_setting(:fft_bins, Vizcore::Analysis::Pipeline::DEFAULT_FFT_PREVIEW_BINS),
           peak_hold_frames: analysis_setting(:peak_hold_frames, 0),
-          silence_reset_frames: analysis_setting(:silence_reset_frames, Vizcore::Analysis::Pipeline::SILENCE_RESET_FRAMES)
+          silence_reset_frames: analysis_setting(:silence_reset_frames, Vizcore::Analysis::Pipeline::SILENCE_RESET_FRAMES),
+          japanese_hiragana: japanese_hiragana_setting
         )
       end
 
@@ -276,6 +277,12 @@ module Vizcore
         @config.bpm_lock? || !!Hash(@definition[:analysis] || {})[:bpm_lock]
       rescue StandardError
         @config.bpm_lock?
+      end
+
+      def japanese_hiragana_setting
+        return { enabled: true } if @config.voice_kana?
+
+        analysis_setting(:japanese_hiragana, nil)
       end
 
       def supported_fft_size(size)

@@ -16,6 +16,21 @@ test("buildAudioInspectorState clamps audio meters and fft bins", () => {
     bar_count: 3,
     phrase_count: 1,
     peak_frequency: 440.4,
+    japanese_hiragana: {
+      text: "か",
+      confidence: 0.63,
+      vowel: "a",
+      vowel_confidence: 0.78,
+      consonant: "k",
+      consonant_confidence: 0.49,
+      stable: true,
+      silence: false,
+      candidates: [
+        { text: "か", confidence: 0.63 },
+        { text: "た", confidence: 0.41 },
+        { text: "あ", confidence: 1.4 },
+      ],
+    },
   }, 4);
 
   assert.equal(state.amplitude, 1);
@@ -29,6 +44,22 @@ test("buildAudioInspectorState clamps audio meters and fft bins", () => {
   assert.equal(state.barCount, 3);
   assert.equal(state.phraseCount, 1);
   assert.equal(state.peakFrequency, 440.4);
+  assert.deepEqual(state.hiragana, {
+    enabled: true,
+    text: "か",
+    confidence: 0.63,
+    vowel: "a",
+    vowelConfidence: 0.78,
+    consonant: "k",
+    consonantConfidence: 0.49,
+    stable: true,
+    silence: false,
+    candidates: [
+      { text: "か", confidence: 0.63 },
+      { text: "た", confidence: 0.41 },
+      { text: "あ", confidence: 1 },
+    ],
+  });
 });
 
 test("formatMeterValue produces stable numeric labels", () => {

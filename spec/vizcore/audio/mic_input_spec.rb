@@ -117,6 +117,7 @@ RSpec.describe Vizcore::Audio::MicInput do
     mic.start
 
     expect(mic.using_fallback?).to eq(true)
+    expect(mic.last_error&.message).to eq("Microphone stream open failed")
     expect(fallback.started).to eq(true)
     expect(mic.read(4)).to eq([0.7, 0.6, 0.5, 0.4])
   ensure

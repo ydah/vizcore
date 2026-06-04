@@ -78,7 +78,9 @@ module Vizcore
           frame_size: frame_size,
           ring_buffer: ring_buffer.respond_to?(:metrics) ? ring_buffer.metrics : {},
           requested_sample_rate: @requested_sample_rate,
-          sample_rate_mismatch: sample_rate_mismatch?
+          sample_rate_mismatch: sample_rate_mismatch?,
+          using_fallback: input_using_fallback?,
+          last_error: input_last_error
         }
       end
 
@@ -164,6 +166,22 @@ module Vizcore
         Integer(@input.stream_sample_rate) != Integer(@requested_sample_rate)
       rescue StandardError
         false
+      end
+
+      def input_using_fallback?
+        return false unless @input.respond_to?(:using_fallback?)
+
+        !!@input.using_fallback?
+      rescue StandardError
+        false
+      end
+
+      def input_last_error
+        return nil unless @input.respond_to?(:last_error)
+
+        @input.last_error&.message
+      rescue StandardError
+        nil
       end
     end
   end

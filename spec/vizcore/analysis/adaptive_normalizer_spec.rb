@@ -41,4 +41,18 @@ RSpec.describe Vizcore::Analysis::AdaptiveNormalizer do
     expect(result[:bands]).to eq(low: 0.8, mid: 0.8)
     expect(result[:fft]).to eq([0.4])
   end
+
+  it "can leave band and fft ratios unamplified while normalizing amplitude" do
+    normalizer = described_class.new(window_size: 4, target: 0.8, floor: 0.05, scale_bands: false, scale_fft: false)
+
+    result = normalizer.call(
+      amplitude: 0.2,
+      bands: { low: 0.1, mid: 0.3 },
+      fft: [0.05, 0.25]
+    )
+
+    expect(result[:amplitude]).to eq(0.8)
+    expect(result[:bands]).to eq(low: 0.1, mid: 0.3)
+    expect(result[:fft]).to eq([0.05, 0.25])
+  end
 end

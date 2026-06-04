@@ -249,6 +249,19 @@
       text-transform: none;
     }
 
+    .audio-inspector__kana,
+    .audio-inspector__kana-detail {
+      margin: 0.18rem 0;
+      color: #d9e8ff;
+      font-size: 0.72rem;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.35;
+    }
+
+    .audio-inspector__kana-detail {
+      color: var(--muted);
+    }
+
     .audio-meter {
       margin-top: 0.24rem;
       color: #aebfda;
@@ -474,6 +487,8 @@
           <span>Audio</span>
           <span id="inspector-peak">Peak: --</span>
         </div>
+        <p id="inspector-hiragana" class="audio-inspector__kana" hidden>Hiragana: --</p>
+        <p id="inspector-hiragana-detail" class="audio-inspector__kana-detail" hidden>Vowel: -- | Consonant: -- | Candidates: --</p>
         <div class="audio-meter">
           <span>amp</span>
           <span class="meter-track"><span id="inspector-amplitude-fill" class="meter-fill"></span></span>

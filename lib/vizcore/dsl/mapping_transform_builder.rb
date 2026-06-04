@@ -73,6 +73,24 @@ module Vizcore
         @values[:hold] = value
       end
 
+      # @param value [String]
+      # @return [String]
+      def fallback(value)
+        @values[:fallback] = value
+      end
+
+      # @param value [String]
+      # @return [String]
+      def prefix(value)
+        @values[:prefix] = value
+      end
+
+      # @param value [String]
+      # @return [String]
+      def suffix(value)
+        @values[:suffix] = value
+      end
+
       # @param value [Numeric] per-frame decay multiplier
       # @return [Numeric]
       def decay(value)

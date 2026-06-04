@@ -24,6 +24,7 @@ export const buildAudioInspectorState = (audio, fftBins = DEFAULT_FFT_BINS) => {
     barCount: Math.max(0, Number(audio?.bar_count || 0) || 0),
     phraseCount: Math.max(0, Number(audio?.phrase_count || 0) || 0),
     peakFrequency: Math.max(0, Number(audio?.peak_frequency || 0) || 0),
+    hiragana: normalizeHiragana(audio?.japanese_hiragana),
   };
 };
 
@@ -38,6 +39,33 @@ export const formatMeterValue = (value, digits = 2) => {
 const normalizeFft = (value, size) => {
   const input = Array.isArray(value) || ArrayBuffer.isView(value) ? Array.from(value) : [];
   return Array.from({ length: size }, (_entry, index) => clamp01(input[index]));
+};
+
+const normalizeHiragana = (value) => {
+  const source = value && typeof value === "object" ? value : null;
+  const candidates = Array.isArray(source?.candidates) ? source.candidates : [];
+  return {
+    enabled: !!source,
+    text: stringValue(source?.text),
+    confidence: clamp01(source?.confidence),
+    vowel: stringValue(source?.vowel),
+    vowelConfidence: clamp01(source?.vowel_confidence),
+    consonant: stringValue(source?.consonant),
+    consonantConfidence: clamp01(source?.consonant_confidence),
+    stable: !!source?.stable,
+    silence: !!source?.silence,
+    candidates: candidates.slice(0, 3).map((candidate) => ({
+      text: stringValue(candidate?.text),
+      confidence: clamp01(candidate?.confidence),
+    })).filter((candidate) => candidate.text),
+  };
+};
+
+const stringValue = (value) => {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  return String(value);
 };
 
 const clamp01 = (value) => {

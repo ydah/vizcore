@@ -18,7 +18,11 @@ module Vizcore
         amplitude peak frequency_band frequency_band_peak fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
         beat_phase beat_2 beat_4 beat_8 beat_triplet triplet bar_phase bar_count phrase_count bpm_confidence
         spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate global lfo adsr envelope
+        hiragana hiragana_text hiragana_confidence hiragana_vowel hiragana_vowel_index hiragana_vowel_confidence
+        hiragana_consonant hiragana_consonant_confidence hiragana_changed hiragana_stable hiragana_silence hiragana_age_ms
       ].freeze
+      STRING_MAPPING_SOURCE_KINDS = %i[hiragana hiragana_text hiragana_vowel hiragana_consonant].freeze
+      STRING_MAPPING_TRANSFORM_KEYS = %i[hold fallback prefix suffix].freeze
       PATH_DEFAULT_DETAIL = 32
       PATH_MIN_DETAIL = 4
       PATH_MAX_DETAIL = 128
@@ -922,6 +926,66 @@ module Vizcore
         mapping_source(:zero_crossing_rate)
       end
 
+      # @return [Hash] source descriptor for guessed hiragana display text
+      def hiragana
+        mapping_source(:hiragana)
+      end
+
+      # @return [Hash] source descriptor for guessed hiragana display text
+      def hiragana_text
+        mapping_source(:hiragana_text)
+      end
+
+      # @return [Hash] source descriptor for hiragana confidence
+      def hiragana_confidence
+        mapping_source(:hiragana_confidence)
+      end
+
+      # @return [Hash] source descriptor for guessed vowel label
+      def hiragana_vowel
+        mapping_source(:hiragana_vowel)
+      end
+
+      # @return [Hash] source descriptor for guessed vowel index
+      def hiragana_vowel_index
+        mapping_source(:hiragana_vowel_index)
+      end
+
+      # @return [Hash] source descriptor for guessed vowel confidence
+      def hiragana_vowel_confidence
+        mapping_source(:hiragana_vowel_confidence)
+      end
+
+      # @return [Hash] source descriptor for guessed consonant label
+      def hiragana_consonant
+        mapping_source(:hiragana_consonant)
+      end
+
+      # @return [Hash] source descriptor for guessed consonant confidence
+      def hiragana_consonant_confidence
+        mapping_source(:hiragana_consonant_confidence)
+      end
+
+      # @return [Hash] source descriptor that is true on frames where text changed
+      def hiragana_changed
+        mapping_source(:hiragana_changed)
+      end
+
+      # @return [Hash] source descriptor that is true when output is stable
+      def hiragana_stable
+        mapping_source(:hiragana_stable)
+      end
+
+      # @return [Hash] source descriptor that is true during silence
+      def hiragana_silence
+        mapping_source(:hiragana_silence)
+      end
+
+      # @return [Hash] source descriptor for current hiragana age in milliseconds
+      def hiragana_age_ms
+        mapping_source(:hiragana_age_ms)
+      end
+
       # @param name [Symbol, String] runtime global value name
       # @return [Hash] source descriptor for mutable runtime globals
       def global(name)
@@ -1524,6 +1588,7 @@ module Vizcore
       end
 
       def build_mapping(source:, target:, transform: {})
+        validate_mapping_transform!(source, transform)
         output = { source: source, target: target.to_sym }
         output[:transform] = transform unless transform.empty?
         output
@@ -1564,7 +1629,7 @@ module Vizcore
         raise ArgumentError, "param min must be less than or equal to max"
       end
 
-      def normalize_transform(gain: nil, range: nil, min: nil, max: nil, curve: nil, attack: nil, release: nil, deadzone: nil, threshold: nil, hysteresis: nil, hold: nil, decay: nil, cooldown: nil, one_shot: nil, as: nil)
+      def normalize_transform(gain: nil, range: nil, min: nil, max: nil, curve: nil, attack: nil, release: nil, deadzone: nil, threshold: nil, hysteresis: nil, hold: nil, decay: nil, cooldown: nil, one_shot: nil, as: nil, fallback: nil, prefix: nil, suffix: nil)
         range_min, range_max = normalize_range(range, context: "mapping")
         min = range_min if min.nil?
         max = range_max if max.nil?
@@ -1584,7 +1649,26 @@ module Vizcore
         output[:decay] = clamp(normalize_float(decay, :decay), 0.0, 1.0) unless decay.nil?
         output[:cooldown] = normalize_non_negative_float(cooldown, :cooldown) unless cooldown.nil?
         output[:one_shot] = !!one_shot unless one_shot.nil?
+        output[:fallback] = fallback.to_s unless fallback.nil?
+        output[:prefix] = prefix.to_s unless prefix.nil?
+        output[:suffix] = suffix.to_s unless suffix.nil?
         output
+      end
+
+      def validate_mapping_transform!(source, transform)
+        kind = source[:kind]&.to_sym
+        transform_keys = transform.keys.map(&:to_sym)
+        if STRING_MAPPING_SOURCE_KINDS.include?(kind)
+          invalid = transform_keys - STRING_MAPPING_TRANSFORM_KEYS
+          return if invalid.empty?
+
+          raise ArgumentError, "string mapping source #{kind} only supports transforms: #{STRING_MAPPING_TRANSFORM_KEYS.join(', ')}"
+        end
+
+        text_only = transform_keys & %i[fallback prefix suffix]
+        return if text_only.empty?
+
+        raise ArgumentError, "mapping transforms fallback, prefix, and suffix require a string mapping source"
       end
 
       def normalize_range(value, context:)

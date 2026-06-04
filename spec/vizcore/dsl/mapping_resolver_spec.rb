@@ -39,6 +39,17 @@ RSpec.describe Vizcore::DSL::MappingResolver do
             { source: { kind: :spectral_flatness }, target: :noise },
             { source: { kind: :spectral_flux }, target: :flux },
             { source: { kind: :zero_crossing_rate }, target: :crossings },
+            { source: { kind: :hiragana }, target: :kana },
+            { source: { kind: :hiragana_confidence }, target: :kana_confidence },
+            { source: { kind: :hiragana_vowel }, target: :kana_vowel },
+            { source: { kind: :hiragana_vowel_index }, target: :kana_vowel_index },
+            { source: { kind: :hiragana_vowel_confidence }, target: :kana_vowel_confidence },
+            { source: { kind: :hiragana_consonant }, target: :kana_consonant },
+            { source: { kind: :hiragana_consonant_confidence }, target: :kana_consonant_confidence },
+            { source: { kind: :hiragana_changed }, target: :kana_changed },
+            { source: { kind: :hiragana_stable }, target: :kana_stable },
+            { source: { kind: :hiragana_silence }, target: :kana_silence },
+            { source: { kind: :hiragana_age_ms }, target: :kana_age },
             { source: { kind: :global, name: :intensity }, target: :global_intensity },
             { source: { kind: :lfo, wave: :triangle, rate: 0.5, phase: 0.0 }, target: :lfo_value }
           ]
@@ -71,7 +82,20 @@ RSpec.describe Vizcore::DSL::MappingResolver do
         spectral_rolloff: 4_500.0,
         spectral_flatness: 0.33,
         spectral_flux: 0.27,
-        zero_crossing_rate: 0.08
+        zero_crossing_rate: 0.08,
+        japanese_hiragana: {
+          text: "か",
+          confidence: 0.63,
+          vowel: "a",
+          vowel_index: 0,
+          vowel_confidence: 0.78,
+          consonant: "k",
+          consonant_confidence: 0.49,
+          changed: true,
+          stable: true,
+          silence: false,
+          age_ms: 84
+        }
       }
 
       resolved = resolver.resolve_layers(scene_layers: scene_layers, audio: audio, globals: { intensity: 0.66 }, time: 0.5)
@@ -108,9 +132,45 @@ RSpec.describe Vizcore::DSL::MappingResolver do
         noise: 0.33,
         flux: 0.27,
         crossings: 0.08,
+        kana: "か",
+        kana_confidence: 0.63,
+        kana_vowel: "a",
+        kana_vowel_index: 0,
+        kana_vowel_confidence: 0.78,
+        kana_consonant: "k",
+        kana_consonant_confidence: 0.49,
+        kana_changed: true,
+        kana_stable: true,
+        kana_silence: false,
+        kana_age: 84,
         global_intensity: 0.66,
         lfo_value: 0.5
       )
+    end
+
+    it "applies text transforms to hiragana string mappings" do
+      resolver = described_class.new
+      scene_layers = [
+        {
+          name: :caption,
+          type: :text,
+          params: {},
+          mappings: [
+            {
+              source: { kind: :hiragana },
+              target: :content,
+              transform: { fallback: "…", prefix: "「", suffix: "」" }
+            }
+          ]
+        }
+      ]
+
+      resolved = resolver.resolve_layers(
+        scene_layers: scene_layers,
+        audio: { japanese_hiragana: { text: "し" } }
+      )
+
+      expect(resolved[0][:params][:content]).to eq("「し」")
     end
 
     it "preserves custom shader source payload for frontend compilation" do

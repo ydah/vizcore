@@ -9,7 +9,7 @@ RSpec.describe Vizcore::DSL::Engine do
     it "builds scenes and layers from the DSL block" do
       definition = described_class.define do
         audio :mic, device: :default, sample_rate: 44_100
-        audio_normalize mode: :adaptive, window: 3.0, target: 0.8, floor: 0.05, per_band: true
+        audio_normalize mode: :adaptive, window: 3.0, target: 0.8, floor: 0.05, per_band: true, scale_bands: false, scale_fft: false, band_gate: 0.02
         audio_analysis onset_sensitivity: 1.4, fft_bins: 64, peak_hold: 3, silence_reset_frames: 120
         bpm 128
         bpm_lock true
@@ -35,7 +35,7 @@ RSpec.describe Vizcore::DSL::Engine do
 
       expect(definition[:audio]).to eq([{ name: :mic, options: { device: :default, sample_rate: 44_100 } }])
       expect(definition[:analysis]).to eq(
-        audio_normalize: { mode: :adaptive, window: 3.0, target: 0.8, floor: 0.05, per_band: true },
+        audio_normalize: { mode: :adaptive, window: 3.0, target: 0.8, floor: 0.05, per_band: true, scale_bands: false, scale_fft: false, band_gate: 0.02 },
         onset_sensitivity: 1.4,
         fft_bins: 64,
         peak_hold_frames: 3,
@@ -181,6 +181,54 @@ RSpec.describe Vizcore::DSL::Engine do
           transform: { as: :trigger, cooldown: 0.5, one_shot: true }
         }
       )
+    end
+
+    it "stores experimental japanese hiragana settings and content mappings" do
+      definition = described_class.define do
+        experimental_japanese_hiragana enabled: true, min_confidence: 0.32, hold_ms: 240, debug: true
+
+        scene :voice_kana do
+          layer :kana_text do
+            type :text
+            content "…"
+            map hiragana, to: :content, fallback: "…"
+            map hiragana_confidence, to: :opacity, range: 0.15..1.0
+          end
+        end
+      end
+
+      expect(definition[:analysis][:japanese_hiragana]).to include(
+        enabled: true,
+        min_confidence: 0.32,
+        hold_ms: 240,
+        debug: true
+      )
+      layer = definition[:scenes].first[:layers].first
+      expect(layer[:mappings]).to include(
+        {
+          source: { kind: :hiragana },
+          target: :content,
+          transform: { fallback: "…" }
+        },
+        {
+          source: { kind: :hiragana_confidence },
+          target: :opacity,
+          transform: { min: 0.15, max: 1.0 }
+        }
+      )
+    end
+
+    it "rejects numeric transforms on hiragana string mappings" do
+      expect do
+        described_class.define do
+          scene :bad do
+            layer :text do
+              type :text
+              map hiragana, to: :content, gain: 2.0
+            end
+          end
+        end
+      end.to raise_error(ArgumentError, /string mapping source hiragana/)
     end
 
     it "builds extended audio feature mapping sources" do

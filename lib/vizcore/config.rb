@@ -37,6 +37,7 @@ module Vizcore
     # @param osc_port [Integer, nil] UDP port for OSC control sync
     # @param reload [Boolean] true when scene file changes should be reloaded while running
     # @param projector_mode [Boolean] true when the browser should hide operator UI by default
+    # @param voice_kana [Boolean] true when voice-to-kana analysis should be enabled from CLI
     # @param scene_switch_effect [Hash, nil] transition metadata applied to manual scene switches
     # @param allow_public_control [Boolean] true when binding operator control routes on a public host is intentional
     def initialize(
@@ -55,6 +56,7 @@ module Vizcore
       osc_port: nil,
       reload: DEFAULT_RELOAD,
       projector_mode: false,
+      voice_kana: false,
       scene_switch_effect: nil,
       scene_switch_effect_duration: nil,
       allow_public_control: false
@@ -74,6 +76,7 @@ module Vizcore
       @osc_port = normalize_optional_port(osc_port)
       @reload = !!reload
       @projector_mode = !!projector_mode
+      @voice_kana = !!voice_kana
       @scene_switch_effect = normalize_scene_switch_effect(scene_switch_effect, scene_switch_effect_duration)
       @allow_public_control = !!allow_public_control
     end
@@ -86,6 +89,11 @@ module Vizcore
     # @return [Boolean] true when browser output should start without operator UI.
     def projector?
       projector_mode
+    end
+
+    # @return [Boolean] true when CLI explicitly enables voice-to-kana analysis.
+    def voice_kana?
+      @voice_kana
     end
 
     # @return [Boolean] true when scene hot reload is enabled.

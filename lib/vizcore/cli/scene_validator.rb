@@ -16,7 +16,11 @@ module Vizcore
         amplitude peak frequency_band frequency_band_peak fft_spectrum onset kick snare hihat beat beat_confidence beat_pulse beat_count bpm
         beat_phase beat_2 beat_4 beat_8 beat_triplet triplet bar_phase bar_count phrase_count bpm_confidence
         spectral_centroid spectral_rolloff spectral_flatness spectral_flux zero_crossing_rate global lfo adsr envelope
+        hiragana hiragana_text hiragana_confidence hiragana_vowel hiragana_vowel_index hiragana_vowel_confidence
+        hiragana_consonant hiragana_consonant_confidence hiragana_changed hiragana_stable hiragana_silence hiragana_age_ms
       ].freeze
+      STRING_MAPPING_SOURCE_KINDS = %i[hiragana hiragana_text hiragana_vowel hiragana_consonant].freeze
+      STRING_MAPPING_TRANSFORM_KEYS = %i[hold fallback prefix suffix].freeze
 
       LFO_WAVES = %i[sine triangle saw square].freeze
       FREQUENCY_BANDS = %i[sub low mid high].freeze
@@ -294,8 +298,8 @@ module Vizcore
 
           validate_mapping_source(kind, source, scene_name, layer_name, issues)
           issues << error("scene #{scene_name} layer #{layer_name} has mapping without target", code: "E_MAPPING_TARGET_MISSING") unless mapping[:target]
-          validate_mapping_target(mapping[:target], layer, scene_name, layer_name, issues)
-          validate_transform(Hash(mapping[:transform] || {}), scene_name, layer_name, mapping[:target], issues)
+          validate_mapping_target(mapping[:target], layer, kind, scene_name, layer_name, issues)
+          validate_transform(Hash(mapping[:transform] || {}), scene_name, layer_name, mapping[:target], issues, source_kind: kind)
         end
       end
 
@@ -431,7 +435,9 @@ module Vizcore
         end
       end
 
-      def validate_transform(transform, scene_name, layer_name, target, issues)
+      def validate_transform(transform, scene_name, layer_name, target, issues, source_kind: nil)
+        validate_string_mapping_transform(transform, source_kind, scene_name, layer_name, target, issues)
+
         if transform.key?(:as)
           mode = transform[:as]
           mode_value = mode.respond_to?(:to_sym) ? mode.to_sym : nil
@@ -446,6 +452,28 @@ module Vizcore
         issues << error("scene #{scene_name} layer #{layer_name} mapping #{target} has min greater than max", code: "E_MAPPING_RANGE")
       rescue ArgumentError, TypeError
         issues << error("scene #{scene_name} layer #{layer_name} mapping #{target} has non-numeric min/max", code: "E_MAPPING_RANGE")
+      end
+
+      def validate_string_mapping_transform(transform, source_kind, scene_name, layer_name, target, issues)
+        transform_keys = transform.keys.map(&:to_sym)
+        unless STRING_MAPPING_SOURCE_KINDS.include?(source_kind)
+          text_only = transform_keys & %i[fallback prefix suffix]
+          return if text_only.empty?
+
+          issues << error(
+            "scene #{scene_name} layer #{layer_name} mapping #{target} uses string-only transform on non-string source: #{text_only.sort.join(', ')}",
+            code: "E_STRING_MAPPING_TRANSFORM"
+          )
+          return
+        end
+
+        invalid = transform_keys - STRING_MAPPING_TRANSFORM_KEYS
+        return if invalid.empty?
+
+        issues << error(
+          "scene #{scene_name} layer #{layer_name} mapping #{target} uses numeric transform on string source: #{invalid.sort.join(', ')}",
+          code: "E_STRING_MAPPING_TRANSFORM"
+        )
       end
 
       def validate_transitions(transitions, names, issues)
@@ -656,13 +684,29 @@ module Vizcore
         nil
       end
 
-      def validate_mapping_target(target, layer, scene_name, layer_name, issues)
+      def validate_mapping_target(target, layer, source_kind, scene_name, layer_name, issues)
         value = target.to_s
+        validate_text_content_mapping_target(value, layer, source_kind, scene_name, layer_name, issues)
         return unless value.start_with?("shapes.")
 
         validate_shape_mapping_target(value, layer, scene_name, layer_name, issues)
       rescue StandardError
         issues << error("scene #{scene_name} layer #{layer_name} mapping #{target} has invalid target", code: "E_MAPPING_TARGET")
+      end
+
+      def validate_text_content_mapping_target(target, layer, source_kind, scene_name, layer_name, issues)
+        return unless target == "content"
+
+        layer_type = (layer[:type] || layer["type"] || :geometry).to_sym
+        unless Vizcore::LayerCatalog.capability_for(layer_type)&.type == :text
+          issues << error("scene #{scene_name} layer #{layer_name} maps content on non-text layer", code: "E_MAPPING_TARGET")
+        end
+
+        return if STRING_MAPPING_SOURCE_KINDS.include?(source_kind)
+
+        issues << error("scene #{scene_name} layer #{layer_name} maps non-string source #{source_kind} to text content", code: "E_TEXT_CONTENT_MAPPING_SOURCE")
+      rescue StandardError
+        issues << error("scene #{scene_name} layer #{layer_name} mapping #{target} has invalid text content target", code: "E_MAPPING_TARGET")
       end
 
       def validate_shape_mapping_target(target, layer, scene_name, layer_name, issues)
