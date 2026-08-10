@@ -1,5 +1,10 @@
 import fs from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../frontend");
+const requireFromFrontend = createRequire(path.join(frontendRoot, "package.json"));
 
 const options = parseArgs(process.argv.slice(2));
 
@@ -10,9 +15,9 @@ if (!options.url) {
 
 let chromium;
 try {
-  ({ chromium } = await import("playwright"));
+  ({ chromium } = requireFromFrontend("playwright"));
 } catch {
-  console.error("Playwright is required for browser capture. Install it with `npm install -D playwright` in the frontend project.");
+  console.error("Playwright is required for browser capture. Install it with `npm install --prefix frontend`.");
   process.exit(2);
 }
 

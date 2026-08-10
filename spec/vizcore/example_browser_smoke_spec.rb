@@ -5,8 +5,9 @@ require "pathname"
 require "tmpdir"
 
 EXAMPLE_BROWSER_SMOKE_REQUIRED = ENV["VIZCORE_BROWSER_SMOKE_REQUIRED"] == "1"
+EXAMPLE_BROWSER_FRONTEND_ROOT = File.expand_path("frontend", Dir.pwd)
 EXAMPLE_BROWSER_NODE_ENV = begin
-  node_modules = File.expand_path("frontend/node_modules", Dir.pwd)
+  node_modules = File.join(EXAMPLE_BROWSER_FRONTEND_ROOT, "node_modules")
   if File.directory?(node_modules)
     fallback = ENV["NODE_PATH"]
     { "NODE_PATH" => fallback.to_s.empty? ? node_modules : "#{node_modules}#{File::PATH_SEPARATOR}#{fallback}" }
@@ -21,7 +22,8 @@ def example_browser_playwright_available?
     "node",
     "--input-type=module",
     "-e",
-    "import('playwright').then(() => process.exit(0)).catch(() => process.exit(1))"
+    "import('playwright').then(() => process.exit(0)).catch(() => process.exit(1))",
+    chdir: EXAMPLE_BROWSER_FRONTEND_ROOT
   )
 
   status.success?
@@ -53,8 +55,7 @@ elsif !example_browser_playwright_available?
     it "requires Playwright and browser dependencies to run" do
       raise <<~MSG
         Playwright is required for example browser smoke capture.
-        Install with: npm install --prefix frontend
-        and export NODE_PATH=$PWD/frontend/node_modules (or use the CI task).
+        Install with: npm install --prefix frontend (or use the CI task).
       MSG
     end
   end
